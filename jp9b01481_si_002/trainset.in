@@ -1,0 +1,586 @@
+CHARGE
+#Keyw Weight Atom (a5,1x,f6.2,1x,i4)
+sih3          0.1  1   0.34                      
+SiOH4_opt     0.1  1  -0.597
+SiOH4_opt     0.02 2   1.068
+SiOH4_opt     0.1  7   0.336
+quartz_geo    0.1  1   1.4000
+Si_SiH3_1_OH_3_opt   0.02 2   0.93878
+Si_SiH3_2_OH_2_opt   0.02 2   0.77585
+Si_SiH3_3_OH_1_opt   0.02 1   0.36661
+Si_SiH3_4_opt        0.02 1  -0.23921
+ENDCHARGE
+HEATFO
+#Keyw Weight Lit# (a5,1x,f6.2,f10.4)
+ENDHEATFO
+GEOMETRY
+#Keyw Weight At1 At2 At3 At4 #Lit (a5,1x,f6.2,1x,4i4,f10.4)
+H3SiOH_opt       2.00   1   2   3     112.3
+SiH4_opt         2.00   2   1   3     109.5
+H2SiOH2_opt      0.02   1   2           1.66 
+H2SiOH2_opt      2.00   1   2   3     114.62 
+H2SiO_opt        0.02   1   2           1.53 
+H3SiOSiH3_opt    0.02   1   2           1.65 
+H3SiOSiH3_opt    3.00   1   2   3     150.00 
+H3SiSiH2SiH3_opt 0.005  1   4           1.48 
+Si2H6_opt        0.02   1   2           2.35 
+Si2H6_opt        2.00   1   2   3     110.00 
+H3SiSiH2OH_opt   2.00   1   2   3     107.38 
+SiOH4_opt        0.02   1   2           1.65 
+Si2H4_opt        0.10   1   2           2.18 
+SiO2_opt         0.02   1   2           1.52 
+4ring            0.05   1   2           2.404 
+Bridge           0.09   1   2   4     131.42
+pyramid          1.00   2   7           2.62
+pyramid          1.00   1   7           2.38
+quartz_geo       0.01   1   2           1.6081
+quartz_geo       0.01   2   5           1.6094
+quartz_geo       2.00   7   3   8     110.54
+quartz_geo       2.00   1   2   5     143.66
+stish_geo        0.04   1   2           1.8089
+stish_geo        0.04   2   4           1.7568
+stish_geo        5.00   1   2   4     130.67
+stish_geo        5.00   2   4   5      90.00
+coes_geo         0.01   1   6           1.5937
+coes_geo         0.01   2   6           1.5877
+coes_geo         2.00   1   6   2     150.36
+coes_geo         2.00   1  13  21     140.80
+coes_geo         2.00   6   1  13     107.67
+coes_geo         2.00   6   1   3       110.55
+tridym_geo       0.04   2  16           1.5007
+tridym_geo       0.04   5  16           1.5667
+tridym_geo       2.00   1  23   5       180.00
+tridym_geo       2.00  16   5  23       111.01
+quartz_b_geo     0.01   5   9           1.6160
+quartz_b_geo     2.00   5   9   3       146.93
+quartz_b_geo     2.00   2   5   9       101.31
+quartz_b_geo     2.00   2   5   7       111.31
+quartz_b_geo     2.00   2   5   6       116.13
+crist_low_geo    0.01   3   6           1.6014
+crist_low_geo    0.01   5   6           1.6084
+crist_low_geo    2.00   3   6  5      146.77
+crist_low_geo    2.00   6   3  10     109.25
+crist_low_geo    2.00   4   3  10     108.16
+crist_high_geo   0.04   2  10           1.5502
+crist_high_geo   8.00   7  18  10     180.0
+crist_high_geo   8.00   2  10  18     109.47
+si29_ideal      40.00 0.01
+si29_qmd_1      40.00 0.01
+si29_qmd_3      40.00 0.01
+ENDGEOMETRY
+CELL PARAMETERS
+#Keyw Weight Type #Lit
+quartz           0.05    a   4.913
+quartz           0.05    b   4.913
+quartz           0.05    c   5.4052
+stish            0.05    a   4.1772
+stish            0.05    b   4.1772
+stish            0.05    c   2.6651
+coes_opt         0.05    a   7.11 
+coes_opt         0.05    b   7.11
+coes_opt         0.05    c   7.15
+trydi            0.15    a  10.06 
+trydi            0.15    b  10.06 
+trydi            0.15    c   8.22 
+cris_opt         0.05    a   9.95 
+cris_opt         0.05    b   9.95 
+cris_opt         0.05    c   6.93 
+fauja            0.15    a  24.27 
+fauja            0.15    b  24.27 
+fauja            0.15    c  24.27 
+a_Si_opt         0.02    a   5.285
+ENDCELL PARAMETERS
+ENERGY  
+#Weigh op1 Key1  n1  op2 Key2  n2  op3 Key3  n3  op4 Key4  n4  op5 Key5  n5  #Lit (f6.2,5(1x,a1,3x,a5,1x,i3),f10.4)  
+# Si-2OCH3-2CH3 Si-C Single Bond Dissociation                 
+# Si-Si bond 
+10.0   +   Si2H6_opt /1   -   Si2H6_b1_65  /1                                          -162.30
+10.0   +   Si2H6_opt /1   -   Si2H6_b1_89  /1                                           -47.60
+ 5.0   +   Si2H6_opt /1   -   Si2H6_b2_11  /1                                            -9.60
+ 5.0   +   Si2H6_opt /1   -   Si2H6_b2_35  /1                                            -0.01
+ 2.0   +   Si2H6_opt /1   -   Si2H6_b2_59  /1                                           -5.30
+ 1.0   +   Si2H6_opt /1   -   Si2H6_b2_83  /1                                           -16.70
+ 1.0   +   Si2H6_opt /1   -   Si2H6_b3_06  /1                                           -28.50
+ 1.7   +   Si2H6_opt /1   -   Si2H6_b3_29  /1                                           -40.30
+ 2.0   +   Si2H6_opt /1   -   Si2H6_b3_53  /1                                           -51.30
+ 2.5   +   Si2H6_opt /1   -   Si2H6_b3_76  /1                                           -60.80
+ 1.5   +   Si2H6_opt /1   -   Si2H6_b4_00  /1                                           -74.90
+# Si=Si bond 
+30.0   +   Si2H4_opt /1   -   Si2H4_b1_52 /1                                             -212.00
+ 7.0   +   Si2H4_opt /1   -   Si2H4_b1_74 /1                                              -67.00
+ 2.7   +   Si2H4_opt /1   -   Si2H4_b1_95 /1                                              -13.50
+ 3.7   +   Si2H4_opt /1   -   Si2H4_b2_18 /1                                               -7.60
+ 3.7   +   Si2H4_opt /1   -   Si2H4_b2_40 /1                                              -21.30
+ 4.0   +   Si2H4_opt /1   -   Si2H4_b2_62 /1                                              -34.50
+ 8.0   +   Si2H4_opt /1   -   Si2H4_b2_80 /1                                              -49.60
+ 8.0   +   Si2H4_opt /1   -   Si2H4_b3_00 /1                                              -60.20
+ 8.0   +   Si2H4_opt /1   -   Si2H4_b3_26 /1                                              -66.90
+ 8.0   +   Si2H4_opt /1   -   Si2H4_b3_48 /1                                              -70.90
+ 8.0   +   Si2H4_opt /1   -   Si2H4_b3_91 /1                                              -72.90
+# Si-O bond in H3Si-O-SiH3
+ 1.0   +   H3SiOSiH3_opt /1   -   SiOSi_b1_31 /1                                          -81.90
+ 3.0   +   H3SiOSiH3_opt /1   -   SiOSi_b1_49 /1                                          -13.90
+ 3.0   +   H3SiOSiH3_opt /1   -   SiOSi_b1_64 /1                                           -0.01
+ 9.0   +   H3SiOSiH3_opt /1   -   SiOSi_b1_81 /1                                           -7.50
+ 4.5   +   H3SiOSiH3_opt /1   -   SiOSi_b1_98 /1                                          -24.00
+ 4.5   +   H3SiOSiH3_opt /1   -   SiOSi_b2_14 /1                                          -42.00
+ 3.7   +   H3SiOSiH3_opt /1   -   SiOSi_b2_30 /1                                          -59.90
+ 3.7   +   H3SiOSiH3_opt /1   -   SiOSi_b2_48 /1                                          -77.70
+10.0   +   H3SiOSiH3_opt /1   -   SiOSi_b2_64 /1                                          -90.90
+20.0   +   H3SiOSiH3_opt /1   -   SiOSi_b2_80/1                                          -102.60
+20.0   +   H3SiOSiH3_opt /1   -   SiOSi_b3_00/1                                          -102.60
+15.0   +   H3SiOSiH3_opt /1   -   SiOSi_b3_10/1                                          -112.00
+ 0.95   +   H3SiOSiH3_opt /1   -   SiOSi_b11_80/1                                         -118.40
+# Si-O bond in Si(OH)4
+ 0.8   +   SiOH4_opt /1   -   SiOH4_b1_32/1                                              -78.00
+ 7.0   +   SiOH4_opt /1   -   SiOH4_b1_49/1                                              -13.40
+ 7.0   +   SiOH4_opt /1   -   SiOH4_b1_65/1                                               -7.30
+ 7.0   +   SiOH4_opt /1   -   SiOH4_b1_81/1                                              -23.80
+ 7.0   +   SiOH4_opt /1   -   SiOH4_b1_97/1                                              -43.10
+ 7.0   +   SiOH4_opt /1   -   SiOH4_b2_14/1                                              -61.20
+ 7.0   +   SiOH4_opt /1   -   SiOH4_b2_30/1                                              -77.70
+ 4.0   +   SiOH4_opt /1   -   SiOH4_b2_47/1                                              -92.70
+ 4.0   +   SiOH4_opt /1   -   SiOH4_b2_63/1                                             -105.30
+ 4.0   +   SiOH4_opt /1   -   SiOH4_b2_80/1                                             -116.50
+ 4.0   +   SiOH4_opt /1   -   SiOH4_b2_96/1                                             -125.90
+ 4.0   +   SiOH4_opt /1   -   SiOH4_b13_55/1                                            -134.20
+# Si-H bond
+ 4.0   +   SiH4_opt /1   -   SiH4_b1_19 /1                                              -30.90
+ 2.0   +   SiH4_opt /1   -   SiH4_b1_34 /1                                               -5.70
+ 2.0   +   SiH4_opt /1   -   SiH4_b1_47 /1                                               -0.01
+ 4.0   +   SiH4_opt /1   -   SiH4_b1_63 /1                                               -3.80
+ 5.0   +   SiH4_opt /1   -   SiH4_b1_78 /1                                              -12.60
+ 5.0   +   SiH4_opt /1   -   SiH4_b1_93 /1                                              -23.40
+ 5.0   +   SiH4_opt /1   -   SiH4_b2.09 /1                                              -34.70
+ 5.0   +   SiH4_opt /1   -   SiH4_b2_20 /1                                              -45.50
+ 5.0   +   SiH4_opt /1   -   SiH4_b2_38 /1                                              -56.80
+ 5.0   +   SiH4_opt /1   -   SiH4_b2_52/1                                              -66.70
+ 5.0   +   SiH4_opt /1   -   SiH4_b2_66/1                                              -75.50
+ 5.0   +   SiH4_opt /1   -   SiH4_b2_82/1                                              -83.70
+ 5.0   +   SiH4_opt /1   -   SiH4_b2_97/1                                              -91.50
+ 3.0   +   SiH4_opt /1   -   SiH4_b3_13/1                                              -98.10
+# Si=O bond
+ 5.0   +   H2SiO_opt/1   -   H2SiO_b1_13/1                                             -237.90
+ 5.0   +   H2SiO_opt/1   -   H2SiO_b1_33/1                                               -0.01
+ 3.0   +   H2SiO_opt/1   -   H2SiO_b1_53/1                                              -38.10
+ 7.0   +   H2SiO_opt/1   -   H2SiO_b1_73/1                                              -17.90
+ 7.0   +   H2SiO_opt/1   -   H2SiO_b1_93/1                                              -51.90
+ 2.0   +   H2SiO_opt/1   -   H2SiO_b2_13/1                                              -86.90
+ 2.0   +   H2SiO_opt/1   -   H2SiO_b2_33/1                                             -117.50
+ 0.8   +   H2SiO_opt/1   -   H2SiO_b4_93/1                                             -147.20
+# Si-O-H angle
+ 5.0   +   a1_6 /1   -   a1_1 /1                                               -9.50
+ 0.55   +   a1_6 /1   -   a1_2 /1                                               -1.90
+ 0.2   +   a1_6 /1   -   a1_3 /1                                               -0.40
+ 0.35   +   a1_6 /1   -   a1_4 /1                                               -0.10
+ 0.20  +   a1_6 /1   -   a1_5 /1                                               -0.01
+ 0.20  +   a1_6 /1   -   a1_7 /1                                               -0.01
+ 0.5   +   a1_6 /1   -   a1_8 /1                                               -0.10
+ 0.5   +   a1_6 /1   -   a1_9 /1                                               -0.40
+ 1.0   +   a1_6 /1   -   a1_10/1                                               -1.40
+ 1.0   +   a1_6 /1   -   a1_11/1                                               -4.70
+# H-Si-H angle
+ 1.0   +   a2_6 /1   -   a2_1 /1                                              -13.00
+ 1.0   +   a2_6 /1   -   a2_2 /1                                               -2.90
+ 0.5   +   a2_6 /1   -   a2_3 /1                                               -0.60
+ 0.5   +   a2_6 /1   -   a2_4 /1                                               -0.10
+ 0.25  +   a2_6 /1   -   a2_5 /1                                               -0.01
+ 0.25  +   a2_6 /1   -   a2_7 /1                                               -0.01
+ 0.5   +   a2_6 /1   -   a2_8 /1                                               -0.10
+ 0.5   +   a2_6 /1   -   a2_9 /1                                               -0.60
+ 1.0   +   a2_6 /1   -   a2_10/1                                               -2.60
+ 1.0   +   a2_6 /1   -   a2_11/1                                              -10.80
+# H-Si-O angle
+ 1.0   +   a3_6 /1   -   a3_1 /1                                              -16.80
+ 1.0   +   a3_6 /1   -   a3_2 /1                                               -3.60
+ 0.5   +   a3_6 /1   -   a3_3 /1                                               -0.80
+ 0.5   +   a3_6 /1   -   a3_4 /1                                               -0.10
+ 0.23  +   a3_6 /1   -   a3_5 /1                                               -0.01
+ 0.23  +   a3_6 /1   -   a3_7 /1                                               -0.01
+ 0.5   +   a3_6 /1   -   a3_8 /1                                               -0.10
+ 0.5   +   a3_6 /1   -   a3_9 /1                                               -0.80
+ 1.0   +   a3_6 /1   -   a3_10/1                                               -3.40
+ 1.0   +   a3_6 /1   -   a3_11/1                                              -14.00
+# Si-Si-H angle
+ 1.0   +   a4_6 /1   -   a4_1 /1                                               -8.70
+ 0.5   +   a4_6 /1   -   a4_2 /1                                               -2.00
+ 0.5   +   a4_6 /1   -   a4_3 /1                                               -0.40
+ 0.5   +   a4_6 /1   -   a4_4 /1                                               -0.10
+ 0.25  +   a4_6 /1   -   a4_5 /1                                               -0.01
+ 0.25  +   a4_6 /1   -   a4_7 /1                                               -0.01
+ 0.5   +   a4_6 /1   -   a4_8 /1                                               -0.10
+ 0.5   +   a4_6 /1   -   a4_9 /1                                               -0.40
+ 0.5   +   a4_6 /1   -   a4_10/1                                               -1.90
+ 1.0   +   a4_6 /1   -   a4_11/1                                               -7.70
+# O-Si-O angle
+ 1.0   +   a5_6 /1   -   a5_1 /1                                              -14.20
+ 0.4   +   a5_6 /1   -   a5_2 /1                                               -3.00
+ 0.5   +   a5_6 /1   -   a5_3 /1                                               -0.40
+ 0.5   +   a5_6 /1   -   a5_4 /1                                               -0.20
+ 0.25  +   a5_6 /1   -   a5_5 /1                                               -0.01
+ 0.25  +   a5_6 /1   -   a5_7 /1                                               -0.01
+ 0.5   +   a5_6 /1   -   a5_8 /1                                               -0.20
+ 0.5   +   a5_6 /1   -   a5_9 /1                                               -0.90
+ 0.5   +   a5_6 /1   -   a5_10/1                                               -3.90
+ 1.0   +   a5_6 /1   -   a5_11/1                                              -15.40
+# O-Si-Si angle
+ 1.0   +   a6_6 /1   -   a6_1 /1                                              -11.00
+ 0.4   +   a6_6 /1   -   a6_2 /1                                               -2.30
+ 0.5   +   a6_6 /1   -   a6_3 /1                                               -0.50
+ 0.5   +   a6_6 /1   -   a6_4 /1                                               -0.10
+ 0.25  +   a6_6 /1   -   a6_5 /1                                               -0.01
+ 0.25  +   a6_6 /1   -   a6_7 /1                                               -0.01
+ 0.5   +   a6_6 /1   -   a6_8 /1                                               -0.10
+ 0.5   +   a6_6 /1   -   a6_9 /1                                               -0.50
+ 0.5   +   a6_6 /1   -   a6_10/1                                               -2.30
+ 0.5   +   a6_6 /1   -   a6_11/1                                               -9.50
+# Si-O-Si angle
+ 0.4   +   a7_6 /1   -   a7_1 /1                                              -21.00
+ 1.0   +   a7_6 /1   -   a7_2 /1                                               -1.30
+ 0.5   +   a7_6 /1   -   a7_3 /1                                               -0.10
+ 0.5   +   a7_6 /1   -   a7_4 /1                                               -0.01
+ 0.25  +   a7_6 /1   -   a7_5 /1                                               -0.01
+ 0.25  +   a7_6 /1   -   a7_7 /1                                               -0.01
+ 0.5   +   a7_6 /1   -   a7_8 /1                                               -0.01
+ 0.5   +   a7_6 /1   -   a7_9 /1                                               -0.01
+ 0.9   +   a7_6 /1   -   a7_10/1                                               -0.01
+ 0.9   +   a7_6 /1   -   a7_11/1                                               -0.01
+# Si-Si-Si angle
+ 0.7   +   a8_6 /1   -   a8_1 /1                                              -10.30
+ 0.5   +   a8_6 /1   -   a8_2 /1                                               -1.90
+ 0.5   +   a8_6 /1   -   a8_3 /1                                               -0.10
+ 0.5   +   a8_6 /1   -   a8_4 /1                                               -0.01
+ 0.25  +   a8_6 /1   -   a8_5 /1                                               -0.01
+ 0.25  +   a8_6 /1   -   a8_7 /1                                               -0.01
+ 0.5   +   a8_6 /1   -   a8_8 /1                                               -0.01
+ 0.5   +   a8_6 /1   -   a8_9 /1                                               -0.30
+ 1.0   +   a8_6 /1   -   a8_10/1                                               -1.40
+ 1.0   +   a8_6 /1   -   a8_11/1                                               -5.90
+# Si(OH)4 dimerisation
+ 1.0   +   SiOH4_opt /1   -   dim1 /2                                          -3.70
+ 0.5   +   SiOH4_opt /1   -   dim2 /2                                           0.50
+ 0.9   +   dim1 /1   -   dim2 /1                                                8.00
+# Cluster+H2O
+ 2.0   +   cl1_1/1   -   cl1_2/1                                               15.00
+ 2.0   +   cl1_2/1   -   cl1_3/1                                               51.70
+ 3.8   +   cl1_3/1   -   cl1_4/1                                              -30.10
+ 3.8   +   cl1_4/1   -   cl1_5/1                                               49.80
+# SiO-six membered ring
+ 1.0   +   62_6  /1   -   62_1 /1                                             -120.50
+ 1.0   +   62_6  /1   -   62_2 /1                                              -32.60
+ 1.0   +   62_6  /1   -   62_3 /1                                               -7.60
+ 0.6   +   62_6  /1   -   62_4 /1                                               -1.50
+ 0.3   +   62_6  /1   -   62_5 /1                                               -0.20
+ 0.4   +   62_6  /1   -   62_7 /1                                               -0.10
+ 0.8   +   62_6  /1   -   62_8 /1                                               -1.20
+ 1.2   +   62_6  /1   -   62_9 /1                                               -7.30
+ 0.3  +   62_6  /1   -   62_10/1                                              -34.90
+ 4.0   +   62_6  /1   -   62_11/1                                             -148.90
+# SiH2-six membered ring
+ 0.4   +   61_1 /1   -   61_2 /1                                               -0.01
+ 0.8   +   61_1 /1   -   61_3 /1                                               -0.50
+ 2.0   +   61_1 /1   -   61_4 /1                                               -2.60
+ 2.00   +   61_1 /1   -   61_5 /1                                              -12.00
+ 2.00   +   61_1 /1   -   61_6 /1                                              -51.70
+# Ring conformations
+ 0.4   +   conf1/1   -   conf2/1                                               -1.80
+ 0.5   +   conf1/1   -   conf3/1                                               -7.40
+# Condensation reactions
+ 1.5   +   cond1/1   -   cond2/1                                              -34.40
+ 0.6   +   cond3/1   -   cond4/1                                              -11.20
+# O-coordination
+10.0   +   ocor1/1   -   ocor2/1                                              119.50
+ 2.5   +   ocor2/1   -   ocor3/1                                              -22.10
+ 2.50  +   ocor2/1   -   ocor4/1                                              -28.60
+# Si-coordination
+10.0   +   sico1/1   -   sico2/1                                              135.90
+ 2.5   +   sico2/1   -   sico3/1                                                4.00
+ 2.50  +   sico3/1   -   sico4/1                                               -9.70
+# H2Si=SiH2 vs. HSi-SiH3
+ 1.0   +   Si2H4_opt /1   -   H3SiSiH_opt /1                                    -5.10
+# Silicon cages
+#25.0   +   cage1/1   -   cage2/1                                             -368.00
+# 2.0   +   cage1/1   -   cage3/1                                              -30.00
+# 1.0   +   cage3/1   -   cage4/1                                               -3.00
+#25.0   +   cage5/1   -   cage6/1                                             -372.00
+#25.0   +   cage7/1   -   cage2/1                                             -220.00
+# 2.0   +   cl2_1/1   -   cl2_2/1                                               -3.50
+# 2.0   +   cl2_1/1   -   cl2_3/1                                              -10.00
+# 2.0   +   cl2_1/1   -   cl2_4/1                                              -18.00
+# 2.0   +   cl2_1/1   -   cl2_5/1                                              -29.00
+# crystals
+ 0.5   +   quartz/3  -   SiO2_opt/1                                             -143.40
+ 0.5   +   quartz/3  -   cris_opt/16                                               0.26
+ 2.0   +   quartz/3  -   coes_opt/8                                               -3.17
+ 0.5   +   quartz/3  -   trydi/16                                                  0.25
+ 1.0   +   quartz/3  -   fauja/192                                                -3.30
+ 0.50   +   quartz/3  -   stish/2                                                 -20.47
+ 0.25  +   a_Si_opt /8  -   amorph_Si /8                                          -8.50                    
+ 0.9   +   a_Si_opt /8  -   b_Si_opt /4                                           -16.00
+ 1.0   +   a_Si_opt /8  -   si_sc /1                                              -24.00
+ 0.2   +   a_Si_opt /8  -   si_av/63                                               -1.30
+# Si_a EOS
+ 1.0   +   a_Si_100/8  -   a_Si_120/8                                              -2.80
+ 0.4   +   a_Si_100/8  -   a_Si_110/8                                              -0.30
+ 0.4   +   a_Si_100/8  -   a_Si_90/8                                               -1.70
+ 0.8   +   a_Si_100/8  -   a_Si_80/8                                               -8.30
+ 1.3   +   a_Si_100/8  -   a_Si_70/8                                              -24.30
+ 1.2   +   a_Si_100/8  -   a_Si_60/8                                              -36.30
+ 1.2   +   a_Si_100/8  -   a_Si_50/8                                              -51.30
+# Si_b EOS
+ 0.4   +   b_Si_100/4  -   b_Si_120/4                                         -2.90
+ 0.3   +   b_Si_100/4  -   b_Si_110/4                                         -0.80
+ 0.4   +   b_Si_100/4  -   b_Si_90/4                                          -2.30
+ 0.8   +   b_Si_100/4  -   b_Si_80/4                                          -4.90
+ 1.5   +   b_Si_100/4  -   b_Si_70/4                                         -17.20
+ 4.0   +   b_Si_100/4  -   b_Si_60/4                                         -41.30
+# Si_sc EOS
+ 0.8   +   si_sc100/1  -   si_sc146/1                                        -11.71
+ 1.5   +   si_sc100/1  -   si_sc133/1                                        -6.41
+ 1.0   +   si_sc100/1  -   si_sc121/1                                        -3.06
+ 0.4   +   si_sc100/1  -   si_sc110/1                                        -1.00
+ 0.5   +   si_sc100/1  -   si_sc90/1                                         -0.80
+ 0.8   +   si_sc100/1  -   si_sc81/1                                         -7.90
+ 0.8   +   si_sc100/1  -   si_sc73/1                                         -15.00
+ 1.0   +   si_sc100/1  -   si_sc66/1                                         -28.20
+# a-Cristobalite EOS
+ 0.5   +   cris_100/16  -   cris_120/16                                              -9.00
+ 0.4   +   cris_100/16  -   cris_110/16                                              -0.60
+ 0.3   +   cris_100/16  -   cris_90/16                                              -0.90
+ 0.3   +   cris_100/16  -   cris_80/16                                              -3.20
+ 0.7   +   cris_100/16  -   cris_70/16                                              -7.00
+ 1.5   +   cris_100/16  -   cris_60/16                                             -16.00
+# Coesite EOS
+ 1.0   +   coesite_100/8  -   coesite_120/8                                   -10.00
+ 1.0   +   coesite_100/8  -   coesite_110/8                                    -3.10
+ 1.0   +   coesite_100/8  -   coesite_90/8                                    -3.20
+ 0.8   +   coesite_100/8  -   coesite_80/8                                   -13.00
+ 1.5   +   coesite_100/8  -   coesite_70/8                                   -32.00
+ 2.0   +   coesite_100/8  -   coesite_60/8                                   -75.00
+# Stishovite EOS
+ 2.00  +   stish/2  -   stish2/2                                             -5.07
+# 4ring --> 2 H2Si=O reaction
+ 3.00  +   4ri_5/1  -   4ri_1/1                                             -117.6
+ 3.00  +   4ri_5/1  -   4ri_2/1                                              -45.8
+ 3.00  +   4ri_5/1  -   4ri_3/1                                              -10.5
+ 3.00  +   4ri_5/1  -   4ri_4/1                                               -2.6
+ 3.00  +   4ri_5/1  -   4ri_6/1                                               -2.1 
+ 3.00  +   4ri_5/1  -   4ri_7/1                                               -8.3
+ 3.00  +   4ri_5/1  -   4ri_8/1                                              -31.2
+ 3.00  +   4ri_5/1  -   4ri_9/1                                               -62.8
+ 1.50  +   4ri_5/1  -   4ri_10/1                                              -79.8 
+ 1.50  +   4ri_5/1  -   4ri_11/1                                              -89.8 
+ 1.50  +   4ri_5/1  -   4ri_12/1                                              -96.5 
+# 4(OH)Si --> 2(OH)SiO2 + H2 --> 2(OH)SiOO (3ring) + H2
+ 3.00  +   SiOH4_opt/1  -   O2SiOH2_H2/1                               -134.4
+ 2.00  +   3ring_H2/1  -  O2SiOH2_H2/1                                  -13.6
+# H2SiO rings
+ 0.60  +   4ring/1  -   H2SiO_opt/1 - H2SiO_opt/1                 -105.42
+ 1.90  +   6ring/3  -   4ring/2                                    -15.04
+ 0.8  +   8ring/4  -   6ring/3                                    -2.03 
+ 1.50  +  10ring/5  -   8ring/4                                    -0.06
+ 1.50  +  12ring/6  -  10ring/5                                     0.06
+ 1.50  +  14ring/7  -  12ring/6                                     0.25
+25.00  +  4ring/1  -   4ringH/1                                    -5.65
+10.00  +  6ring/1  -   6ringH/1                                   -24.72
+10.00  +  8ring/1  -   8ringH/1                                   -30.81
+10.00  +  10ring/1  -   10ringH/1                                 -24.85
+10.00  +  12ring/1  -   12ringH/1                                 -25.48
+# SiO2 ringsI
+ 0.80  +   4ringII/1  -   SiO2_opt/1 - SiO2_opt/1               -98.35
+ 0.60  +   6ringII/3  -   4ringII/2                             -12.90
+ 0.40  +   8ringII/4  -   6ringII/3                             -0.80
+ 1.00  +  10ringII/5  -   8ringII/4                             -0.16
+ 1.00  +  12ringII/6  -  10ringII/5                             -0.28
+ 0.75  +  14ringII/7  -  12ringII/6                             -0.31
+# H-dimer complex
+30.00  +   dim2_2/1  +   Hydrogen/2 - H_dimer/1                -84.50
+40.00  +   sico1_2/1 + sico2_2/1 - H_dimer/1                    -10.92
+ 2.00  +   dim2_2/1  +   Hydrogen/2 - sico1_2/1 -sico2_2/1      -74.50
+# Hydrogen in a-quartz (single point seqquest Thomas Mattsson)
+25.00  +   H-q72_1/1 - H-q72_2/1                                 -7.9
+25.00  +   H-q72_1/1 - H-q72_3/1                                -17.6
+25.00  +   H-q72_1/1 - H-q72_4/1                                -29.5
+25.00  +   H-q72_1/1 - H-q72_5/1                                -47.9
+# Si heats of fusion
+ 0.5   +   a_Si_opt /8                                           -107.6
+20.0   +   pyramid /10                                           -73.40
+13.0   +   Si14 /14                                              -68.60
+13.0   +   Si18 /18                                              -69.43
+13.0   +   Si22 /22                                              -68.50
+ 0.8   +   a_Si_opt/8 - si29_ideal/29                             -18.0
+ 0.9   +   a_Si_opt/8 - si29_qmd_1/29                             -18.1
+ 0.9   +   a_Si_opt/8 - si29_qmd_3/29                             -17.7
+# SiO2 heats of formation
+0.40   +   a_Si_opt /8  + o2_min/1  - quartz/3                      217.66
+# O-coordination
+1.6 + ocor_2/1 + Si2H6_opt/1 - ocor_4/1                            -102.5
+2.5 + ocor_2/1 + Si2H6_opt/2 - ocor_3/1                             -59.0
+2.5 + ocor_2/1 - Si2H6_opt/2 - ocor_1/1                             -82.6
+# Si-coordination
+ 1.8  + sico_4/1 + h2o2_min/1 - sico_6/1                                     -60.9
+ 1.8  + sico_4/1 + h2o2_min/2 - sico_5/1                                     -23.6
+ 1.8  + sico_4/1 - h2o2_min/2 - sico_3/1                                    -108.3
+# Oxygen bridge
+ 3.0   +   Obridge_opt/1   -   H2SiH2SiO_birad/1                             -67.80
+ 2.0   +   Obridge_opt/1   -   H2SiOSiH2_birad/1                             -28.40
+ 2.0   +   Obridge_H2_opt/1  -  H3SiHSiO_H2_opt/1                            -13.20
+ 2.0   +   H3SiOSiH3_opt/1   -   H3SiHSiO_H2_opt/1                           -65.20
+ 2.0   +   H3SiOSiH3_opt/1   -   Obridge_H2_opt/1                            -53.00
+# Si=O double bond
+ 3.0   +   H2SiO_opt/1   -   Si2H4_opt/2 - o2_min/2                           -49.1
+ 3.0   +   obri1/1 - Si2H4_opt/2 - H2SiO_opt/1                                -38.4
+ 3.0   +   H2SiO_opt/1   -   h2si/1 - o2_min/2                                -79.5
+ 3.0   +   obri1/1 - h2si/1 - H2SiO_opt/1                                     -68.8
+# Interface
+ 1.0   +   9SiO2/1 + 56Si/2 - interface4/4                                    -5.4
+# H-diffusion
+ 1.0   +   qzh1_1_8/1 - qzh1_1_1/1                                          -24.0
+ 5.0   +   qzh1_1_8/1 - qz1/1                                                14.0
+# Si-O-Si angle in Si8O2H18-complex
+ 0.4   +   Bridge_a131 /1 - Bridge_a126  /1                                  -0.7
+ 0.3  +   Bridge_a131 /1 - Bridge_a121  /1                                  -2.0
+ 0.3   +   Bridge_a131 /1 - Bridge_a116  /1                                  -4.0
+ 0.3   +   Bridge_a131 /1 - Bridge_a111  /1                                  -6.8
+ 0.5   +   Bridge_a131 /1 - Bridge_a106  /1                                 -10.6
+ 0.8   +   Bridge_a131 /1 - Bridge_a101  /1                                 -15.9
+ 1.2   +   Bridge_a131 /1 - Bridge_a96  /1                                  -22.7
+ 1.5   +   Bridge_a131 /1 - Bridge_a91  /1                                  -31.1
+# Si8O2H18-complex
+ 1.0   +   noBridge /1 - Bridge  /1                                         -7.8
+# PDMS_p21n EoS (OH)(CH3)2-Si-O-Si-(CH3)2(OH)
+ 0.5   +  pdms_0   /4 - pdms_opt  /4                                                -0.32
+ 0.5   +  pdms_0   /4 - pdms_e4   /4                                                -4.14
+ 0.5   +  pdms_0   /4 - pdms_e3   /4                                                -2.25
+ 0.3   +  pdms_0   /4 - pdms_e2   /4                                                -1.23
+ 0.1   +  pdms_0   /4 - pdms_e1   /4                                                -0.26
+ 0.5   +  pdms_0   /4 - pdms_c1   /4                                                -0.32
+ 0.5   +  pdms_0   /4 - pdms_c2   /4                                                -4.35
+ 1.5   +  pdms_0   /4 - pdms_c3   /4                                               -10.79
+ 2.0   +  pdms_0   /4 - pdms_c4   /4                                               -28.46 
+ 2.5   +  pdms_0   /4 - pdms_c5   /4                                               -52.10
+ 3.0   +  pdms_0   /4 - pdms_c6   /4                                               -84.50
+ 3.5   +  pdms_0   /4 - pdms_c7   /4                                              -128.00
+ 4.0   +  pdms_0   /4 - pdms_c8   /4                                              -169.72
+ 4.5   +  pdms_0   /4 - pdms_c9   /4                                              -256.68
+ 5.0   +  pdms_0   /4 - pdms_c10  /4                                              -371.96
+# SiC EoS     
+ 9.5   +  SiC-cond_0   /1 - SiC-cond_e3   /1                                           -57.09
+ 5.5   +  SiC-cond_0   /1 - SiC-cond_e2   /1                                           -35.34
+ 3.5   +  SiC-cond_0   /1 - SiC-cond_e1   /1                                            -9.65
+ 4.5   +  SiC-cond_0   /1 - SiC-cond_opt  /1                                            -0.001
+ 3.5   +  SiC-cond_0   /1 - SiC-cond_c1   /1                                            -4.40
+ 5.5   +  SiC-cond_0   /1 - SiC-cond_c2   /1                                           -23.86
+# Heat of Formation
+ 1.0   +  SiC-cond_opt /4 - C_opt /8 - a_Si_opt/8                                     -15.03
+# Si(111) surface energies
+ 0.5   + das3x3 /9 -  si70_crystal  /9 - si_crystal_H/2 + si40_crystal/4      24.50
+ 0.5   + das5x5 /25 - si8_crystal  /1 - si_crystal_H/2 + si40_crystal/4       23.99
+ 2.5   + das7x7 /49 -  si396_crystal  /49 - si_crystal_H/2 + si40_crystal/4    23.91
+ 2.5   + das9x9 /81 -  si658_crystal  /81 - si_crystal_H/2 + si40_crystal/4    24.15
+# Si(SiH3)4 ... Si(OH)4 clusters
+ 1.2   +  SiOH4_opt/1 + Si_SiH3_4_opt /1 - Si_SiH3_2_OH_2_opt/1 - Si_SiH3_2_OH_2_opt /1    -31.02
+ 1.3   +  SiOH4_opt/1 + Si_SiH3_4_opt /1 - Si_SiH3_3_OH_1_opt/1 - Si_SiH3_1_OH_3_opt /1    -17.62
+# Silicon suboxides
+ 0.7   +   SiO2_xtl /8   + Si_a_xtl/64                - Si2O3_xtl/6       -26.5
+ 0.7   +   SiO2_xtl /24  + Si_a_xtl/64                - SiO_xtl/24        -26.2
+ 0.5   +   SiO2_xtl /24  + Si_a_xtl/32 + Si_a_xtl/64  - Si2O_xtl/18       -49.6
+ 1.0   +   Si2O3_xtl/12 -  Si2O3_xtl_v0 /12                               -0.01
+ 1.0   +   Si2O_xtl/36  -  Si2O_xtl_v0 /36                                -0.01
+ 1.5   +   SiO_xtl/48  -   SiO_xtl_v0 /48                                 -0.01
+ 5.0   +   Si_a_xtl/64  -   Si_a_xtl_v0 /64                               -0.01
+ 5.0   +   SiO2_xtl/24  -   SiO2_xtl_v0 /24                               -0.01
+# General anion_dimer
+ 0.50  +  ip1_cr   /1 - ip1_cp /1                                         -2.26
+ 0.35  +  ip1_cr   /1 - ip1_ts /1                                        -17.84
+ 5.25  +  ip2_cr   /1 - ip2_cp /1                                          0.54
+ 5.25  +  ip3_cr   /1 - ip3_cp /1                                         -0.81
+ 5.25  +  ip5_cr   /1 - ip5_cp /1                                          8.84
+50.25  +  ip10_cr   /1 - ip10_cp /1                                       -8.51
+# General neutral_reaction_1
+ 0.50  +  ts2_cp   /1 - ts2_cr /1                                         -4.76
+ 1.00  +  ts2_cp   /1 - ts2_path_ts4 /1                                   -30.88
+ 0.40  +  ts2_cp   /1 - ts2_cp /1                                          -0.01
+# General neutral_reaction_2
+ 0.50  +  L1_cp   /1 - L1_cr /1                                           -6.23
+ 0.50  +  L1_cp   /1 - L1_ts /1                                           -33.73
+ 0.50  +  L1_cp   /1 - L1_cp /1                                           -0.01
+# General neutral_reaction_3
+ 0.50  +  3ring_cr   /1 - 3ring_cr /1                                     -0.01
+ 0.50  +  3ring_cr   /1 - 3ring_ts /1                                     -28.00
+ 0.50  +  3ring_cr   /1 - 3ring_cp /1                                     -0.19
+# General anion_reaction_1
+ 0.50  +  ts1_cr   /1 - ts1_precr /1                                         -6.44
+ 0.50  +  ts1_cr   /1 - ts1_prets /1                                         -19.51
+ 0.50  +  ts1_cr   /1 - ts1_cr /1                                              0.01
+ 0.35  +  ts1_cr   /1 - ts1_ts /1                                         -17.05
+ 0.35  +  ts1_cr   /1 - ts1_cp /1                                         -2.96
+# General anion_reaction_2
+ 0.50  +  L1_ts1_cr   /1 - L1_ts1_precr /1                                -7.72
+ 0.50  +  L1_ts1_cr   /1 - L1_ts1_prets /1                               -17.57
+ 0.50  +  L1_ts1_cr   /1 - L1_ts1_cr /1                                   -0.01
+ 0.50  +  L1_ts1_cr   /1 - L1_ts1_ts /1                                  -17.76
+ 0.50  +  L1_ts1_cr   /1 - L1_ts1_cp /1                                   -1.90
+# General anion_reaction_3
+ 0.40  +  Si3_precr   /1 - Si3_precr /1                                   -0.01
+ 0.40  +  Si3_precr   /1 - Si3_prets /1                                    -6.44
+ 0.35  +  Si3_precr   /1 - Si3_cr /1                                       -3.08
+ 0.40  +  Si3_precr   /1 - Si3_ts /1                                      -17.01
+ 0.40  +  Si3_precr   /1 - Si3_cp /1                                       -0.47
+# General anion_reaction_4
+ 0.50  +  L2_4l1_cr   /1 - L2_4l1_precr /1                                 -13.01
+ 0.50  +  L2_4l1_precr /1 - L2_4l1_prets /1                                 -16.69   !check this !
+ 0.50  +  L2_4l1_cr   /1 - L2_4l1_cr /1                                     -0.01
+ 0.50  +  L2_4l1_cr   /1 - L2_4l1_ts /1                                    -17.51
+ 0.50  +  L2_4l1_cr   /1 - L2_4l1_cp /1                                    -0.49
+# General anion_reaction_5
+ 0.50  +  L2_42_cp   /1 - L2_42_precr /1                                  -15.72
+ 0.50  +  L2_42_precr   /1 - L2_42_prets /1                                  -20.23  !check this
+ 0.50  +  L2_42_cp   /1 - L2_42_cr /1                                      -6.27
+ 0.50  +  L2_42_cp   /1 - L2_42_ts /1                                     -22.78
+ 0.50  +  L2_42_cp   /1 - L2_42_cp /1                                      -0.01
+# General anion_reaction_6
+ 0.50  +  4mr_precr   /1 - 4mr_precr /1                                    -0.01
+ 0.50  +  4mr_precr   /1 - 4mr_prets /1                                    -7.66
+ 0.35  +  4mr_precr   /1 - 4mr_cr /1                                       -2.06
+ 0.50  +  4mr_precr   /1 - 4mr_ts /1                                      -18.05
+ 0.50  +  4mr_precr   /1 - 4mr_cp /1                                       -1.33
+# Restraint H2O_SiOH4_reaction
+ 2.50  +  H2O_SiOH4_opt   /1 - H2O_SiOH4_1_8/1                                  -25.00
+ 2.50  +  H2O_SiOH4_opt   /1 - H2O_SiOH4_2_0/1                                   -5.00
+ 2.50  +  H2O_SiOH4_opt   /1 - H2O_SiOH4_2_2/1                                   -0.01
+ 2.50  +  H2O_SiOH4_opt   /1 - H2O_SiOH4_2_4/1                                   -5.01
+ 1.70  +  H2O_SiOH4_opt   /1 - H2O_SiOH4_2_6/1                                   -8.01
+ 1.70  +  H2O_SiOH4_opt   /1 - H2O_SiOH4_2_8/1                                   -4.01
+ 1.70  +  H2O_SiOH4_opt   /1 - H2O_SiOH4_3_0/1                                   -0.01
+ 1.70  +  H2O_SiOH4_opt   /1 - H2O_SiOH4_3_2/1                                    1.01
+ 1.70  +  H2O_SiOH4_opt   /1 - H2O_SiOH4_5_00/1                                   0.01
+# General anion_Thuat_paper
+ 0.40  +  mono_mono   /1 - dimer_water /1                                    20.8
+ 0.40  +  dimer_mono   /1 - trimer_water /1                                  14.3
+ 0.40  +  trimer_nowater /1 - 3mer_ring /1                                  -0.43
+ 0.40  +  trimer_mono   /1 - 4mer_water /1                                   20.8
+ 0.40  +  trimer_mono   /1 - 4mer_br_water /1                                28.9
+ 0.40  +  4mer_water   /1 - 4mer_br_water /1                                  8.1
+ 0.40  +  4mer_nowater   /1 - 4mer_ring/1                                   -1.54
+#
+ 1.00  +  trimer_nowater /1 - 3ring_nowater /1 - h2o_min/1              -14.3
+ 5.00  +  4mer_nowater   /1 - 4ring_nowater/1 - h2o_min/1               -15.3
+# Diffusion path for O in Si-alpha
+10.0  +  delta_47_B/1 - delta_47_B/1                       0.0001
+10.0  +  delta_33/1   - delta_47_B/1                       2.5000
+1.00  +  delta_24/1   - delta_47_B/1                       37.200
+0.50  +   ATS_16/1    - delta_47_B/1                       58.343
+0.50  +  delta_0/1    - delta_47_B/1                      46.200
+1.00  +  delta_m17/1  - delta_47_B/1                      21.900
+1.00  +  delta_m26/1  - delta_47_B/1                      9.200
+10.0  +  delta_m33/1  - delta_47_B/1                      2.300
+10.0  +  delta_m47_B/1  - delta_47_B/1                    0.0001
+# Bond-center interstitial O in Si-alpha
+#6.20   +   delta_47_B/1 - Si_216/1 - O2/2                25.37
+# Hexagonal/Tetragonal Interstitial O in Si-alpha
+0.5  +  Si_217_T/1  - delta_47_B/1                      85.785
+0.3  +  Si_217_H/1  - delta_47_B/1                      87.861
+# O-vacancy in amorpous SiO2
+ 3.0  +   O_vac_in_SiO2/18 - Pristine_SiO2/18 + O2/2    139.00
+ENDENERGY

@@ -4,10 +4,10 @@
 units		    real
 
 atom_style	    charge
-read_data	    data.AB
+read_data	    SiOH.data
 
 pair_style	    reax/c lmp_control
-pair_coeff	    * * SiHOFF.reax Si O H
+pair_coeff	    * * SiOH.reax Si O H
 
 neighbor	    2 bin
 neigh_modify	every 10 delay 0 check no

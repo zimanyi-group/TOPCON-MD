@@ -1,0 +1,30 @@
+LAMMPS (23 Jun 2022)
+OMP_NUM_THREADS environment is not set. Defaulting to 1 thread. (src/comm.cpp:98)
+  using 1 OpenMP thread(s) per MPI task
+# REAX potential for Nitroamines system
+# .....
+
+units		    real
+
+atom_style	    charge
+read_data	    SiOH.data
+Reading data file ...
+  orthogonal box = (0 0 0) to (25 25 25)
+  1 by 2 by 2 MPI processor grid
+  reading atoms ...
+  12 atoms
+  read_data CPU = 0.001 seconds
+
+pair_style	    reax/c lmp_control
+WARNING: Ignoring inactive control parameter: simulation_name (src/REAXFF/reaxff_control.cpp:98)
+WARNING: Ignoring inactive control parameter: energy_update_freq (src/REAXFF/reaxff_control.cpp:98)
+WARNING: Support for writing native trajectories has been removed after LAMMPS version 8 April 2021 (src/REAXFF/reaxff_control.cpp:114)
+WARNING: Ignoring inactive control parameter: traj_title (src/REAXFF/reaxff_control.cpp:98)
+WARNING: Ignoring inactive control parameter: atom_info (src/REAXFF/reaxff_control.cpp:98)
+WARNING: Ignoring inactive control parameter: atom_forces (src/REAXFF/reaxff_control.cpp:98)
+WARNING: Ignoring inactive control parameter: atom_velocities (src/REAXFF/reaxff_control.cpp:98)
+WARNING: Ignoring inactive control parameter: bond_info (src/REAXFF/reaxff_control.cpp:98)
+WARNING: Ignoring inactive control parameter: angle_info (src/REAXFF/reaxff_control.cpp:98)
+pair_coeff	    * * SiOH.reax Si O H
+ERROR on proc 0: SiOH.reax:54: Invalid force field file format (src/REAXFF/reaxff_ffield.cpp:584)
+Last command: pair_coeff	    * * SiOH.reax Si O H
