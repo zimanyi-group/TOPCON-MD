@@ -6,7 +6,7 @@ units		    real
 atom_style	    charge
 read_data	    SiOH.data
 
-pair_style	    reax/c lmp_control
+pair_style	    reax/c lmp_control.lmp
 pair_coeff	    * * SiOH.reax Si O H
 
 neighbor	    2 bin
