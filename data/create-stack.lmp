@@ -1,0 +1,56 @@
+clear
+units         metal
+dimension     3
+boundary     p p p
+atom_style	    charge
+
+atom_modify map array
+variable dt equal 0.001
+
+
+###
+lattice diamond 5.43
+#lattice hex 6.00
+region sim block 0 10 0 10 0 10
+region top block 2 3 2 3 2 3
+region bot block 0 2 0 2 0 2 
+
+# create_box 3 sim
+
+# create_atoms 1 single 1 1 1
+# create_atoms 2 single 3 3 3
+
+#####
+
+read_data SiOH.data# add append
+change_box all x scale 10 y scale 10 z scale 10 
+#replicate 4 4 4
+
+#====================================================
+
+# mass         1 28.0855 #Si
+# mass         2 15.9991 #O
+# mass         3 1.00784 #H
+
+
+pair_style	    reaxff NULL#/c lmp_control.lmp
+pair_coeff	    * * ../potential/SiOH.reax Si O H
+
+#delete_atoms overlap 0.1 all all
+
+neighbor        2 bin
+neigh_modify    every 10 delay 0 check no
+
+fix 1 all nve
+fix 2 all qeq/reax 1 0.0 10.0 1e-6 ../potential/param.qeq
+#fix 3 all temp/berendsen 500 500.0 100.0
+
+
+timestep ${dt}
+dump		    1 all atom 10 data-topcon.dump
+
+run		        1000
+
+
+
+

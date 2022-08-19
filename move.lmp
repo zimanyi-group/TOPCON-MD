@@ -1,0 +1,124 @@
+#=======Move the a-Si:H to the c-Si========================
+#	I am now passing the density of the a-Si:H as variable rho
+#	If I muliply rho by lx*ly I will have the linear mass density in the z dir
+#	
+#=======Constants=======================================
+variable sr equal 0.67875
+variable u equal 10.0/6.022
+variable scale equal $((v_rho / 2.33) ^ 0.33)
+variable sep equal $(1.3575 * v_scale)
+variable sw equal $(v_sr / v_scale)
+variable ave_den equal $((v_rho + 2.33) / 2)
+#===========c-Si variables=============================
+variable ctop equal bound(csi,zmax)
+variable cbot equal bound(csi,zmin)
+region c_top_layer block EDGE EDGE EDGE EDGE $(v_ctop - v_sr) $(v_ctop) units box
+group c_top_face region c_top_layer
+variable ccom equal xcm(c_top_face,z)
+variable cmass equal mass(c_top_face)
+#=============a-Si:H variables================================
+variable atop equal bound(asih,zmax)
+variable abot equal bound(asih,zmin)
+region a_bottom_layer block EDGE EDGE EDGE EDGE $(v_abot) $(v_abot + v_sw) units box
+region a_top_layer block EDGE EDGE EDGE EDGE $(v_atop - v_sw) $(v_atop) units box
+group a_top_face region a_top_layer
+group a_bot_face region a_bottom_layer
+variable botcom equal xcm(a_bot_face,z)
+variable topcom equal xcm(a_top_face,z)
+#=========Distance variables================================== 
+variable d equal $(v_abot - v_ctop)
+# "Initial distance:	distance moved:"
+#=====run until the a-Si:H botcom is 1.3575 A from c-Si botcom
+variable clow equal $(v_ctop - v_sr)
+variable chi equal $(v_ctop + (2*v_sr))
+variable width equal $(v_chi - v_clow)
+region inter block EDGE EDGE EDGE EDGE $(v_clow) $(v_chi) units box
+#=====================================================================
+variable test_vol equal $(lx*ly*v_width)
+variable step equal -0.05
+label my_loop
+variable a loop 200
+group merge region inter
+variable check equal $((mass(merge) / v_test_vol) * v_u)
+variable rel_den equal $(abs(v_ave_den - v_check))
+print " check = $(v_check) rel den = $(v_rel_den)"
+print "rho = $(v_rho) top d = $(v_top_d) ave density = $(v_ave_den)"
+print "clow = $(v_clow) chigh = $(v_chi)"
+if "$(v_rel_den) <= 0.1" then "jump move.in end_loop"
+if "$(v_abot) <= $(v_ctop + v_sr)" then "jump move.in end_loop"
+
+group merge delete
+variable check delete
+displace_atoms asih move 0 0 $(v_step) units box
+next a
+jump move.in my_loop
+label end_loop
+#==================================================================
+#run 10 every 1 "if '$(v_abot <= v_ctop)' then 'jump move.in break'" &
+ #"displace_atoms asih move 0 0 $(v_step) units box " &
+#"print 'd = $(v_botcom - v_ccom) aSi bottom = $(v_abot) ctop = $(v_ctop)'"
+ 
+change_box all z final $(v_cbot) $(v_atop + v_top_d) units box
+#==============Print out params========================
+variable ah equal $(zhi - v_ctop)
+variable V equal $(lx * ly * v_ah)
+print "a-Si:H Lower bound = $(v_abot) A Upper bound = $(v_atop) A Volume =  $(v_V) A^3" #file sample_$(v_fnum)_params.txt
+print "Total Density = $((mass(asih) / v_V) * v_u)(g/cm^3) scale = $(v_scale) sep = $(v_sep) sw = $(v_sw)  H Concentration = $(v_CH) %" #append sample_$(v_fnum)_params.txt
+print "Top Face Distance = $( zhi - v_atop) A Bottom Face Distance = $(v_abot - v_ctop) A" #append sample_$(v_fnum)_params.txt
+
+
+
+
+min_style sd
+minimize 1.0e-4 1.0e-6 10000 100000
+
+write_dump all atom pre_${fnum}.atom
+
+fix f1 all nve/limit 0.01
+run 1000
+
+unfix f1
+write_dump all atom sample_${fnum}.atom
+
+variable topcom delete
+variable IDK delete
+variable sr delete
+variable ctop delete 
+variable cbot delete 
+variable cdel delete 
+variable atop delete 
+variable abot delete 
+variable sr delete
+variable lim delete 
+variable botcom delete 
+variable ccom delete 
+variable p delete
+variable p0 delete
+variable d delete 
+variable stop delete 
+variable step delete  
+variable delpe delete 
+variable V delete
+region a_bottom_layer delete
+region a_top_layer delete
+region c_top_layer delete
+group a_bot_face delete
+group a_top_face delete
+group c_top_face delete
+#group merge delete
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

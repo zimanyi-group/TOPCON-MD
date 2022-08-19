@@ -1,0 +1,124 @@
+LAMMPS (23 Jun 2022 - Update 1)
+OMP_NUM_THREADS environment is not set. Defaulting to 1 thread. (src/comm.cpp:98)
+  using 1 OpenMP thread(s) per MPI task
+clear
+OMP_NUM_THREADS environment is not set. Defaulting to 1 thread. (src/comm.cpp:98)
+  using 1 OpenMP thread(s) per MPI task
+units         metal
+dimension     3
+boundary     p p p
+atom_style	    charge
+
+atom_modify map array
+variable dt equal 0.001
+
+
+###
+lattice diamond 5.43
+Lattice spacing in x,y,z = 5.43 5.43 5.43
+#lattice hex 6.00
+region sim block 0 10 0 10 0 10
+region top block 2 3 2 3 2 3
+region bot block 0 2 0 2 0 2
+
+# create_box 3 sim
+
+# create_atoms 1 single 1 1 1
+# create_atoms 2 single 3 3 3
+
+#####
+
+read_data SiOH.data# add append
+Reading data file ...
+  orthogonal box = (0 0 0) to (5.1463944 5.1463944 5.1463944)
+  1 by 1 by 1 MPI processor grid
+WARNING: Atom style in data file differs from currently defined atom style (src/read_data.cpp:538)
+  reading atoms ...
+  9 atoms
+  read_data CPU = 0.010 seconds
+change_box all x scale 10 y scale 10 z scale 10
+Changing box ...
+  orthogonal box = (-23.158775 0 0) to (28.305169 5.1463944 5.1463944)
+  orthogonal box = (-23.158775 -23.158775 0) to (28.305169 28.305169 5.1463944)
+  orthogonal box = (-23.158775 -23.158775 -23.158775) to (28.305169 28.305169 28.305169)
+#replicate 4 4 4
+
+#====================================================
+
+# mass         1 28.0855 #Si
+# mass         2 15.9991 #O
+# mass         3 1.00784 #H
+
+
+pair_style	    reaxff NULL#/c lmp_control.lmp
+pair_coeff	    * * ../potential/SiOH.reax Si O H
+WARNING: Changed valency_val to valency_boc for X (src/REAXFF/reaxff_ffield.cpp:296)
+
+#delete_atoms overlap 0.1 all all
+
+neighbor        2 bin
+neigh_modify    every 10 delay 0 check no
+
+fix 1 all nve
+fix 2 all qeq/reax 1 0.0 10.0 1e-6 ../potential/param.qeq
+#fix 3 all temp/berendsen 500 500.0 100.0
+
+
+timestep ${dt}
+timestep 0.001
+dump		    1 all atom 10 data-topcon.dump
+
+run		        1000
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+Your simulation uses code contributions which should be cited:
+
+- pair reaxff command:
+
+@Article{Aktulga12,
+ author = {H. M. Aktulga, J. C. Fogarty, S. A. Pandit, A. Y. Grama},
+ title = {Parallel reactive molecular dynamics: Numerical methods and algorithmic techniques},
+ journal = {Parallel Computing},
+ year =    2012,
+ volume =  38,
+ pages =   {245--259}
+}
+
+- fix qeq/reaxff command:
+
+@Article{Aktulga12,
+ author = {H. M. Aktulga, J. C. Fogarty, S. A. Pandit, A. Y. Grama},
+ title = {Parallel reactive molecular dynamics: Numerical methods and algorithmic techniques},
+ journal = {Parallel Computing},
+ year =    2012,
+ volume =  38,
+ pages =   {245--259}
+}
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+WARNING: Total cutoff < 2*bond cutoff. May need to use an increased neighbor list skin. (src/REAXFF/pair_reaxff.cpp:372)
+Neighbor list info ...
+  update every 10 steps, delay 0 steps, check no
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 9.5
+  ghost atom cutoff = 9.5
+  binsize = 4.75, bins = 11 11 11
+  2 neighbor lists, perpetual/occasional/extra = 2 0 0
+  (1) pair reaxff, perpetual
+      attributes: half, newton off, ghost
+      pair build: half/bin/newtoff/ghost
+      stencil: full/ghost/bin/3d
+      bin: standard
+  (2) fix qeq/reax, perpetual, copy from (1)
+      attributes: half, newton off
+      pair build: copy
+      stencil: none
+      bin: none
+WARNING: Non-zero lower Taper-radius cutoff (src/REAXFF/reaxff_init_md.cpp:83)
+Per MPI rank memory allocation (min/avg/max) = 7.207 | 7.207 | 7.207 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         0   0              1.2232733e+08  0              1.2232733e+08 -1.1144232e+10
+ERROR: Lost atoms: original 9 current 6 (src/thermo.cpp:481)
+Last command: run		        1000

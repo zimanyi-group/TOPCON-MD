@@ -1,2 +1,12 @@
-ERROR on proc 0: Cannot open input script testing.in: No such file or directory (src/lammps.cpp:518)
-Last command: (unknown)
+LAMMPS (23 Jun 2022 - Update 1)
+OMP_NUM_THREADS environment is not set. Defaulting to 1 thread. (src/comm.cpp:98)
+  using 1 OpenMP thread(s) per MPI task
+# REAX potential for Nitroamines system
+# .....
+
+units		    real
+
+atom_style	    charge
+read_data	    ../data/SiOH.data
+ERROR: Cannot open file ../data/SiOH.data: No such file or directory (src/read_data.cpp:331)
+Last command: read_data	    ../data/SiOH.data

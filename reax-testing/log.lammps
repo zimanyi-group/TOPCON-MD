@@ -7,13 +7,13 @@ OMP_NUM_THREADS environment is not set. Defaulting to 1 thread. (src/comm.cpp:98
 units		    real
 
 atom_style	    charge
-read_data	    SiOH.data
+read_data	    ../data/SiOH.data
 Reading data file ...
   orthogonal box = (0 0 0) to (25 25 25)
   1 by 1 by 1 MPI processor grid
   reading atoms ...
   12 atoms
-  read_data CPU = 0.002 seconds
+  read_data CPU = 0.001 seconds
 
 pair_style	    reax/c lmp_control.lmp
 WARNING: Ignoring inactive control parameter: simulation_name (src/REAXFF/reaxff_control.cpp:98)
@@ -25,7 +25,7 @@ WARNING: Ignoring inactive control parameter: atom_forces (src/REAXFF/reaxff_con
 WARNING: Ignoring inactive control parameter: atom_velocities (src/REAXFF/reaxff_control.cpp:98)
 WARNING: Ignoring inactive control parameter: bond_info (src/REAXFF/reaxff_control.cpp:98)
 WARNING: Ignoring inactive control parameter: angle_info (src/REAXFF/reaxff_control.cpp:98)
-pair_coeff	    * * SiOH.reax Si O H
+pair_coeff	    * * ../potential/SiOH.reax Si O H
 WARNING: Changed valency_val to valency_boc for X (src/REAXFF/reaxff_ffield.cpp:296)
 
 neighbor	    2 bin
