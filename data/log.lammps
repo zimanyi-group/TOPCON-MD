@@ -4,44 +4,51 @@ OMP_NUM_THREADS environment is not set. Defaulting to 1 thread. (src/comm.cpp:98
 clear
 OMP_NUM_THREADS environment is not set. Defaulting to 1 thread. (src/comm.cpp:98)
   using 1 OpenMP thread(s) per MPI task
-units         metal
+units         real
 dimension     3
 boundary     p p p
 atom_style	    charge
+variable lconst equal 5.1463944279
+variable boxdim equal v_lconst
+#atom_modify map array
+variable dt equal 0.0005
 
-atom_modify map array
-variable dt equal 0.001
 
 
 ###
-lattice diamond 5.43
-Lattice spacing in x,y,z = 5.43 5.43 5.43
-#lattice hex 6.00
-region sim block 0 10 0 10 0 10
-region top block 2 3 2 3 2 3
-region bot block 0 2 0 2 0 2
+lattice diamond $(v_lconst)#Ang
+lattice diamond 5.1463944278999997906
+Lattice spacing in x,y,z = 5.1463944 5.1463944 5.1463944
 
-# create_box 3 sim
-
-# create_atoms 1 single 1 1 1
-# create_atoms 2 single 3 3 3
-
-#####
-
+#region sim block $(-v_boxdim/2) $(v_boxdim/2) $(-v_boxdim/2) $(v_boxdim/2) $(-v_boxdim/2) $(v_boxdim/2)
+#region top block 2 3 2 3 2 3
+#region bot block 0 2 0 2 0 2
 read_data SiOH.data# add append
 Reading data file ...
   orthogonal box = (0 0 0) to (5.1463944 5.1463944 5.1463944)
-  1 by 1 by 1 MPI processor grid
+  1 by 1 by 2 MPI processor grid
 WARNING: Atom style in data file differs from currently defined atom style (src/read_data.cpp:538)
   reading atoms ...
   9 atoms
-  read_data CPU = 0.010 seconds
-change_box all x scale 10 y scale 10 z scale 10
-Changing box ...
-  orthogonal box = (-23.158775 0 0) to (28.305169 5.1463944 5.1463944)
-  orthogonal box = (-23.158775 -23.158775 0) to (28.305169 28.305169 5.1463944)
-  orthogonal box = (-23.158775 -23.158775 -23.158775) to (28.305169 28.305169 28.305169)
-#replicate 4 4 4
+  read_data CPU = 0.001 seconds
+replicate 7 7 7
+Replicating atoms ...
+  orthogonal box = (0 0 0) to (36.024761 36.024761 36.024761)
+  1 by 1 by 2 MPI processor grid
+  3087 atoms
+  replicate CPU = 0.001 seconds
+
+# create_box 3 sim
+
+# create_atoms 1 single 2.308807 0.000000 $(v_boxdim-3.603467)
+# create_atoms 1 single -1.154403 1.999485 1.801733
+# create_atoms 1 single -1.154403 -1.999485 0.000000
+# create_atoms 2 single 1.375998 1.140800 $(4.245244-v_boxdim)
+# create_atoms 2 single -1.675961 0.621249 $(7.848711-v_boxdim)
+# create_atoms 2 single 0.299963 -1.762049 $(6.046977-v_boxdim)
+# create_atoms 2 single 0.299963 1.762049 $(v_boxdim-4.245244)
+# create_atoms 2 single -1.675961 -0.621249 -0.64177
+# create_atoms 2 single 1.375998 -1.140800 -2.443511
 
 #====================================================
 
@@ -50,25 +57,21 @@ Changing box ...
 # mass         3 1.00784 #H
 
 
+
 pair_style	    reaxff NULL#/c lmp_control.lmp
-pair_coeff	    * * ../potential/SiOH.reax Si O H
+pair_coeff	    * * ../potential/HOSi.reax H O Si
 WARNING: Changed valency_val to valency_boc for X (src/REAXFF/reaxff_ffield.cpp:296)
 
-#delete_atoms overlap 0.1 all all
 
+thermo 10
 neighbor        2 bin
 neigh_modify    every 10 delay 0 check no
 
-fix 1 all nve
+#fix 1 all nve
 fix 2 all qeq/reax 1 0.0 10.0 1e-6 ../potential/param.qeq
 #fix 3 all temp/berendsen 500 500.0 100.0
-
-
-timestep ${dt}
-timestep 0.001
-dump		    1 all atom 10 data-topcon.dump
-
-run		        1000
+min_style hftn
+minimize 1.0e-6 1.0e-6 1000 1000
 
 CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
 
@@ -98,13 +101,14 @@ Your simulation uses code contributions which should be cited:
 
 CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
 
+WARNING: Using 'neigh_modify every 1 delay 0 check yes' setting during minimization (src/min.cpp:187)
 WARNING: Total cutoff < 2*bond cutoff. May need to use an increased neighbor list skin. (src/REAXFF/pair_reaxff.cpp:372)
 Neighbor list info ...
-  update every 10 steps, delay 0 steps, check no
+  update every 1 steps, delay 0 steps, check yes
   max neighbors/atom: 2000, page size: 100000
   master list distance cutoff = 9.5
   ghost atom cutoff = 9.5
-  binsize = 4.75, bins = 11 11 11
+  binsize = 4.75, bins = 8 8 8
   2 neighbor lists, perpetual/occasional/extra = 2 0 0
   (1) pair reaxff, perpetual
       attributes: half, newton off, ghost
@@ -117,8 +121,118 @@ Neighbor list info ...
       stencil: none
       bin: none
 WARNING: Non-zero lower Taper-radius cutoff (src/REAXFF/reaxff_init_md.cpp:83)
-Per MPI rank memory allocation (min/avg/max) = 7.207 | 7.207 | 7.207 Mbytes
+Per MPI rank memory allocation (min/avg/max) = 119.3 | 119.5 | 119.6 Mbytes
    Step          Temp          E_pair         E_mol          TotEng         Press     
-         0   0              1.2232733e+08  0              1.2232733e+08 -1.1144232e+10
-ERROR: Lost atoms: original 9 current 6 (src/thermo.cpp:481)
-Last command: run		        1000
+         0   0              1.5440809e+11  0              1.5440809e+11 -1.4122492e+12
+        10   0             -26381.16       0             -26381.16       6968076.7    
+        20   0             -214304.07      0             -214304.07     -390362.26    
+        30   0             -289770.93      0             -289770.93     -640845.1     
+        40   0             -377535.27      0             -377535.27      426000.08    
+        50   0             -475774.81      0             -475774.81     -757971.72    
+        60   0             -488517.38      0             -488517.38     -411621.11    
+        70   0             -496515.92      0             -496515.92     -257657.49    
+        80   0             -509547.01      0             -509547.01     -279954.88    
+        90   0             -519336.06      0             -519336.06     -505787.75    
+       100   0             -532043.36      0             -532043.36     -426504.05    
+       105   0             -583633.09      0             -583633.09      208963.36    
+Loop time of 73.9735 on 2 procs for 104 steps with 3087 atoms
+
+99.8% CPU use with 2 MPI tasks x 1 OpenMP threads
+
+Minimization stats:
+  Stopping criterion = max force evaluations
+  Energy initial, next-to-last, final = 
+      154408091975.676  -569599.482048342  -583633.089799441
+  Force two-norm initial, final = 1.028305e+11 249418.42
+  Force max component initial, final = 3.7750099e+09 151345.23
+  Final line search alpha, max atom move = 0 0
+  Iterations, force evaluations = 104 1003
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 45.984     | 47.075     | 48.166     |  15.9 | 63.64
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0.17918    | 1.2712     | 2.3631     |  96.9 |  1.72
+Output  | 0.0003153  | 0.0005225  | 0.0007297  |   0.0 |  0.00
+Modify  | 25.55      | 25.551     | 25.551     |   0.0 | 34.54
+Other   |            | 0.07601    |            |       |  0.10
+
+Nlocal:         1543.5 ave        1568 max        1519 min
+Histogram: 1 0 0 0 0 0 0 0 0 1
+Nghost:           5920 ave        5939 max        5901 min
+Histogram: 1 0 0 0 0 0 0 0 0 1
+Neighs:         251892 ave      255632 max      248151 min
+Histogram: 1 0 0 0 0 0 0 0 0 1
+
+Total # of neighbors = 503783
+Ave neighs/atom = 163.19501
+Neighbor list builds = 0
+Dangerous builds not checked
+
+timestep $(dt)
+timestep 1
+dump		    1 all atom 10 data-topcon.dump
+
+run 200
+WARNING: No fixes with time integration, atoms won't move (src/verlet.cpp:60)
+WARNING: Total cutoff < 2*bond cutoff. May need to use an increased neighbor list skin. (src/REAXFF/pair_reaxff.cpp:372)
+Per MPI rank memory allocation (min/avg/max) = 116.3 | 116.4 | 116.5 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+       105   0             -583626.74      0             -583626.74      208963.3     
+       110   0             -583626.81      0             -583626.81      208963.3     
+       120   0             -583626.79      0             -583626.79      208963.3     
+       130   0             -583627.06      0             -583627.06      208963.31    
+       140   0             -583626.32      0             -583626.32      208963.29    
+       150   0             -583626.37      0             -583626.37      208963.29    
+       160   0             -583626.36      0             -583626.36      208963.29    
+       170   0             -583626.55      0             -583626.55      208963.3     
+       180   0             -583626.64      0             -583626.64      208963.3     
+       190   0             -583626.54      0             -583626.54      208963.3     
+       200   0             -583626.66      0             -583626.66      208963.3     
+       210   0             -583626.62      0             -583626.62      208963.3     
+       220   0             -583626.62      0             -583626.62      208963.3     
+       230   0             -583626.62      0             -583626.62      208963.3     
+       240   0             -583626.64      0             -583626.64      208963.3     
+       250   0             -583626.58      0             -583626.58      208963.3     
+       260   0             -583626.6       0             -583626.6       208963.3     
+       270   0             -583626.58      0             -583626.58      208963.3     
+       280   0             -583626.64      0             -583626.64      208963.3     
+       290   0             -583626.67      0             -583626.67      208963.3     
+       300   0             -583626.68      0             -583626.68      208963.3     
+       305   0             -583626.69      0             -583626.69      208963.3     
+Loop time of 15.7663 on 2 procs for 200 steps with 3087 atoms
+
+Performance: 1.096 ns/day, 21.898 hours/ns, 12.685 timesteps/s
+99.8% CPU use with 2 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 10.121     | 10.377     | 10.633     |   7.9 | 65.82
+Neigh   | 0.538      | 0.54786    | 0.55772    |   1.3 |  3.47
+Comm    | 0.17428    | 0.43074    | 0.68719    |  39.1 |  2.73
+Output  | 0.036558   | 0.03693    | 0.037303   |   0.2 |  0.23
+Modify  | 4.361      | 4.371      | 4.381      |   0.5 | 27.72
+Other   |            | 0.003101   |            |       |  0.02
+
+Nlocal:         1543.5 ave        1568 max        1519 min
+Histogram: 1 0 0 0 0 0 0 0 0 1
+Nghost:         5925.5 ave        5950 max        5901 min
+Histogram: 1 0 0 0 0 0 0 0 0 1
+Neighs:         254811 ave      258501 max      251121 min
+Histogram: 1 0 0 0 0 0 0 0 0 1
+
+Total # of neighbors = 509622
+Ave neighs/atom = 165.08649
+Neighbor list builds = 20
+Dangerous builds not checked
+
+write_data SilicaCrystal.data
+System init for write_data ...
+WARNING: Total cutoff < 2*bond cutoff. May need to use an increased neighbor list skin. (src/REAXFF/pair_reaxff.cpp:372)
+
+
+
+
+Total wall time: 0:01:30

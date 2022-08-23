@@ -1,12 +1,351 @@
 LAMMPS (23 Jun 2022 - Update 1)
 OMP_NUM_THREADS environment is not set. Defaulting to 1 thread. (src/comm.cpp:98)
   using 1 OpenMP thread(s) per MPI task
-# REAX potential for Nitroamines system
-# .....
 
-units		    real
+clear
+OMP_NUM_THREADS environment is not set. Defaulting to 1 thread. (src/comm.cpp:98)
+  using 1 OpenMP thread(s) per MPI task
+units         real
+dimension     2
+boundary    p p p
+atom_style  charge
 
-atom_style	    charge
-read_data	    ../data/SiOH.data
-ERROR: Cannot open file ../data/SiOH.data: No such file or directory (src/read_data.cpp:331)
-Last command: read_data	    ../data/SiOH.data
+#atom_modify map array
+variable dt equal .01
+
+lattice sq2 5.1
+Lattice spacing in x,y,z = 5.1 5.1 5.1
+
+region island sphere 0 0 0 3
+region sim block -20 20 -20 20 -0.3 0.3
+create_box 3 sim
+Created orthogonal box = (-102 -102 -1.53) to (102 102 1.53)
+  2 by 1 by 1 MPI processor grid
+
+create_atoms 3 region sim
+Created 3200 atoms
+  using lattice units in orthogonal box = (-102 -102 -1.53) to (102 102 1.53)
+  create_atoms CPU = 0.005 seconds
+create_atoms 2 random 150 111111 island overlap .2 maxtry 50
+Created 150 atoms
+  using lattice units in orthogonal box = (-102 -102 -1.53) to (102 102 1.53)
+  create_atoms CPU = 0.040 seconds
+
+group Oatms type 2
+150 atoms in group Oatms
+
+mass         1 1.00784 #H
+mass         2 15.9991 #O
+mass         3 28.0855 #Si
+
+
+pair_style	    reaxff topcon.control
+WARNING: Support for writing native trajectories has been removed after LAMMPS version 8 April 2021 (src/REAXFF/reaxff_control.cpp:114)
+pair_coeff	    * * potential/HOSi.reax H O Si
+WARNING: Changed valency_val to valency_boc for X (src/REAXFF/reaxff_ffield.cpp:296)
+#Pair style reaxff requires use of exactly one of the fix qeq/reaxff or fix qeq/shielded or fix acks2/reaxff commands
+
+
+neighbor        1.5 bin
+neigh_modify    every 10 delay 0 check no
+
+timestep ${dt}
+timestep 0.01
+
+thermo 10
+
+dump d1 all custom 10 island.dump id type q x y z ix iy iz mass element vx vy vz
+dump_modify d1 element H O Si
+
+
+
+fix r1 all acks2/reaxff 1 0.0 10.0 1e-6 reaxff
+
+delete_atoms overlap 2.5 Oatms Oatms
+System init for delete_atoms ...
+WARNING: Total cutoff < 2*bond cutoff. May need to use an increased neighbor list skin. (src/REAXFF/pair_reaxff.cpp:372)
+Neighbor list info ...
+  update every 10 steps, delay 0 steps, check no
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 7.5891
+  ghost atom cutoff = 7.5891
+  binsize = 3.79455, bins = 54 54 1
+  3 neighbor lists, perpetual/occasional/extra = 2 1 0
+  (1) command delete_atoms, occasional
+      attributes: full, newton on
+      pair build: full/bin/atomonly
+      stencil: full/bin/2d
+      bin: standard
+  (2) pair reaxff, perpetual
+      attributes: half, newton off, ghost
+      pair build: half/bin/newtoff/ghost
+      stencil: full/ghost/bin/2d
+      bin: standard
+  (3) fix acks2/reaxff, perpetual, copy from (2)
+      attributes: half, newton off
+      pair build: copy
+      stencil: none
+      bin: none
+Deleted 108 atoms, new total = 3242
+
+minimize 0 1.0e-9 1000 1000
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+Your simulation uses code contributions which should be cited:
+
+- pair reaxff command:
+
+@Article{Aktulga12,
+ author = {H. M. Aktulga, J. C. Fogarty, S. A. Pandit, A. Y. Grama},
+ title = {Parallel reactive molecular dynamics: Numerical methods and algorithmic techniques},
+ journal = {Parallel Computing},
+ year =    2012,
+ volume =  38,
+ pages =   {245--259}
+}
+
+- fix acks2/reaxff command:
+
+@Article{O'Hearn2020,
+ author = {K. A. O'Hearn, A. Alperen, and H. M. Aktulga},
+ title = {Fast Solvers for Charge Distribution Models on Shared Memory Platforms},
+ journal = {SIAM J. Sci. Comput.},
+ year =    2020,
+ volume =  42,
+ pages =   {1--22}
+}
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+WARNING: Using 'neigh_modify every 1 delay 0 check yes' setting during minimization (src/min.cpp:187)
+WARNING: Total cutoff < 2*bond cutoff. May need to use an increased neighbor list skin. (src/REAXFF/pair_reaxff.cpp:372)
+Neighbor list info ...
+  update every 1 steps, delay 0 steps, check yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 7.5891
+  ghost atom cutoff = 7.5891
+  binsize = 3.79455, bins = 54 54 1
+  2 neighbor lists, perpetual/occasional/extra = 2 0 0
+  (1) pair reaxff, perpetual
+      attributes: half, newton off, ghost
+      pair build: half/bin/newtoff/ghost
+      stencil: full/ghost/bin/2d
+      bin: standard
+  (2) fix acks2/reaxff, perpetual, copy from (1)
+      attributes: half, newton off
+      pair build: copy
+      stencil: none
+      bin: none
+WARNING: Non-zero lower Taper-radius cutoff (src/REAXFF/reaxff_init_md.cpp:83)
+Per MPI rank memory allocation (min/avg/max) = 37.31 | 37.32 | 37.34 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         0   0             -79805.316      0             -79805.316     -15648.842    
+        10   0             -84211.762      0             -84211.762     -2469.0977    
+        20   0             -85830.579      0             -85830.579     -3352.7129    
+        30   0             -86483.102      0             -86483.102     -2640.4452    
+        40   0             -86850.962      0             -86850.962     -2717.1593    
+        50   0             -86986.151      0             -86986.151     -2259.895     
+        60   0             -87164.657      0             -87164.657     -2482.7322    
+        70   0             -87403.896      0             -87403.896     -2702.4255    
+        80   0             -87537.615      0             -87537.615     -6069.4604    
+        90   0             -87596.26       0             -87596.26      -2238.971     
+       100   0             -87918.249      0             -87918.249     -5355.9901    
+       110   0             -88056.626      0             -88056.626      868.43638    
+       120   0             -88213.363      0             -88213.363     -1292.1976    
+       130   0             -88414.43       0             -88414.43       5963.2709    
+       140   0             -88934.594      0             -88934.594     -596.94567    
+       150   0             -88998.813      0             -88998.813     -967.57202    
+       160   0             -89005.594      0             -89005.594     -948.47828    
+       170   0             -89009.976      0             -89009.976     -968.40225    
+       180   0             -89013.599      0             -89013.599     -997.81339    
+       190   0             -89017.333      0             -89017.333     -1041.5893    
+       200   0             -89050.379      0             -89050.379      670.17128    
+       210   0             -89080.062      0             -89080.062     -123.46656    
+       220   0             -89098.915      0             -89098.915      995.65469    
+       230   0             -89137.47       0             -89137.47       1249.0316    
+       240   0             -89226.173      0             -89226.173     -1526.6873    
+       250   0             -89242.114      0             -89242.114     -1386.8569    
+       260   0             -89251.092      0             -89251.092     -1688.8033    
+       263   0             -89251.615      0             -89251.615     -661.09883    
+Loop time of 9.53825 on 2 procs for 263 steps with 3242 atoms
+
+99.3% CPU use with 2 MPI tasks x 1 OpenMP threads
+
+Minimization stats:
+  Stopping criterion = max force evaluations
+  Energy initial, next-to-last, final = 
+     -79805.3163316396   -89251.500475798  -89251.6154153178
+  Force two-norm initial, final = 2739.5971 434.47535
+  Force max component initial, final = 1200.9284 255.22581
+  Final line search alpha, max atom move = 2.2719383e-06 0.00057985729
+  Iterations, force evaluations = 263 1005
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 1.2659     | 1.2679     | 1.2698     |   0.2 | 13.29
+Neigh   | 0.0010647  | 0.0012214  | 0.0013782  |   0.4 |  0.01
+Comm    | 0.03708    | 0.037894   | 0.038707   |   0.4 |  0.40
+Output  | 0.17728    | 0.17768    | 0.17809    |   0.1 |  1.86
+Modify  | 7.9992     | 8.0004     | 8.0016     |   0.0 | 83.88
+Other   |            | 0.05315    |            |       |  0.56
+
+Nlocal:           1621 ave        1628 max        1614 min
+Histogram: 1 0 0 0 0 0 0 0 0 1
+Nghost:            329 ave         338 max         320 min
+Histogram: 1 0 0 0 0 0 0 0 0 1
+Neighs:        10539.5 ave       10545 max       10534 min
+Histogram: 1 0 0 0 0 0 0 0 0 1
+
+Total # of neighbors = 21079
+Ave neighs/atom = 6.5018507
+Neighbor list builds = 3
+Dangerous builds not checked
+
+
+#velocity all create 300.0 4928459 rot yes dist gaussian
+
+#fix f1 all nvt temp 1 1 100
+fix f1 all nve/limit 0.1
+run 1000
+WARNING: Total cutoff < 2*bond cutoff. May need to use an increased neighbor list skin. (src/REAXFF/pair_reaxff.cpp:372)
+Per MPI rank memory allocation (min/avg/max) = 35.69 | 35.7 | 35.72 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+       263   0             -89251.615      0             -89251.615     -661.09884    
+       270   0.0013102855  -89251.623      0             -89251.615     -692.0958     
+       280   0.0063600926  -89251.656      0             -89251.615     -824.82568    
+       290   0.011748604   -89251.691      0             -89251.615     -1004.1256    
+       300   0.015683599   -89251.714      0             -89251.613     -1167.6488    
+       310   0.019622354   -89251.741      0             -89251.615     -1279.6755    
+       320   0.026088247   -89251.783      0             -89251.615     -1327.7225    
+       330   0.03624236    -89251.849      0             -89251.615     -1309.2143    
+       340   0.048915338   -89251.93       0             -89251.615     -1224.9583    
+       350   0.061310462   -89252.01       0             -89251.615     -1084.024     
+       360   0.071276021   -89252.074      0             -89251.615     -916.96408    
+       370   0.0797925     -89252.128      0             -89251.614     -782.73372    
+       380   0.090332035   -89252.197      0             -89251.615     -746.10147    
+       390   0.10437218    -89252.286      0             -89251.614     -829.9597     
+       400   0.1191677     -89252.383      0             -89251.615     -994.58563    
+       410   0.13140971    -89252.461      0             -89251.615     -1171.709     
+       420   0.14100645    -89252.524      0             -89251.615     -1308.9381    
+       430   0.15048406    -89252.584      0             -89251.615     -1382.3698    
+       440   0.16223883    -89252.66       0             -89251.615     -1385.5215    
+       450   0.17662829    -89252.753      0             -89251.615     -1317.6836    
+       460   0.19175506    -89252.848      0             -89251.613     -1182.7193    
+       470   0.20500697    -89252.935      0             -89251.615     -999.36776    
+       480   0.21585713    -89253.005      0             -89251.615     -814.83163    
+       490   0.22728995    -89253.079      0             -89251.615     -699.20161    
+       500   0.24269763    -89253.177      0             -89251.614     -704.01946    
+       510   0.26136021    -89253.298      0             -89251.615     -818.48521    
+       520   0.27955481    -89253.416      0             -89251.615     -979.18354    
+       530   0.29548696    -89253.518      0             -89251.615     -1119.9743    
+       540   0.3108461     -89253.617      0             -89251.615     -1202.904     
+       550   0.32842148    -89253.73       0             -89251.615     -1214.7464    
+       560   0.34944345    -89253.866      0             -89251.615     -1152.6598    
+       570   0.37255658    -89254.014      0             -89251.615     -1017.6575    
+       580   0.39470653    -89254.157      0             -89251.615     -821.1126     
+       590   0.41381411    -89254.28       0             -89251.615     -600.2031     
+       600   0.43140395    -89254.394      0             -89251.615     -423.37987    
+       610   0.45119174    -89254.521      0             -89251.615     -359.10188    
+       620   0.47382664    -89254.667      0             -89251.615     -421.16567    
+       630   0.49557548    -89254.807      0             -89251.615     -555.71622    
+       640   0.51324266    -89254.92       0             -89251.615     -688.1581     
+       650   0.5275421     -89255.013      0             -89251.615     -768.60624    
+       660   0.54141193    -89255.102      0             -89251.615     -777.69054    
+       670   0.55685223    -89255.201      0             -89251.614     -711.50901    
+       680   0.57324906    -89255.307      0             -89251.615     -571.1884     
+       690   0.58782355    -89255.401      0             -89251.616     -366.62571    
+       700   0.59821383    -89255.468      0             -89251.615     -132.52877    
+       710   0.60570203    -89255.516      0             -89251.615      60.815872    
+       720   0.6146991     -89255.574      0             -89251.615      134.10944    
+       730   0.62713415    -89255.66       0             -89251.621      60.299885    
+       740   0.63982157    -89255.736      0             -89251.615     -109.8378     
+       750   0.64937875    -89255.797      0             -89251.615     -294.10927    
+       760   0.65655142    -89255.844      0             -89251.615     -433.59219    
+       770   0.66473753    -89255.896      0             -89251.615     -503.32484    
+       780   0.6764031     -89255.97       0             -89251.614     -496.22109    
+       790   0.69107659    -89256.066      0             -89251.615     -410.92369    
+       800   0.70581026    -89256.161      0             -89251.615     -255.98591    
+       810   0.71813438    -89256.24       0             -89251.615     -68.4132      
+       820   0.72967837    -89256.315      0             -89251.615      74.75411     
+       830   0.74524264    -89256.415      0             -89251.615      89.663428    
+       840   0.76631642    -89256.551      0             -89251.615     -44.204655    
+       850   0.78895131    -89256.697      0             -89251.616     -262.73227    
+       860   0.80984924    -89256.826      0             -89251.61      -476.05395    
+       870   0.83041186    -89256.963      0             -89251.615     -625.80592    
+       880   0.85425833    -89257.116      0             -89251.615     -690.0141     
+       890   0.88323292    -89257.304      0             -89251.615     -663.3956     
+       900   0.91565824    -89257.512      0             -89251.615     -546.81914    
+       910   0.94760412    -89257.718      0             -89251.615     -357.06627    
+       920   0.97692204    -89257.907      0             -89251.615     -149.78709    
+       930   1.0065516     -89258.098      0             -89251.615     -21.14147     
+       940   1.040838      -89258.319      0             -89251.615     -48.556699    
+       950   1.07833       -89258.56       0             -89251.615     -216.67403    
+       960   1.1135596     -89258.787      0             -89251.615     -432.30283    
+       970   1.1446971     -89258.993      0             -89251.621     -605.64423    
+       980   1.1747574     -89259.181      0             -89251.615     -691.91318    
+       990   1.2072168     -89259.39       0             -89251.615     -734.09778    
+      1000   1.2422624     -89259.616      0             -89251.615     -619.04684    
+      1010   1.2762331     -89259.835      0             -89251.615     -411.87559    
+      1020   1.3055799     -89260.024      0             -89251.615     -155.77919    
+      1030   1.3317747     -89260.193      0             -89251.615      52.938243    
+      1040   1.3607055     -89260.379      0             -89251.615      105.67391    
+      1050   1.3941124     -89260.594      0             -89251.615     -22.634161    
+      1060   1.4271519     -89260.807      0             -89251.615     -247.89929    
+      1070   1.4568374     -89260.998      0             -89251.615     -461.63624    
+      1080   1.4861948     -89261.187      0             -89251.615     -601.30176    
+      1090   1.5198324     -89261.404      0             -89251.615     -646.98633    
+      1100   1.5588975     -89261.655      0             -89251.615     -594.62311    
+      1110   1.5999224     -89261.92       0             -89251.615     -450.19754    
+      1120   1.6383102     -89262.167      0             -89251.615     -253.82148    
+      1130   1.6745049     -89262.4        0             -89251.615     -106.09663    
+      1140   1.714261      -89262.655      0             -89251.614     -127.42364    
+      1150   1.7589357     -89262.943      0             -89251.615     -345.17391    
+      1160   1.8023055     -89263.223      0             -89251.615     -659.37563    
+      1170   1.8405037     -89263.468      0             -89251.615     -943.26239    
+      1180   1.8766781     -89263.702      0             -89251.615     -1125.4727    
+      1190   1.9155154     -89263.952      0             -89251.615     -1183.4942    
+      1200   1.9575568     -89264.224      0             -89251.616     -1112.9268    
+      1210   1.9985057     -89264.489      0             -89251.618     -925.41507    
+      1220   2.0342237     -89264.716      0             -89251.615     -681.52923    
+      1230   2.0675966     -89264.931      0             -89251.615     -512.36108    
+      1240   2.1055914     -89265.177      0             -89251.615     -542.9385     
+      1250   2.1473445     -89265.445      0             -89251.615     -761.20155    
+      1260   2.1858726     -89265.693      0             -89251.615     -1031.4616    
+      1263   2.1964165     -89265.761      0             -89251.615     -1102.0982    
+Loop time of 10.955 on 2 procs for 1000 steps with 3242 atoms
+
+Performance: 0.079 ns/day, 304.306 hours/ns, 91.282 timesteps/s
+99.4% CPU use with 2 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 1.2882     | 1.305      | 1.3217     |   1.5 | 11.91
+Neigh   | 0.044685   | 0.045328   | 0.045972   |   0.3 |  0.41
+Comm    | 0.081191   | 0.087489   | 0.093788   |   2.1 |  0.80
+Output  | 0.76523    | 0.77637    | 0.7875     |   1.3 |  7.09
+Modify  | 8.7342     | 8.7342     | 8.7343     |   0.0 | 79.73
+Other   |            | 0.006647   |            |       |  0.06
+
+Nlocal:           1621 ave        1626 max        1616 min
+Histogram: 1 0 0 0 0 0 0 0 0 1
+Nghost:          329.5 ave         336 max         323 min
+Histogram: 1 0 0 0 0 0 0 0 0 1
+Neighs:        10546.5 ave       10551 max       10542 min
+Histogram: 1 0 0 0 0 0 0 0 0 1
+
+Total # of neighbors = 21093
+Ave neighs/atom = 6.506169
+Neighbor list builds = 100
+Dangerous builds not checked
+
+print 'done'
+done
+
+
+
+
+
+Total wall time: 0:00:20

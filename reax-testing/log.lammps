@@ -1,45 +1,73 @@
 LAMMPS (23 Jun 2022 - Update 1)
 OMP_NUM_THREADS environment is not set. Defaulting to 1 thread. (src/comm.cpp:98)
   using 1 OpenMP thread(s) per MPI task
-# REAX potential for Nitroamines system
-# .....
-
-units		    real
-
+clear
+OMP_NUM_THREADS environment is not set. Defaulting to 1 thread. (src/comm.cpp:98)
+  using 1 OpenMP thread(s) per MPI task
+units         metal
+dimension     3
+boundary     p p p
 atom_style	    charge
-read_data	    ../data/SiOH.data
-Reading data file ...
-  orthogonal box = (0 0 0) to (25 25 25)
-  1 by 1 by 1 MPI processor grid
-  reading atoms ...
-  12 atoms
-  read_data CPU = 0.001 seconds
+variable boxdim equal 5.14
+variable latticedim equal 5.14
 
-pair_style	    reax/c lmp_control.lmp
-WARNING: Ignoring inactive control parameter: simulation_name (src/REAXFF/reaxff_control.cpp:98)
-WARNING: Ignoring inactive control parameter: energy_update_freq (src/REAXFF/reaxff_control.cpp:98)
-WARNING: Support for writing native trajectories has been removed after LAMMPS version 8 April 2021 (src/REAXFF/reaxff_control.cpp:114)
-WARNING: Ignoring inactive control parameter: traj_title (src/REAXFF/reaxff_control.cpp:98)
-WARNING: Ignoring inactive control parameter: atom_info (src/REAXFF/reaxff_control.cpp:98)
-WARNING: Ignoring inactive control parameter: atom_forces (src/REAXFF/reaxff_control.cpp:98)
-WARNING: Ignoring inactive control parameter: atom_velocities (src/REAXFF/reaxff_control.cpp:98)
-WARNING: Ignoring inactive control parameter: bond_info (src/REAXFF/reaxff_control.cpp:98)
-WARNING: Ignoring inactive control parameter: angle_info (src/REAXFF/reaxff_control.cpp:98)
-pair_coeff	    * * ../potential/SiOH.reax Si O H
+#lattice diamond $(v_latticedim)#Ang
+#atom_modify map array
+variable dt equal 0.001
+
+#region sim block $(-v_boxdim2) $(v_boxdim/2) $(-v_boxdim/2) $(v_boxdim/2) $(-v_boxdim/2) $(v_boxdim/2)
+region sim block 0 $(v_boxdim) 0 $(v_boxdim) 0 $(v_boxdim)
+region sim block 0 5.1399999999999996803 0 $(v_boxdim) 0 $(v_boxdim)
+region sim block 0 5.1399999999999996803 0 5.1399999999999996803 0 $(v_boxdim)
+region sim block 0 5.1399999999999996803 0 5.1399999999999996803 0 5.1399999999999996803
+create_box 3 sim
+Created orthogonal box = (0 0 0) to (5.14 5.14 5.14)
+  1 by 1 by 2 MPI processor grid
+
+
+create_atoms 3 single 2.6 2.6 2.6
+Created 1 atoms
+  using lattice units in orthogonal box = (0 0 0) to (5.14 5.14 5.14)
+  create_atoms CPU = 0.000 seconds
+create_atoms 2 single 1.5 1.5 1.5
+Created 1 atoms
+  using lattice units in orthogonal box = (0 0 0) to (5.14 5.14 5.14)
+  create_atoms CPU = 0.005 seconds
+create_atoms 2 single 4 4 4
+Created 1 atoms
+  using lattice units in orthogonal box = (0 0 0) to (5.14 5.14 5.14)
+  create_atoms CPU = 0.000 seconds
+
+
+# create_atoms 1 single -1.154403 1.999485 1.801733
+# create_atoms 1 single -1.154403 -1.999485 0.000000
+# create_atoms 2 single 1.375998 1.140800 4.245244
+# create_atoms 2 single -1.675961 0.621249 7.848711
+# create_atoms 2 single 0.299963 -1.762049 6.046977
+# create_atoms 2 single 0.299963 1.762049 4.245244
+# create_atoms 2 single -1.675961 -0.621249 -0.64177
+# create_atoms 2 single 1.375998 -1.140800 -2.443511
+
+mass         1 1.00784 #H
+mass         2 15.9991 #O
+mass         3 28.0855 #Si
+
+pair_style	    reaxff NULL#/c lmp_control.lmp
+pair_coeff	    * * ../potential/HOSi.reax H O Si
 WARNING: Changed valency_val to valency_boc for X (src/REAXFF/reaxff_ffield.cpp:296)
 
 neighbor	    2 bin
 neigh_modify	every 10 delay 0 check no
 
-fix		        1 all nve
-fix             2 all qeq/reax 1 0.0 10.0 1e-6 param.qeq
-fix             3 all temp/berendsen 500.0 500.0 100.0
+timestep 0.001
 
-timestep	    0.25
+dump D1 all atom 10 testing.dump
+thermo 10
 
-#dump		    1 all atom 30 dump.reax.ab
+fix r1 all qeq/reax 1 0.0 10.0 1e-6 reaxff
 
-run		        3000
+min_style hftn
+minimize 1.0e-6 1.0e-6 1000 1000
 
 CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
 
@@ -69,15 +97,16 @@ Your simulation uses code contributions which should be cited:
 
 CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
 
+WARNING: Using 'neigh_modify every 1 delay 0 check yes' setting during minimization (src/min.cpp:187)
 WARNING: Total cutoff < 2*bond cutoff. May need to use an increased neighbor list skin. (src/REAXFF/pair_reaxff.cpp:372)
 Neighbor list info ...
-  update every 10 steps, delay 0 steps, check no
+  update every 1 steps, delay 0 steps, check yes
   max neighbors/atom: 2000, page size: 100000
-  master list distance cutoff = 8.0891
-  ghost atom cutoff = 8.0891
-  binsize = 4.04455, bins = 7 7 7
+  master list distance cutoff = 9.5
+  ghost atom cutoff = 9.5
+  binsize = 4.75, bins = 2 2 2
   2 neighbor lists, perpetual/occasional/extra = 2 0 0
-  (1) pair reax/c, perpetual
+  (1) pair reaxff, perpetual
       attributes: half, newton off, ghost
       pair build: half/bin/newtoff/ghost
       stencil: full/ghost/bin/3d
@@ -88,8 +117,187 @@ Neighbor list info ...
       stencil: none
       bin: none
 WARNING: Non-zero lower Taper-radius cutoff (src/REAXFF/reaxff_init_md.cpp:83)
-Per MPI rank memory allocation (min/avg/max) = 6.498 | 6.498 | 6.498 Mbytes
+Per MPI rank memory allocation (min/avg/max) = 14.09 | 14.09 | 14.09 Mbytes
    Step          Temp          E_pair         E_mol          TotEng         Press     
-         0   0              48900.794      0              48900.794      4507989.5    
-ERROR: Lost atoms: original 12 current 8 (src/thermo.cpp:481)
-Last command: run		        3000
+         0   0             -226.57942      0             -226.57942     -2872382.8    
+        10   0             -370.89027      0             -370.89027     -1001433.6    
+        20   0             -475.51601      0             -475.51601     -2521613.7    
+        30   0             -475.51042      0             -475.51042     -2519515.8    
+Loop time of 0.102303 on 2 procs for 29 steps with 3 atoms
+
+98.8% CPU use with 2 MPI tasks x 1 OpenMP threads
+
+Minimization stats:
+  Stopping criterion = energy tolerance
+  Energy initial, next-to-last, final = 
+     -226.579424368666  -475.509438946365  -475.510415241452
+  Force two-norm initial, final = 249.21809 330.6943
+  Force max component initial, final = 112.56948 151.76934
+  Final line search alpha, max atom move = 0 0
+  Iterations, force evaluations = 29 184
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.072123   | 0.072198   | 0.072272   |   0.0 | 70.57
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0.010852   | 0.010919   | 0.010986   |   0.1 | 10.67
+Output  | 0.0001815  | 0.000213   | 0.0002445  |   0.0 |  0.21
+Modify  | 0.016929   | 0.016942   | 0.016954   |   0.0 | 16.56
+Other   |            | 0.002031   |            |       |  1.99
+
+Nlocal:            1.5 ave           2 max           1 min
+Histogram: 1 0 0 0 0 0 0 0 0 1
+Nghost:          323.5 ave         324 max         323 min
+Histogram: 1 0 0 0 0 0 0 0 0 1
+Neighs:          122.5 ave         161 max          84 min
+Histogram: 1 0 0 0 0 0 0 0 0 1
+
+Total # of neighbors = 245
+Ave neighs/atom = 81.666667
+Neighbor list builds = 0
+Dangerous builds not checked
+
+velocity all create 300.0 4928459 rot yes dist gaussian
+# fix f1 all temp/berendsen 1.0 1 10
+# run 100
+
+
+fix f2 all nvt temp 300 1000 .1
+run 1000
+WARNING: Total cutoff < 2*bond cutoff. May need to use an increased neighbor list skin. (src/REAXFF/pair_reaxff.cpp:372)
+Per MPI rank memory allocation (min/avg/max) = 10.96 | 10.96 | 10.96 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+        30   300           -475.42733      0             -475.34977     -2518937.1    
+        40   741.59582     -142.92923      0             -142.73751     -1141248.6    
+        50   0.00013115272 -335.44959      0             -335.44959     -765.77509    
+        60   1.7516875e-05 -335.44933      0             -335.44933     -1117.4927    
+        70   2.635964e-05  -335.44957      0             -335.44957     -1117.5257    
+        80   3.5481231e-05 -335.44948      0             -335.44948     -1117.5441    
+        90   4.4750388e-05 -335.44947      0             -335.44947     -1117.5269    
+       100   5.4124519e-05 -335.44944      0             -335.44944     -1117.51      
+       110   6.3588328e-05 -335.44938      0             -335.44938     -1117.5236    
+       120   7.3104165e-05 -335.44947      0             -335.44947     -1117.4837    
+       130   8.2689272e-05 -335.44936      0             -335.44936     -1117.5269    
+       140   9.2335603e-05 -335.44933      0             -335.44933     -1117.5592    
+       150   0.00010200872 -335.44934      0             -335.44934     -1117.5227    
+       160   0.00011172592 -335.44928      0             -335.44928     -1117.4785    
+       170   0.00012150814 -335.44927      0             -335.44927     -1117.5337    
+       180   0.00013134502 -335.44922      0             -335.44922     -1117.5803    
+       190   0.00014119657 -335.44915      0             -335.44915     -1117.5141    
+       200   0.00015108647 -335.44929      0             -335.44929     -1117.5599    
+       210   0.00016105823 -335.44918      0             -335.44918     -1117.5212    
+       220   0.00017108132 -335.44917      0             -335.44917     -1117.5877    
+       230   0.00018111942 -335.44915      0             -335.44915     -1117.6062    
+       240   0.00019119524 -335.44917      0             -335.44917     -1117.5503    
+       250   0.00020136    -335.44908      0             -335.44908     -1117.5945    
+       260   0.00021156538 -335.44908      0             -335.44908     -1117.5934    
+       270   0.00022180732 -335.44892      0             -335.44892     -1117.5295    
+       280   0.00023209752 -335.44902      0             -335.44902     -1117.533     
+       290   0.00024245717 -335.44905      0             -335.44905     -1117.6115    
+       300   0.00025288273 -335.44895      0             -335.44895     -1117.6395    
+       310   0.00026332287 -335.44896      0             -335.44896     -1117.5695    
+       320   0.00027382769 -335.44891      0             -335.44891     -1117.5478    
+       330   0.00028442789 -335.44889      0             -335.44889     -1117.6186    
+       340   0.00029508136 -335.44884      0             -335.44884     -1117.683     
+       350   0.00030575601 -335.44885      0             -335.44885     -1117.5754    
+       360   0.00031650832 -335.44884      0             -335.44884     -1117.6187    
+       370   0.00032734841 -335.4487       0             -335.4487      -1117.6051    
+       380   0.00033824216 -335.44872      0             -335.44872     -1117.6755    
+       390   0.00034915763 -335.44889      0             -335.44889     -1117.6452    
+       400   0.00036018067 -335.44875      0             -335.44875     -1117.6241    
+       410   0.00037125914 -335.44872      0             -335.44872     -1117.6931    
+       420   0.00038244379 -335.44866      0             -335.44866     -1117.7672    
+       430   0.00039362447 -335.44861      0             -335.44861     -1117.621     
+       440   0.00040489645 -335.44864      0             -335.44864     -1117.6027    
+       450   0.00041628864 -335.44855      0             -335.44855     -1117.6882    
+       460   0.00042775964 -335.44859      0             -335.44859     -1117.7734    
+       470   0.00043923492 -335.44845      0             -335.44845     -1117.6136    
+       480   0.0004507821  -335.44846      0             -335.44846     -1117.6854    
+       490   0.00046244714 -335.44836      0             -335.44835     -1117.6604    
+       500   0.00047425558 -335.44842      0             -335.44842     -1117.8196    
+       510   0.00048606836 -335.44835      0             -335.44835     -1117.6727    
+       520   0.0004979342  -335.44832      0             -335.44832     -1117.7016    
+       530   0.00050992647 -335.44829      0             -335.44829     -1117.7706    
+       540   0.0005220274  -335.44825      0             -335.44825     -1117.7994    
+       550   0.00053416724 -335.44829      0             -335.44829     -1117.7421    
+       560   0.00054637619 -335.44814      0             -335.44814     -1117.6523    
+       570   0.00055875161 -335.44814      0             -335.44814     -1117.8049    
+       580   0.00057121667 -335.44797      0             -335.44797     -1117.8001    
+       590   0.00058369324 -335.44804      0             -335.44804     -1117.7342    
+       600   0.00059626623 -335.44803      0             -335.44803     -1117.7032    
+       610   0.00060898123 -335.44804      0             -335.44804     -1117.807     
+       620   0.00062184619 -335.44795      0             -335.44795     -1117.8316    
+       630   0.00063471522 -335.44792      0             -335.44792     -1117.8216    
+       640   0.00064764971 -335.44793      0             -335.44793     -1117.8137    
+       650   0.00066077283 -335.44784      0             -335.44784     -1117.8226    
+       660   0.00067401777 -335.44796      0             -335.44796     -1117.8687    
+       670   0.00068732517 -335.44771      0             -335.44771     -1117.7534    
+       680   0.00070069555 -335.44774      0             -335.44774     -1117.883     
+       690   0.00071420786 -335.44766      0             -335.44766     -1117.8438    
+       700   0.00072787455 -335.44769      0             -335.44769     -1117.8985    
+       710   0.00074161433 -335.44764      0             -335.44764     -1117.8654    
+       720   0.0007554304  -335.44749      0             -335.44749     -1117.7728    
+       730   0.00076937327 -335.44751      0             -335.44751     -1117.9195    
+       740   0.00078351417 -335.44742      0             -335.44742     -1117.942     
+       750   0.00079769815 -335.44742      0             -335.44742     -1117.8347    
+       760   0.00081197145 -335.4473       0             -335.4473      -1117.8862    
+       770   0.00082641236 -335.44733      0             -335.44733     -1117.9806    
+       780   0.00084104916 -335.44715      0             -335.44715     -1117.9548    
+       790   0.00085569038 -335.44721      0             -335.44721     -1117.8224    
+       800   0.00087048875 -335.44723      0             -335.44723     -1117.8757    
+       810   0.0008854608  -335.44713      0             -335.44713     -1117.9685    
+       820   0.00090059015 -335.44709      0             -335.44709     -1117.9798    
+       830   0.00091577007 -335.44701      0             -335.44701     -1117.9254    
+       840   0.00093106896 -335.44701      0             -335.44701     -1117.9924    
+       850   0.00094656622 -335.44692      0             -335.44692     -1117.99      
+       860   0.00096227003 -335.4469       0             -335.4469      -1118.0251    
+       870   0.00097801147 -335.44687      0             -335.44687     -1118.0128    
+       880   0.000993874   -335.44681      0             -335.44681     -1117.9794    
+       890   0.0010099218  -335.44689      0             -335.44689     -1118.0458    
+       900   0.0010261953  -335.44667      0             -335.44667     -1118.0624    
+       910   0.0010425735  -335.44666      0             -335.44666     -1117.9831    
+       920   0.0010590456  -335.44668      0             -335.44668     -1118.0823    
+       930   0.001075706   -335.44648      0             -335.44648     -1118.0711    
+       940   0.0010925626  -335.44651      0             -335.44651     -1118.085     
+       950   0.0011095048  -335.44646      0             -335.44646     -1118.0312    
+       960   0.0011266183  -335.4465       0             -335.4465      -1118.0365    
+       970   0.001143966   -335.44638      0             -335.44638     -1118.1239    
+       980   0.0011615459  -335.44634      0             -335.44634     -1118.1391    
+       990   0.0011791598  -335.44617      0             -335.44617     -1118.1182    
+      1000   0.0011969218  -335.44627      0             -335.44627     -1118.1081    
+      1010   0.0012149242  -335.44614      0             -335.44614     -1118.1377    
+      1020   0.0012331763  -335.44609      0             -335.44609     -1118.1765    
+      1030   0.001251546   -335.44608      0             -335.44608     -1118.1413    
+Loop time of 0.662459 on 2 procs for 1000 steps with 3 atoms
+
+Performance: 130.423 ns/day, 0.184 hours/ns, 1509.526 timesteps/s
+99.2% CPU use with 2 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.39126    | 0.39166    | 0.39205    |   0.1 | 59.12
+Neigh   | 0.047301   | 0.047602   | 0.047902   |   0.1 |  7.19
+Comm    | 0.10264    | 0.10459    | 0.10655    |   0.6 | 15.79
+Output  | 0.014588   | 0.016287   | 0.017986   |   1.3 |  2.46
+Modify  | 0.098642   | 0.099051   | 0.099461   |   0.1 | 14.95
+Other   |            | 0.00327    |            |       |  0.49
+
+Nlocal:            1.5 ave           2 max           1 min
+Histogram: 1 0 0 0 0 0 0 0 0 1
+Nghost:          323.5 ave         324 max         323 min
+Histogram: 1 0 0 0 0 0 0 0 0 1
+Neighs:          128.5 ave         167 max          90 min
+Histogram: 1 0 0 0 0 0 0 0 0 1
+
+Total # of neighbors = 257
+Ave neighs/atom = 85.666667
+Neighbor list builds = 100
+Dangerous builds not checked
+#fix f2 all npt temp 300.0 1000.0 100.0 iso 0.0 0.0 1000.0
+
+# fix f2 all nvt temp 20 20 100
+# fix f1 all nve
+# run	1000
+Total wall time: 0:00:00
