@@ -1,17 +1,17 @@
 
 clear
 units         real
-dimension     2
+dimension     3
 boundary    p p p
 atom_style  charge
 
 #atom_modify map array
 variable dt equal .01
 
-lattice sq2 5.1
+lattice diamond 5.43
 
-region island sphere 0 0 0 3
-region sim block -20 20 -20 20 -0.3 0.3
+region island sphere 0 0 0 2
+region sim block -3 3 -3 3 -3 3
 create_box 3 sim
 
 create_atoms 3 region sim
@@ -41,9 +41,10 @@ dump_modify d1 element H O Si
 
 
 
-fix r1 all acks2/reaxff 1 0.0 10.0 1e-6 reaxff
+#fix r1 all acks2/reaxff 1 0.0 10.0 1e-6 reaxff
+fix r1 all qeq/reaxff  1 0.0 10.0 1e-6 reaxff
 
-delete_atoms overlap 2.5 Oatms Oatms
+delete_atoms overlap 1 Oatms Oatms
 
 minimize 0 1.0e-9 1000 1000
 
@@ -52,7 +53,7 @@ minimize 0 1.0e-9 1000 1000
 
 #fix f1 all nvt temp 1 1 100
 fix f1 all nve/limit 0.1
-run 1000
+run 100
 
 print 'done'
 
