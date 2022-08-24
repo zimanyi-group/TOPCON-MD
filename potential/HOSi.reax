@@ -1,11 +1,13 @@
 Reactive MD-force field: Si/O/H force field 2019
-
-34      ! Number of general parameters
+39      ! Number of general parameters
     50.0000 !Overcoordination parameter
     9.5469  !Overcoordination parameter
     26.5405 !Valency angle conjugation parameter
     1.7224  !Triple bond stabilisation parameter
     6.8702  !Triple bond stabilisation parameter
+    0.0000  !Not used
+    1.0588  !Not used                                                            
+    4.6000  !Not used 
     12.1176 !Undercoordination parameter
     13.3056 !Undercoordination parameter
    -70.5044 !Triple bond stabilization energy
@@ -25,13 +27,15 @@ Reactive MD-force field: Si/O/H force field 2019
     10.0000 !Torsion overcoordination
     1.9487  !Torsion overcoordination
     -1.2327 !Conjugation 0 (not used)
-    2.1645  !Conjugation 1.5591 !vdWaals shielding
+    2.1645  !Conjugation 
+    1.5591  !vdWaals shielding
     0.1000  !Cutoff for bond order (*100)
     2.1365  !Valency angle conjugation parameter
     0.6991  !Overcoordination parameter
     50.0000 !Overcoordination parameter
     1.8512  !Valency/lone pair parameter
-    0.5000  !Not used 20.0000 !Not used
+    0.5000  !Not used 
+    20.0000 !Not used
     5.0000  !Molecular energy (not used)
     0.0000  !Molecular energy (not used)
     2.6962  !Valency angle conjugation parameter

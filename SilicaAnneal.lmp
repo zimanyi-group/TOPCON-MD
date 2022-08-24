@@ -53,7 +53,8 @@ run 5000
 unfix f1
 
 next i
-#jump SELF temploop
+jump SELF temploop
+
 
 print 'done'
 

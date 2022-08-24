@@ -5,7 +5,7 @@ boundary    p p p
 atom_style  charge
 
 #atom_modify map array
-variable dt equal .001
+variable dt equal .5
 
 read_data data/SilicaCrystal3x.data
 #read_data data/risingTChkPt.data
@@ -16,27 +16,32 @@ pair_coeff	    * * potential/HOSi.reax H O Si
 
 
 
-neighbor        2.5 bin
-neigh_modify    every 10 delay 0 check no
+neighbor        2 bin
+neigh_modify    every 10 delay 0 check yes
 
 timestep ${dt}
 
-thermo 1000
-dump d1 all custom 200 equilibrium.dump id type q x y z ix iy iz mass element vx vy vz
-dump_modify d1 element H O Si
+thermo 2
+dump d1 all custom 10 equilibrium.dump id type q x y z ix iy iz mass element vx vy vz
+dump_modify d1 element Si O H
 
 
+fix r1 all qeq/reaxff 1 0.0 10.0 1e-6 reaxff maxiter 400
 
 
-fix r1 all qeq/reaxff 1 0.0 10.0 1e-6 reaxff
+minimize 1.0e-6 1.0e-6 1000 1000
+thermo 100
 
-# minimize 0 1.0e-6 1000 1000
-# thermo 100
+velocity all create 700.0 4928459 rot yes dist gaussian
 
-#velocity all create 100.0 4928459 rot yes dist gaussian
-#fix f1 all nve/limit 0.01
-fix f3 all nvt temp 10 10 100
+# fix f1 all nve/limit 0.1
+# run 1000
+# unfix f1
 
-run 200000
+
+fix f1 all nvt temp 700 700 100
+
+run 1000
+
 
 #write_data data/risingTChkPt.data

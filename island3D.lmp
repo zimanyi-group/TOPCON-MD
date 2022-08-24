@@ -55,6 +55,9 @@ minimize 0 1.0e-9 1000 1000
 fix f1 all nve/limit 0.1
 run 100
 
+# fix f1 all nvt temp 1 1 100
+# run 100
+
 print 'done'
 
 
