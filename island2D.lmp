@@ -18,6 +18,7 @@ create_atoms 3 region sim
 create_atoms 2 random 600 12345 island overlap .2 maxtry 100
 
 group Oatms type 2
+group igroup region island
 
 mass         1 1.00784 #H
 mass         2 15.9991 #O
@@ -50,7 +51,7 @@ minimize 0 1.0e-9 1000 1000
 
 #velocity all create 7000.0 4928459 rot yes dist gaussian
 
-fix f1 all nvt temp 500 500 100
+fix f1 igroup nvt temp 300 500 100
 run 10000
 
 
