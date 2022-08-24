@@ -51,7 +51,7 @@ minimize 0 1.0e-9 1000 1000
 
 #velocity all create 7000.0 4928459 rot yes dist gaussian
 
-fix f1 igroup nvt temp 300 500 100
+fix f1 igroup nvt temp 300 300 100
 run 10000
 
 
