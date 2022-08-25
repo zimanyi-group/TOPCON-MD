@@ -29,19 +29,23 @@ dump_modify d1 element Si O H
 fix r1 all qeq/reaxff 1 0.0 10.0 1e-6 reaxff maxiter 400
 
 
-minimize 1.0e-6 1.0e-6 1000 1000
+# minimize 1.0e-6 1.0e-6 1000 1000
 thermo 100
 
-velocity all create 700.0 4928459 rot yes dist gaussian
+velocity all create 7000.0 4928459 rot yes dist gaussian
 
 # fix f1 all nve/limit 0.1
 # run 1000
 # unfix f1
 
 
-fix f1 all nvt temp 700 700 100
+fix f1 all nvt temp 7000 7000 100
 
-run 1000
+run 2000
 
+unfix f1
+fix f1 all nvt temp 300 300 100
+
+run 2000
 
 #write_data data/risingTChkPt.data

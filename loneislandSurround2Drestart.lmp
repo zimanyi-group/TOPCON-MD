@@ -1,0 +1,85 @@
+
+clear
+units         real
+dimension     2
+boundary    p p p
+atom_style  charge
+
+#atom_modify map array
+variable dt equal .5
+variable l equal 5.43
+variable p equal 4.5
+variable b equal sqrt(3.0)/2
+
+lattice sq2 $l
+
+read_restart data/island2dEnd.restart
+
+mass         1 1.00784 #H
+mass         2 15.9991 #O
+mass         3 28.0855 #Si
+
+pair_style	    reaxff topcon.control
+pair_coeff	    * * potential/HOSi.reax H O Si
+# #Pair style reaxff requires use of exactly one of the fix qeq/reaxff or fix qeq/shielded or fix acks2/reaxff commands 
+
+neighbor        2.5 bin
+neigh_modify    every 10 delay 0 check yes
+
+timestep ${dt}
+
+thermo 1000
+
+dump d1 all custom 100 island.dump id type q x y z ix iy iz mass element vx vy vz
+dump_modify d1 element H O Si
+
+
+
+
+fix r1 all qeq/reaxff 1 0.0 7.0 1e-6 reaxff maxiter 400
+fix ff all enforce2d
+
+fix f1 all nvt temp 300 300 100
+run 100
+unfix f1
+
+
+region largesim block -12 12 -12 12 -0.3 0.3
+
+change_box all x final -12 12 y final -12 12 boundary p p p
+
+region exclude1 block -12 -6.5 -12 12 -0.3 0.3
+region exclude2 block 6.5 12 -12 12 -0.3 0.3
+region exclude3 block -12 12 -12 -6.5 -0.3 0.3
+region exclude4 block -12 12 6.5  12 -0.3 0.3
+
+region outerbox union 4 exclude1 exclude2 exclude3 exclude4
+region innerbox union 4 exclude1 exclude2 exclude3 exclude4 side out
+
+create_atoms 3 region outerbox
+
+group Oatms type 2
+group Siatms type 3
+
+#delete_atoms overlap .1 Siatms all 
+
+# region island sphere 0 0 0 10
+# region sim block -6.5 6.5 -6.5 6.5 -0.3 0.3
+
+group innerg region innerbox
+group outerg region outerbox
+
+write_data data/loneisland.data
+
+
+fix f1 innerg nvt temp 1000 1000 100
+fix f2 outerg nvt temp 1 1 100
+
+run 10000
+unfix f1
+
+
+fix f1 innerg nvt temp 3000 3000 100
+
+run 10000
+unfix f1

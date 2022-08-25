@@ -46,7 +46,7 @@ mass         3 28.0855 #Si
 
 
 pair_style	    reaxff  topcon.control
-pair_coeff	    * * potential/HOSi.reax Si O H
+pair_coeff	    * * potential/HOSi.reax H O Si
 
 
 thermo 10

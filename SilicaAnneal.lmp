@@ -8,9 +8,9 @@ atom_style  charge
 #atom_modify map array
 variable dt equal .5
 
-variable tVal equal 1000
-variable tStep equal 1000
-variable i loop 10
+# variable tVal equal 1000
+# variable tStep equal 1000
+# variable i loop 10
 #read_data test10k.data
 
 read_data data/SilicaCrystal3k.data
@@ -26,34 +26,76 @@ neigh_modify    every 10 delay 0 check no
 
 timestep ${dt}
 
-thermo 10
+thermo 1000
 
-dump d1 all custom 10 silicaanneal.dump id type q x y z ix iy iz mass element vx vy vz
+
+
+dump d1 all custom 1000 silicaanneal.dump id type q x y z ix iy iz mass element vx vy vz
 dump_modify d1 element H O Si
 
-velocity all create 7000.0 4928459 rot yes dist gaussian
+# velocity all create 7000.0 4928459 rot yes dist gaussian
 
 fix r1 all qeq/reax 1 0.0 10.0 1e-6 reaxff
 
-run 0
-
-label temploop
-
-variable curT equal temp+${tStep}
-print ${curT}
-fix f1 all nvt temp ${curT} ${curT} 100000
-#fix f1 all nvt temp "${curT}+${i}*${tStep}" "${curT}+${i}*${tStep}" 10 tchain 3
-run 5000
-
+fix f1 all nvt temp 7000 7000 100
+run 50000
 unfix f1
 
-fix f1 all npt iso 0 0 5000 temp ${curT} ${curT} 100
-run 5000
-
+fix f1 all nvt temp 7000 300 100
+run 100000
 unfix f1
 
-next i
-jump SELF temploop
+fix f1 all nvt temp 300 300 100
+run 500000
+unfix f1
+
+
+write_data SiO2-nvtAnneal.data
+
+
+
+fix f1 all npt temp 7000 7000 100 iso 0 0 5000
+run 100000
+unfix f1
+
+fix f1 all nvt temp 7000 300 iso 0 0 5000
+run 200000
+unfix f1
+
+fix f1 all nvt temp 300 300 iso 0 0 5000
+run 10000
+unfix f1
+
+
+write_data SiO2-nptAnneal.data
+
+
+
+
+
+
+
+
+
+# # run 0
+
+# # label temploop
+
+# # variable curT equal temp+${tStep}
+# # print ${curT}
+# #fix f1 all nvt temp ${curT} ${curT} 100000
+# #fix f1 all nvt temp "${curT}+${i}*${tStep}" "${curT}+${i}*${tStep}" 10 tchain 3
+# run 5000
+
+# unfix f1
+
+# fix f1 all npt iso 0 0 5000 temp ${curT} ${curT} 100
+# run 5000
+
+# unfix f1
+
+# next i
+# jump SELF temploop
 
 
 print 'done'

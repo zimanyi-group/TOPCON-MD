@@ -1,0 +1,91 @@
+
+clear
+units         real
+dimension     2
+boundary    p p p
+atom_style  charge
+
+#atom_modify map array
+variable dt equal .5
+variable l equal 5.43
+variable i loop 20
+
+
+lattice hex $l
+#region extSim block -30 30 -16 16 -0.3 0.3
+region left block -24 0 -10 10 -0.3 0.3
+region right block 0 24 -10 10 -0.3 0.3
+region sim union 2 left right
+
+create_box 3 sim
+
+#create_atoms 3 random 400 12345 sim overlap .35 maxtry 2000
+create_atoms 3 region sim
+create_atoms 2 random 1000 12345 left overlap .5 maxtry 2000
+
+
+mass         1 1.00784 #H
+mass         2 15.9991 #O
+mass         3 28.0855 #Si
+
+
+pair_style	    reaxff topcon.control
+pair_coeff	    * * potential/HOSi.reax H O Si
+#Pair style reaxff requires use of exactly one of the fix qeq/reaxff or fix qeq/shielded or fix acks2/reaxff commands 
+
+neighbor        2.5 bin
+neigh_modify    every 10 delay 0 check yes
+
+timestep ${dt}
+
+thermo 1000
+
+dump d1 all custom 100 2dsplitplane.dump id type q x y z ix iy iz mass element vx vy vz
+dump_modify d1 element H O Si
+
+
+fix ff all enforce2d
+fix r1 all qeq/reaxff 1 0.0 7.0 1e-6 reaxff maxiter 400
+
+group gOatms type 2
+delete_atoms overlap .3 gOatms all 
+
+
+group gleft region left
+group gright region right
+
+group gOatms type 2
+group gSiatms type 3
+
+
+# fix f2 gright nvt temp 1 1 100
+########################################################
+### Random 
+########################################################
+label startHpet
+unfix r1
+create_atoms 1 random 100 $i left overlap .2
+
+
+group gHatms type 1
+
+fix r1 all qeq/reaxff 1 0.0 7.0 1e-6 reaxff maxiter 400
+fix f1 all npt temp 10 10 100 iso 1.0 1.0 5000
+run 20000
+unfix f1
+
+
+
+delete_atoms group gHatms 
+group gHatms delete
+
+next i
+jump SELF startHpet
+
+# fix f1 gleft npt temp 300 300 100 iso 1.0 1.0 5000
+# run 40000
+# unfix f1
+
+# fix f1 gleft npt temp 10 10 100 iso 1.0 1.0 5000
+# run 40000
+# unfix f1
