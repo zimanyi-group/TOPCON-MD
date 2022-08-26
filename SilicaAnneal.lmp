@@ -26,11 +26,11 @@ neigh_modify    every 10 delay 0 check no
 
 timestep ${dt}
 
-thermo 1000
+thermo 10000
 
 
 
-dump d1 all custom 1000 silicaanneal.dump id type q x y z ix iy iz mass element vx vy vz
+dump d1 all custom 10000 silicaanneal.dump id type q x y z ix iy iz mass element vx vy vz
 dump_modify d1 element H O Si
 
 # velocity all create 7000.0 4928459 rot yes dist gaussian
