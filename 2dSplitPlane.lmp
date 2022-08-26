@@ -57,21 +57,21 @@ group gright region right
 group gOatms type 2
 group gSiatms type 3
 
-
+create_atoms 1 random 100 $i left overlap .2
 # fix f2 gright nvt temp 1 1 100
 ########################################################
 ### Random 
 ########################################################
 label startHpet
 unfix r1
-create_atoms 1 random 100 $i left overlap .2
+
 
 
 group gHatms type 1
 
 fix r1 all qeq/reaxff 1 0.0 7.0 1e-6 reaxff maxiter 400
 fix f1 all npt temp 10 10 100 iso 1.0 1.0 5000
-run 20000
+run 2000
 unfix f1
 
 
