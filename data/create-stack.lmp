@@ -3,8 +3,8 @@ units         real
 dimension     3
 boundary     p p p
 atom_style	    charge
-variable lconst equal 5.1463944279
-variable boxdim equal v_lconst
+# variable lconst equal 5.1463944279
+# variable boxdim equal v_lconst
 #atom_modify map array
 variable dt equal 0.5
 
@@ -15,7 +15,7 @@ variable dt equal 0.5
 #region bot block 0 2 0 2 0 2 
 #read_data data/BCristobaliteSilicaUnitCell.data# add append
 read_data data/SilicaUnitCell.data
-replicate 3 3 3
+replicate 5 5 5
 
 
 #====================================================
@@ -43,7 +43,7 @@ fix r1 all qeq/reax 1 0.0 10.0 1e-6 reaxff
 min_style hftn
 minimize 1.0e-6 1.0e-6 1000 1000
 
-write_data data/SilicaCrystal3x.data
+write_data data/SilicaCrystal3k.data
 
 
 

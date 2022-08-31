@@ -11,34 +11,35 @@ variable dt equal 0.5
 
 # lattice custom $(v_lconst) a1 1 0.0 0.0 a2 0.0 1 0.0 a3 0.0 0.0 1 basis 0 0 0 basis 0.25 0.25 0.25 basis 0.875 0.875 0.125
 # #lattice cubic $(v_lconst) basis 0.25 0.25 0.25 basis 0.875 0.875 0.125
-region box block 0 7.16 0 7.16 0 7.16# 0 $(v_lconst) 0 $(v_lconst) 0 $(v_lconst)
+
+region box block 0 7.13 0 7.13 0 7.13# 0 $(v_lconst) 0 $(v_lconst) 0 $(v_lconst)
 create_box 3 box
 
 #create_atoms 1 box basis 1 2 basis 2 3 basis 3 2
-create_atoms 3 single 0.0000 0.0000 0.0000
-create_atoms 3 single 0.0000 3.5800 3.5800
-create_atoms 3 single 3.5800 3.5800 0.0000
-create_atoms 3 single 3.5800 0.0000 3.5800
-create_atoms 3 single 5.3700 1.7900 5.3700
-create_atoms 3 single 1.7900 1.7900 1.7900
-create_atoms 3 single 1.7900 5.3700 5.3700
-create_atoms 3 single 5.3700 5.3700 1.7900
-create_atoms 2 single 0.8950 0.8950 0.8950
-create_atoms 2 single 6.2650 2.6850 4.4750
-create_atoms 2 single 2.6850 4.4750 6.2650
-create_atoms 2 single 4.4750 6.2650 2.6850
-create_atoms 2 single 2.6850 6.2650 4.4750
-create_atoms 2 single 6.2650 4.4750 2.6850
-create_atoms 2 single 4.4750 2.6850 6.2650
-create_atoms 2 single 0.8950 4.4750 4.4750
-create_atoms 2 single 6.2650 6.2650 0.8950
-create_atoms 2 single 2.6850 0.8950 2.6850
-create_atoms 2 single 2.6850 2.6850 0.8950
-create_atoms 2 single 6.2650 0.8950 6.2650
-create_atoms 2 single 4.4750 0.8950 4.4750
-create_atoms 2 single 0.8950 6.2650 6.2650
-create_atoms 2 single 0.8950 2.6850 2.6850
-create_atoms 2 single 4.4750 4.4750 0.8950
+create_atoms 3 single 0.00000 0.00000 0.00000
+create_atoms 3 single 0.00000 3.56500 3.56500
+create_atoms 3 single 3.56500 3.56500 0.00000
+create_atoms 3 single 3.56500 0.00000 3.56500
+create_atoms 3 single 5.34750 1.78250 5.34750
+create_atoms 3 single 1.78250 1.78250 1.78250
+create_atoms 3 single 1.78250 5.34750 5.34750
+create_atoms 3 single 5.34750 5.34750 1.78250
+create_atoms 2 single 0.89125 0.89125 0.89125
+create_atoms 2 single 6.23875 2.67375 4.45625
+create_atoms 2 single 2.67375 4.45625 6.23875
+create_atoms 2 single 4.45625 6.23875 2.67375
+create_atoms 2 single 2.67375 6.23875 4.45625
+create_atoms 2 single 6.23875 4.45625 2.67375
+create_atoms 2 single 4.45625 2.67375 6.23875
+create_atoms 2 single 0.89125 4.45625 4.45625
+create_atoms 2 single 6.23875 6.23875 0.89125
+create_atoms 2 single 2.67375 0.89125 2.67375
+create_atoms 2 single 2.67375 2.67375 0.89125
+create_atoms 2 single 6.23875 0.89125 6.23875
+create_atoms 2 single 4.45625 0.89125 4.45625
+create_atoms 2 single 0.89125 6.23875 6.23875
+create_atoms 2 single 0.89125 2.67375 2.67375
+create_atoms 2 single 4.45625 4.45625 0.89125
 
 mass         1 1.00784 #H
 mass         2 15.9991 #O
