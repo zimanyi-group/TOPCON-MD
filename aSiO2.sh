@@ -7,23 +7,48 @@
 #SBATCH --partition=med2 # Partition you are running on. Options: low2, med2, high2
 #SBATCH --output=/home/agoga/sandbox/lammps/topcon/slurm-output/SiO-%j.txt
 #SBATCH --mail-user="adgoga@ucdavis.edu"
-#SBATCH --mail-type=END
+#SBATCH --mail-type=FAIL,END
 #SBATCH --mail-type=FAIL
 
-#======memory for neb I will specifically set up a grid nxm makes n-replicas that use m sub-tasks ntasks = n*m
+
+#======
 #SBATCH --ntasks=32
 #SBATCH --ntasks-per-node=32 
 #SBATCH --cpus-per-task=1 
 #SBATCH --mem=64G
 #SBATCH -t 3-00:00
+
+
+
 #blahhh SBATCH --array=0-1
 
-# Here we will run a hybrid MPI/OPENMP code. E.g. we have multiple tasks, and each task has multiple threads
+FILENAME="SilicaAnneal.lmp"
+
 export OMP_NUM_THREADS=1
-j=$SLURM_JOB_ID
+NAME=${FILENAME%.*}
+UNIQUE_TAG=$(date +%m%d-%H%M%S)
+CWD=$(pwd) #current working directory
+OUT_FOLDER=$CWD"/output/"${NAME}${UNIQUE_TAG}"/"
+mkdir -p $CWD"/output/" #just in case output folder is not made
+mkdir $OUT_FOLDER #Now make folder where all the output will go
+
+
+IN_FILE=$CWD"/"$FILENAME
+LOG_FILE=$OUT_FOLDER$NAME".log"
+cp $IN_FILE $OUT_FOLDER
+
+s=$OUT_FOLDER$NAME"_SLURM.txt"
 #i=$SLURM_ARRAY_TASK_ID
-FOLDER=$HOME"/sandbox/lammps/topcon/"
-LFILE=test3.log
-INFILE=$FOLDER"SilicaAnneal.lmp"
+
+# echo $LOG_FILE 
+# echo $IN_FILE
+# echo $OUT_FOLDER
+
+
+
+j=$SLURM_JOB_ID
 PART=16
-srun /home/agoga/sandbox/lammps/lmp_mpi -log $LFILE -in $INFILE
+
+#                                                                       Creates a variable in lammps ${output_folder}
+srun /home/agoga/sandbox/lammps/lmp_mpi -nocite -log $LOG_FILE -in $IN_FILE -var output_folder $OUT_FOLDER
+#lmp_mpi -nocite -log $LOG_FILE -in $IN_FILE -var output_folder $OUT_FOLDER

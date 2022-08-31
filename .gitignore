@@ -1,4 +1,5 @@
 *.dump
 *.log
 *.restart
-
+output/*
+*.data

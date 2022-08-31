@@ -37,7 +37,7 @@ neigh_modify    every 10 delay 0 check yes
 timestep ${dt}
 
 thermo 100
-thermo_style custom step time temp etotal press
+thermo_style custom step time temp etotal pe press ke vol
 
 #fix r1 all acks2/reaxff 1 0.0 10.0 1e-6 reaxff
 fix r1 all qeq/reaxff  1 0.0 10.0 1e-6 reaxff
