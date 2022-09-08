@@ -6,7 +6,7 @@ atom_style	    charge
 # variable lconst equal 5.1463944279
 # variable boxdim equal v_lconst
 #atom_modify map array
-variable dt equal 0.5
+variable dt equal 1
 
 
 
@@ -41,7 +41,7 @@ timestep $(dt)
 fix r1 all qeq/reax 1 0.0 10.0 1e-6 reaxff
 #fix 3 all temp/berendsen 500 500.0 100.0
 min_style hftn
-minimize 1.0e-6 1.0e-6 1000 1000
+minimize 1.0e-10 1.0e-10 10000 10000
 
 write_data data/SilicaCrystal3k.data
 

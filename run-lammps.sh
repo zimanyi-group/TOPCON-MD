@@ -22,7 +22,7 @@
 
 #blahhh SBATCH --array=0-1
 
-FILENAME="SilicaAnneal.lmp"
+FILENAME=$1 #"SilicaAnneal.lmp"
 
 export OMP_NUM_THREADS=1
 NAME=${FILENAME%.*}
@@ -49,7 +49,7 @@ s=$OUT_FOLDER$NAME"_SLURM.txt"
 j=$SLURM_JOB_ID
 PART=16
 
-if [[ $1 == "farm" ]];
+if [[ $2 == "farm" ]];
 then #                                                                  Creates a variable in lammps ${output_folder}
 srun /home/agoga/sandbox/lammps/lmp_mpi -nocite -log $LOG_FILE -in $IN_FILE -var output_folder $OUT_FOLDER
 else
