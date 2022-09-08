@@ -13,8 +13,8 @@ variable dt equal .5
 # variable i loop 10
 #read_data test10k.data
 
-read_data data/SiO2-nvtAnneal-9-2.data
-#read_data data/SilicaCrystal3k.data
+#read_data data/SiO2-nvtAnneal-9-2.data
+read_data data/SilicaCrystal3k.data
 
 
 pair_style	    reaxff topcon.control
