@@ -7,11 +7,29 @@ atom_style  charge
 #atom_modify map array
 variable dt equal .5
 
-read_data data/SilicaCrystal3x.data
+
+region SiLat block -16 16 -10.4 10.4 -20 0
+
+create_box 3 SiLat
+
+lattice diamond 5.43
+
+create_atoms 3 region SiLat
+
+mass         1 1.00784 #H
+mass         2 15.9991 #O
+mass         3 28.0855 #Si
+
+read_data data/SiO1-6.data add append shift 0 0 10.5
+
+write_data ${output_folder}preEquib.data
+
 #read_data data/risingTChkPt.data
 
+
+
 pair_style	    reaxff topcon.control
-pair_coeff	    * * potential/HOSi.reax H O Si
+pair_coeff	    * * potential/ffield_Nayir_SiO_2019.reax H O Si
 #Pair style reaxff requires use of exactly one of the fix qeq/reaxff or fix qeq/shielded or fix acks2/reaxff commands 
 
 
@@ -21,31 +39,26 @@ neigh_modify    every 10 delay 0 check yes
 
 timestep ${dt}
 
-thermo 2
-dump d1 all custom 10 equilibrium.dump id type q x y z ix iy iz mass element vx vy vz
-dump_modify d1 element Si O H
+thermo 100
+thermo_style custom step time temp etotal pe press ke vol
+
+
+dump d1 all custom 100 ${output_folder}equib.dump id type q x y z ix iy iz mass element vx vy vz
+dump_modify d1 element H O Si
 
 
 fix r1 all qeq/reaxff 1 0.0 10.0 1e-6 reaxff maxiter 400
 
-
-# minimize 1.0e-6 1.0e-6 1000 1000
-thermo 100
-
-velocity all create 7000.0 4928459 rot yes dist gaussian
-
-# fix f1 all nve/limit 0.1
-# run 1000
-# unfix f1
+min_style hftn
+minimize 1.0e-6 1.0e-6 1000 1000
 
 
-fix f1 all nvt temp 7000 7000 100
+#velocity all create 300.0 4928459 rot yes dist gaussian
 
-run 2000
-
-unfix f1
 fix f1 all nvt temp 300 300 100
+run $(5000*(1/v_dt))#divide by timestep to make the run time in fs
+unfix f1
 
-run 2000
 
-#write_data data/risingTChkPt.data
+write_data ${output_folder}postequib.data
+

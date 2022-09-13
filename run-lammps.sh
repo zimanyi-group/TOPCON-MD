@@ -18,7 +18,10 @@
 #SBATCH --mem=64G
 #SBATCH -t 10-00:00
 
-
+#COMMAND LINE ARGUMENTS
+#1ST FILE NAME
+#2ND 'farm' or no to tell if farm or not
+#3RD 
 
 #blahhh SBATCH --array=0-1
 
@@ -26,7 +29,7 @@ FILENAME=$1 #"SilicaAnneal.lmp"
 
 export OMP_NUM_THREADS=1
 NAME=${FILENAME%.*}
-UNIQUE_TAG=$(date +%m%d-%H%M%S)
+UNIQUE_TAG=$(date +%m%d-%Hh%Mm%S)
 CWD=$(pwd) #current working directory
 OUT_FOLDER=$CWD"/output/"${NAME}${UNIQUE_TAG}"/"
 mkdir -p $CWD"/output/" #just in case output folder is not made
