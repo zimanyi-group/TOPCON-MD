@@ -80,39 +80,3 @@ unfix f1
 
 
 write_data ${output_folder}SiO2-nptAnneal.data
-
-
-
-
-
-
-
-
-
-# # run 0
-
-# # label temploop
-
-# # variable curT equal temp+${tStep}
-# # print ${curT}
-# #fix f1 all nvt temp ${curT} ${curT} 100000
-# #fix f1 all nvt temp "${curT}+${i}*${tStep}" "${curT}+${i}*${tStep}" 10 tchain 3
-# run 5000
-
-# unfix f1
-
-# fix f1 all npt iso 0 0 5000 temp ${curT} ${curT} 100
-# run 5000
-
-# unfix f1
-
-# next i
-# jump SELF temploop
-
-
-print 'done'
-
-
-
-
-
