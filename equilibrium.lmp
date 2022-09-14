@@ -20,7 +20,7 @@ mass         1 1.00784 #H
 mass         2 15.9991 #O
 mass         3 28.0855 #Si
 
-read_data data/SiO1-6.data add append shift 0 0 10.5
+read_data data/SiO16Dense.data add append shift 0 0 10.5
 
 write_data ${output_folder}preEquib.data
 

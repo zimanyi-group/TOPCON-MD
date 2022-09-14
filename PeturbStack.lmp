@@ -7,12 +7,12 @@ atom_style  charge
 #atom_modify map array
 variable dt equal .5
 
-read_data data/SiO1-6SipreEquib.data
+read_data data/SiSiO16StackNoMin.data
 
 region siox block EDGE EDGE EDGE EDGE 0 EDGE
 region other block EDGE EDGE EDGE EDGE EDGE 0
-group gsiox region siox
-group gother region other
+group gSiox region siox
+group gOther region other
 
 pair_style	    reaxff topcon.control
 pair_coeff	    * * potential/ffield_Nayir_SiO_2019.reax H O Si
@@ -37,20 +37,17 @@ fix r1 all qeq/reaxff 1 0.0 10.0 1e-6 reaxff maxiter 400
 
 
 #velocity all create 300.0 4928459 rot yes dist gaussian
-fix fo gother nvt temp 300 300 100
+fix f0 gOther nvt temp 300 300 100
 
-fix f1 gsiox nvt temp 3000 3000 100
-run $(5000*(1/v_dt))#divide by timestep to make the run time in fs
+fix f1 gSiox nvt temp 4000 4000 100
+run $(15000*(1/v_dt))#divide by timestep to make the run time in fs
 unfix f1
 
 
-fix f1 gsiox nvt temp 3000 300 100
-run $(10000*(1/v_dt))#divide by timestep to make the run time in fs
+fix f1 gSiox nvt temp 4000 300 100
+run $(15000*(1/v_dt))#divide by timestep to make the run time in fs
 unfix f1
 
-fix f1 gsiox nvt temp 300 300 100
-run $(2000*(1/v_dt))#divide by timestep to make the run time in fs
-unfix f1
 
 write_data ${output_folder}postequib.data
 

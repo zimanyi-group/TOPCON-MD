@@ -64,18 +64,20 @@ fix f1 all nvt temp 7000 7000 100
 run $(4000*(1/v_dt))#divide by timestep to make the run time in fs
 unfix f1
 
-write_data ${output_folder}SiO16Hot.data
+
 
 #cool down rapidly
 fix f1 all nvt temp 1000 1000 100
 run $(4000*(1/v_dt))#divide by timestep to make the run time in fs
 unfix f1
 
-fix f1 all npt temp 7000 7000 100 aniso 150 150 5000
+write_data ${output_folder}SiO16NVT.data
+
+fix f1 all npt temp 5000 5000 100 aniso 150 150 5000
 run $(5000*(1/v_dt))#divide by timestep to make the run time in fs
 unfix f1
 
-fix f1 all npt temp 300 300 100 aniso 75 75 5000
+fix f1 all npt temp 300 300 100 aniso 150 150 5000
 run $(5000*(1/v_dt))#divide by timestep to make the run time in fs
 unfix f1
 

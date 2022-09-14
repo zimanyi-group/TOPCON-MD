@@ -1,19 +1,18 @@
-
+# ---------Initialize Simulation---------
 clear
 units         real
 dimension     3
 boundary    p p p
 atom_style  charge
+#atom_modify map array #likely is not needed
 
-#atom_modify map array
-variable dt equal .5
 
-# variable tVal equal 1000
-# variable tStep equal 1000
-# variable i loop 10
-#read_data test10k.data
+#timestep of 0.5 femptoseconds
+variable dt equal .5 
 
-#read_data data/SiO2-nvtAnneal-9-2.data
+
+
+
 read_data data/SilicaCrystal3k.data
 
 
