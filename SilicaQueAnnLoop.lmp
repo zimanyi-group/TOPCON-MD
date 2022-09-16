@@ -50,12 +50,12 @@ run 0#set thermo variables etc
 #COMMENTED OUT TO START WITH NVTANNEAL
 # @1
 fix f1 all nvt temp ${highT} ${highT} 100
-run $(50000*(1/v_dt))#divide by timestep to make the run time in fs
+run $(100000*(1/v_dt))#divide by timestep to make the run time in fs
 unfix f1
 
 #cool down to 300 K in 100 ps 
 fix f1 all nvt temp ${highT} 300 100
-run $(100000*(1/v_dt))
+run $(200000*(1/v_dt))
 unfix f1
 
 #relax at 300 K for 500ps
