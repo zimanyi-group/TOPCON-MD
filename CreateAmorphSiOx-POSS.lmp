@@ -8,17 +8,18 @@ atom_style  charge
 
 
 #timestep of 0.5 femptoseconds
-variable dt equal .5 
+variable dt equal .5
+variable printevery equal 5000
 
 
-
+#region box block 0 80 0 80 0 40# 0 $(v_lconst) 0 $(v_lconst) 0 $(v_lconst)
 # # ---------Create Atoms-------------------
-# read_data data/POSS.data
+read_data data/POSS.data
 # #(-1.93457 -1.92202 -1.94879) to (1.93593 1.96108 1.94931)
-# change_box all x scale 4 y scale 4 z scale 4
-# replicate 6 6 3
+change_box all x scale 4 y scale 4 z scale 4
+replicate 6 6 3
 
-read_data data/SiOx-cool1.data
+# read_data data/SiOx-cool1.data
 
 # ----------Define interatomic potential --------------
 #Pair style reaxff requires use of exactly one of the fix qeq/reaxff or fix qeq/shielded or fix acks2/reaxff commands 
@@ -35,6 +36,7 @@ timestep ${dt}
 
 #qeq/reax uses the Rappe and Goddard QEq technique which was used in the potential in Fogarty2010(p2) that this current potential is. based on 
 fix r1 all qeq/reax 1 0.0 10.0 1e-6 reaxff
+fix b1 all reaxff/bonds ${printevery} ${output_folder}bonds.dump
 run 0
 
 # compute      myKE all ke/atom
@@ -42,56 +44,42 @@ run 0
 # compute      myStress all stress/atom NULL virial
 # compute      flux all heat/flux myKE myPE myStress
 
-dump d1 all custom 5000 ${output_folder}CreateAmorphSiOx.dump id type q x y z ix iy iz mass element vx vy vz
+dump d1 all custom ${printevery} ${output_folder}CreateAmorphSiOx.dump id type q x y z ix iy iz mass element vx vy vz
 dump_modify d1 element H O Si
 
-thermo 5000
-thermo_style custom step temp density
+thermo ${printevery}
+thermo_style custom step temp density vol
 
 min_style hftn
 minimize 1.0e-6 1.0e-6 1000 1000
 
 
-velocity all create 2000.0 123456 mom yes rot yes dist gaussian  # mom and rot yes means net linear and angular momentum is zero
-fix f1 all nvt temp 2000.0 2000.0 100
+variable heatflux equal .012/vol
+fix f1 all nve
+fix h1 all ehex 1000 ${heatflux}#.12
 run $(100000*(1/v_dt))
+unfix h1
 unfix f1
 
-fix f2 all deform 1 x final -20.2 20.2 y final -20.2 20.2 z final -10.4 10.4 remap v
-fix f1 all nvt/sllod temp 1500 1500 100 
-run $(100000*(1/v_dt))
-unfix f1
+write_data ${output_folder}SiOx-heat.data
+# velocity all create 2000.0 123456 mom yes rot yes dist gaussian  # mom and rot yes means net linear and angular momentum is zero
+# fix f1 all nvt temp 2000.0 2000.0 100
+# run $(100000*(1/v_dt))
+# unfix f1
+
+fix f2 all deform 1 x final -20.2 20.2 y final -20.2 20.2 z final -10.4 10.4# remap v
+#fix f1 all nvt/sllod temp 1500 1500 100 
+run $(200000*(1/v_dt))
 unfix f2
 write_data ${output_folder}SiOx-deform.data
 
 
 
-fix f1 all nvt temp 3000 3000 100
-run $(100000*(1/v_dt))
-unfix f1
-write_data ${output_folder}SiOx-heated.data
-
-
-fix f1 all nvt temp 3000 1500 100
-run $(100000*(1/v_dt))
-unfix f1
-write_data ${output_folder}SiOx-cool1.data
-
-
-fix f1 all nvt temp 1500 350 100
-run $(100000*(1/v_dt))
-unfix f1
-write_data ${output_folder}SiOx-cool2.data
-
-
 fix f1 all nvt temp 350 350 100
-run $(1000000*(1/v_dt))
+run $(3000000*(1/v_dt))
+unfix f1
 write_data ${output_folder}SiOx-final-1.data
 
-fix f1 all nvt temp 350 350 100
-run $(1000000*(1/v_dt))
-write_data ${output_folder}SiOx-final2.data
-
-fix f1 all nvt temp 350 350 100
-run $(1000000*(1/v_dt))
-write_data ${output_folder}SiOx-final3.data
+min_style hftn
+minimize 1.0e-6 1.0e-6 1000 1000
+write_data ${output_folder}SiOx-min.data
