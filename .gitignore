@@ -2,4 +2,5 @@
 *.log
 *.restart
 output/*
+output-save/*
 *.data
