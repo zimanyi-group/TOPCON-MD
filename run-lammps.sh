@@ -12,26 +12,37 @@
 
 
 #======
-#SBATCH --ntasks=32
-#SBATCH --ntasks-per-node=32 
+#SBATCH --ntasks=64
+#SBATCH --ntasks-per-node=64
 #SBATCH --cpus-per-task=1 
 #SBATCH --mem=64G
-#SBATCH -t 10-00:00
+#SBATCH -t 12-00:00
 
-#COMMAND LINE ARGUMENTS
-#1ST FILE NAME
-#2ND 'farm' or no to tell if farm or not
-#3RD 
+###COMMAND LINE ARGUMENTS
+###1ST FILE NAME
+###2ND 'farm' or no to tell if farm or not
+###3RD 
 
-#blahhh SBATCH --array=0-1
 
 FILENAME=$1 #"SilicaAnneal.lmp"
+j=$SLURM_JOB_ID
+PART=16
 
 export OMP_NUM_THREADS=1
 NAME=${FILENAME%.*}
-UNIQUE_TAG=$(date +%m%d-%Hh%Mm%S)
+
+if [[ $2 == "farm" ]]; then
+    UNIQUE_TAG=$SLURM_JOBID
+else 
+    UNIQUE_TAG=$(date +%m%d-%Hh%Mm%S)
+fi
+
+
+echo $UNIQUE_TAG
+
 CWD=$(pwd) #current working directory
-OUT_FOLDER=$CWD"/output/"${NAME}${UNIQUE_TAG}"/"
+OUT_FOLDER=$CWD"/output/"${NAME}"-FARM-"${UNIQUE_TAG}"/"
+echo $OUT_FOLDER
 mkdir -p $CWD"/output/" #just in case output folder is not made
 mkdir $OUT_FOLDER #Now make folder where all the output will go
 
@@ -43,18 +54,13 @@ cp $IN_FILE $OUT_FOLDER
 s=$OUT_FOLDER$NAME"_SLURM.txt"
 #i=$SLURM_ARRAY_TASK_ID
 
-# echo $LOG_FILE 
-# echo $IN_FILE
-# echo $OUT_FOLDER
 
 
 
-j=$SLURM_JOB_ID
-PART=16
 
-if [[ $2 == "farm" ]];
-then #                                                                  Creates a variable in lammps ${output_folder}
-srun /home/agoga/sandbox/lammps/lmp_mpi -nocite -log $LOG_FILE -in $IN_FILE -var output_folder $OUT_FOLDER
+
+if [[ $2 == "farm" ]]; then    #                                                          Creates a variable in lammps ${output_folder}
+    srun /home/agoga/sandbox/lammps/lmp_mpi -nocite -log $LOG_FILE -in $IN_FILE -var output_folder $OUT_FOLDER
 else
-mpirun -np 2 lmp_mpi -nocite -log $LOG_FILE -in $IN_FILE -var output_folder $OUT_FOLDER
+    mpirun -np 2 lmp_mpi -nocite -log $LOG_FILE -in $IN_FILE -var output_folder $OUT_FOLDER
 fi

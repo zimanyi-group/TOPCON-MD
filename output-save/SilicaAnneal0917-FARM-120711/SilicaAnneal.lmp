@@ -37,7 +37,7 @@ velocity all create 7000.0 4928459 rot yes dist gaussian
 
 #qeq/reax uses the Rappe and Goddard QEq technique which was used in the potential in Fogarty2010(p2) that this current potential is. based on 
 fix r1 all qeq/reax 1 0.0 10.0 1e-6 reaxff
-fix b11 all reaxff/bonds 100 bonds.reaxff
+
 
 
 
@@ -63,19 +63,18 @@ write_data ${output_folder}SiO2-nvtAnneal.data
 #END @1
 
 #again heated at 7000 K for 100 ps
-fix f1 all nvt temp 7000 7000 100
-fix f2 all deform 1 x final 0 39.7508 y final 0 39.0886 z final 0 36.7919
+fix f1 all npt temp 7000 7000 100 aniso 0 0 5000
 run $(100000*(1/v_dt))
 unfix f1
 
 #cooled down 300 K for 200 ps
-fix f1 all nvt temp 7000 300 100
+fix f1 all npt temp 7000 300 100 aniso 0 0 5000
 run $(200000*(1/v_dt))
 unfix f1
 
 #amorphous structure was relaxed in the NPT ensemble for 100ps
 fix f1 all nvt temp 300 300 100
-
+fix f2 all deform 1 x final 0 39.7508 y final 0 39.0886 z final 0 36.7919
 
 
 run $(100000*(1/v_dt))
