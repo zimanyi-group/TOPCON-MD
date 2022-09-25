@@ -8,7 +8,7 @@ atom_style  charge
 
 
 #timestep of 0.5 femptoseconds
-variable dt equal .5
+variable dt equal .1
 variable printevery equal 5000
 
 
@@ -54,7 +54,7 @@ min_style hftn
 minimize 1.0e-6 1.0e-6 1000 1000
 
 
-variable heatflux equal .012/vol
+variable heatflux equal 2.5e-6/vol
 fix f1 all nve
 fix h1 all ehex 1000 ${heatflux}#.12
 run $(100000*(1/v_dt))
@@ -67,12 +67,12 @@ write_data ${output_folder}SiOx-heat.data
 # run $(100000*(1/v_dt))
 # unfix f1
 
-fix f2 all deform 1 x final -20.2 20.2 y final -20.2 20.2 z final -10.4 10.4# remap v
-#fix f1 all nvt/sllod temp 1500 1500 100 
+fix f2 all deform 1 x final -20.2 20.2 y final -20.2 20.2 z final -10.4 10.4 remap v
+fix f1 all nvt/sllod temp 1500 1500 100 
 run $(200000*(1/v_dt))
 unfix f2
+unfix f1
 write_data ${output_folder}SiOx-deform.data
-
 
 
 fix f1 all nvt temp 350 350 100
