@@ -54,11 +54,15 @@ min_style hftn
 minimize 1.0e-6 1.0e-6 1000 1000
 
 
-variable heatflux equal 2.5e-6/vol
-fix f1 all nve
-fix h1 all ehex 1000 ${heatflux}#.12
-run $(100000*(1/v_dt))
-unfix h1
+# variable heatflux equal 3e-6/vol
+# fix f1 all nve
+# fix h1 all ehex 1000 ${heatflux}#.12
+# run $(100000*(1/v_dt))
+# unfix h1
+# unfix f1
+
+fix f1 all nvt temp 5000 5000 100
+run $(300000*(1/v_dt))
 unfix f1
 
 write_data ${output_folder}SiOx-heat.data
@@ -82,4 +86,5 @@ write_data ${output_folder}SiOx-final-1.data
 
 min_style hftn
 minimize 1.0e-6 1.0e-6 1000 1000
+
 write_data ${output_folder}SiOx-min.data

@@ -12,11 +12,11 @@
 
 
 #======
-#SBATCH --ntasks=64
-#SBATCH --ntasks-per-node=64
+#SBATCH --ntasks=128
+#SBATCH --ntasks-per-node=128
 #SBATCH --cpus-per-task=1 
 #SBATCH --mem=64G
-#SBATCH -t 12-00:00
+#SBATCH -t 4-00:00
 
 ###COMMAND LINE ARGUMENTS
 ###1ST FILE NAME
@@ -38,11 +38,11 @@ else
 fi
 
 
-echo $UNIQUE_TAG
+
 
 CWD=$(pwd) #current working directory
 OUT_FOLDER=$CWD"/output/"${NAME}"-FARM-"${UNIQUE_TAG}"/"
-echo $OUT_FOLDER
+
 mkdir -p $CWD"/output/" #just in case output folder is not made
 mkdir $OUT_FOLDER #Now make folder where all the output will go
 
@@ -60,7 +60,7 @@ s=$OUT_FOLDER$NAME"_SLURM.txt"
 
 
 if [[ $2 == "farm" ]]; then    #                                                          Creates a variable in lammps ${output_folder}
-    srun /home/agoga/sandbox/lammps/lmp_mpi -nocite -log $LOG_FILE -in $IN_FILE -var output_folder $OUT_FOLDER
+    srun /home/agoga/sandbox/lammps/lmp_mpi -nocite -log $LOG_FILE -in $OUT_FOLDER$FILENAME -var output_folder $OUT_FOLDER
 else
-    mpirun -np 2 lmp_mpi -nocite -log $LOG_FILE -in $IN_FILE -var output_folder $OUT_FOLDER
+    mpirun -np 2 lmp_mpi -nocite -log $LOG_FILE -in $OUT_FOLDER$FILENAME -var output_folder $OUT_FOLDER
 fi

@@ -7,7 +7,7 @@
 
 #SBATCH --output=/global/cscratch1/sd/agoga/slurm-output/SiO-%j.txt
 #SBATCH --mail-user="adgoga@ucdavis.edu"
-#SBATCH --mail-type=FAIL,END
+#SBATCH --mail-type=BEGIN,FAIL,END
 
 
 
@@ -40,4 +40,4 @@ export OMP_NUM_THREADS=2
 export OMP_PLACES=threads
 export OMP_PROC_BIND=true
 #                                                           Creates a variable in lammps ${output_folder}
-srun -n 1600 -c 2 --cpu_bind=cores $HOME/lmp -nocite -log $LOG_FILE -in $IN_FILE -var output_folder $OUT_FOLDER
+srun -n 1600 -c 2 --cpu_bind=cores $HOME/lmp -nocite -log $LOG_FILE -in $OUT_FOLDER$FILENAME -var output_folder $OUT_FOLDER
