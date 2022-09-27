@@ -3,4 +3,5 @@
 *.restart
 output/*
 output-save/*
+sandbox/*
 *.data
