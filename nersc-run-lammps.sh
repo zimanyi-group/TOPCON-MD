@@ -2,8 +2,8 @@
 #SBATCH -N 50
 #SBATCH -C haswell
 #SBATCH -q regular
-#SBATCH -J aSiOx
-#SBATCH -t 24:00:00
+#SBATCH -J aSiO2
+#SBATCH -t 2-00:00
 
 #SBATCH --output=/global/cscratch1/sd/agoga/slurm-output/SiO-%j.txt
 #SBATCH --mail-user="adgoga@ucdavis.edu"

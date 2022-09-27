@@ -61,7 +61,7 @@ minimize 1.0e-6 1.0e-6 1000 1000
 # unfix h1
 # unfix f1
 
-fix f1 all nvt temp 5000 5000 100
+fix f1 all nvt temp 7000 7000 100
 run $(300000*(1/v_dt))
 unfix f1
 
@@ -72,12 +72,17 @@ write_data ${output_folder}SiOx-heat.data
 # unfix f1
 
 fix f2 all deform 1 x final -20.2 20.2 y final -20.2 20.2 z final -10.4 10.4 remap v
-fix f1 all nvt/sllod temp 1500 1500 100 
+fix f1 all nvt/sllod temp 7000 7000 100 
 run $(200000*(1/v_dt))
 unfix f2
 unfix f1
 write_data ${output_folder}SiOx-deform.data
 
+
+fix f1 all nvt temp 1500 1500 100
+run $(3000000*(1/v_dt))
+unfix f1
+write_data ${output_folder}SiOx-final-1.data
 
 fix f1 all nvt temp 350 350 100
 run $(3000000*(1/v_dt))

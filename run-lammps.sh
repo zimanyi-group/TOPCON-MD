@@ -4,7 +4,7 @@
 #! -S /bin/bash
 #SBATCH -D ./
 #SBATCH --job-name=a-SiO2
-#SBATCH --partition=high2 # Partition you are running on. Options: low2, med2, high2
+#SBATCH --partition=med2 # Partition you are running on. Options: low2, med2, high2
 #SBATCH --output=/home/agoga/sandbox/lammps/topcon/slurm-output/SiO-%j.txt
 #SBATCH --mail-user="adgoga@ucdavis.edu"
 #SBATCH --mail-type=FAIL,END
@@ -36,8 +36,6 @@ if [[ $2 == "farm" ]]; then
 else 
     UNIQUE_TAG=$(date +%m%d-%Hh%Mm%S)
 fi
-
-
 
 
 CWD=$(pwd) #current working directory
