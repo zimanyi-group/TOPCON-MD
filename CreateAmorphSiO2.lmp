@@ -61,15 +61,15 @@ fix f1 all nvt temp 300 300 100
 run $(500000*(1/v_dt))
 unfix f1
 
-# write_data ${output_folder}aSiO2-nvtAnneal.data
+write_data ${output_folder}aSiO2-nvtAnneal.data
 
 #'again heated at 7000 K for 100 ps'
-fix f1 all npt temp 7000 7000 100 aniso 0 0 5000
+fix f1 all npt temp 3000 3000 100 aniso 0 0 5000
 run $(100000*(1/v_dt))
 unfix f1
 
 #'cooled down 300 K for 200 ps'
-fix f1 all npt temp 7000 300 100 aniso 0 0 5000
+fix f1 all npt temp 3000 300 100 aniso 0 0 5000
 run $(200000*(1/v_dt))
 unfix f1
 
