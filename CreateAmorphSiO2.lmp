@@ -60,7 +60,7 @@ fix r1 all qeq/reax 1 0.0 10.0 1e-6 reaxff
 # run $(500000*(1/v_dt))
 # unfix f1
 
-# write_data ${output_folder}aSiO2-nvtAnneal.data
+write_data ${output_folder}aSiO2-nvtAnneal.data
 
 #'again heated at 7000 K for 100 ps'
 fix f1 all npt temp 5000 5000 100 aniso 0 0 5000
