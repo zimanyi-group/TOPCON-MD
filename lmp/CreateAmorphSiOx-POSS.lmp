@@ -76,16 +76,16 @@ write_data ${output_folder}SiOx-deform.data
 
 
 fix f1 all nvt temp 350 350 100
-run $(3000000*(1/v_dt))
+run $(300000*(1/v_dt))
 unfix f1
 write_data ${output_folder}SiOx-nvt-end.data
 
 fix f1 all npt temp 5000 5000 100 aniso 1 1 5000
-run $(3000000*(1/v_dt))
+run $(300000*(1/v_dt))
 unfix f1
 write_data ${output_folder}SiOx-npt-heat1.data
 
-fix f1 all npt temp 300 3000 100 aniso 1 1 5000
+fix f1 all npt temp 300 300 100 aniso 1 1 5000
 run $(3000000*(1/v_dt))
 unfix f1
 write_data ${output_folder}SiOx-npt-end.data

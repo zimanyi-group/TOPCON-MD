@@ -81,6 +81,6 @@ unfix f1
 write_data ${output_folder}SiO2-nptAnneal.data
 
 min_style hftn
-minimize 1.0e-6 1.0e-6 1000 1000
+minimize 1.0e-8 1.0e-8 100000 100000
 
 write_data ${output_folder}SiOx-min.data
