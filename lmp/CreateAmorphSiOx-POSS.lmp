@@ -10,13 +10,14 @@ atom_style  charge
 #timestep of 0.5 femptoseconds
 variable dt equal .5
 variable printevery equal 5000
+variable restartevery equal 20000
 
 
 #region box block 0 80 0 80 0 40# 0 $(v_lconst) 0 $(v_lconst) 0 $(v_lconst)
 # # ---------Create Atoms-------------------
 read_data data/POSS.data
 # #(-1.93457 -1.92202 -1.94879) to (1.93593 1.96108 1.94931)
-change_box all x scale 4 y scale 4 z scale 4
+change_box all x scale 4 y scale 4 z scale 4 remap
 replicate 6 6 3
 
 # read_data data/SiOx-cool1.data
@@ -50,22 +51,17 @@ dump_modify d1 element H O Si
 thermo ${printevery}
 thermo_style custom step temp density vol
 
+restart ${restartevery} ${output_folder}SiOxRestart*.data
+
 min_style hftn
 minimize 1.0e-6 1.0e-6 1000 1000
 
-
-# variable heatflux equal 3e-6/vol
-# fix f1 all nve
-# fix h1 all ehex 1000 ${heatflux}#.12
-# run $(100000*(1/v_dt))
-# unfix h1
-# unfix f1
 
 fix f1 all nvt temp 7000 7000 100
 run $(300000*(1/v_dt))
 unfix f1
 
-write_data ${output_folder}SiOx-heat.data
+write_data ${output_folder}SiOx-nvt-heat.data
 # velocity all create 2000.0 123456 mom yes rot yes dist gaussian  # mom and rot yes means net linear and angular momentum is zero
 # fix f1 all nvt temp 2000.0 2000.0 100
 # run $(100000*(1/v_dt))
@@ -79,17 +75,23 @@ unfix f1
 write_data ${output_folder}SiOx-deform.data
 
 
-fix f1 all nvt temp 1500 1500 100
-run $(3000000*(1/v_dt))
-unfix f1
-write_data ${output_folder}SiOx-final-1.data
-
 fix f1 all nvt temp 350 350 100
 run $(3000000*(1/v_dt))
 unfix f1
-write_data ${output_folder}SiOx-final-1.data
+write_data ${output_folder}SiOx-nvt-end.data
+
+fix f1 all npt temp 5000 5000 100 aniso 1 1 5000
+run $(3000000*(1/v_dt))
+unfix f1
+write_data ${output_folder}SiOx-npt-heat1.data
+
+fix f1 all npt temp 300 3000 100 aniso 1 1 5000
+run $(3000000*(1/v_dt))
+unfix f1
+write_data ${output_folder}SiOx-npt-end.data
+
 
 min_style hftn
-minimize 1.0e-6 1.0e-6 1000 1000
+minimize 1.0e-8 1.0e-8 100000 100000
 
-write_data ${output_folder}SiOx-min.data
+write_data ${output_folder}SiOx-final.data
