@@ -8,7 +8,7 @@ atom_style  charge
 
 
 #timestep of 0.5 femptoseconds
-variable dt equal .1
+variable dt equal .5
 variable printevery equal 5000
 
 
