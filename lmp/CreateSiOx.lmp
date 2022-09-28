@@ -32,7 +32,7 @@ mass         1 1.00784 #H
 mass         2 15.9991 #O
 mass         3 28.0855 #Si
 
-pair_style	    reaxff topcon.control
+pair_style	    reaxff potential/topcon.control
 pair_coeff	    * * potential/ffield_Nayir_SiO_2019.reax H O Si
 #Pair style reaxff requires use of exactly one of the fix qeq/reaxff or fix qeq/shielded or fix acks2/reaxff commands 
 

@@ -17,7 +17,7 @@ variable dt equal .5
 read_data data/SilicaCrystal3k.data
 
 
-pair_style	    reaxff topcon.control
+pair_style	    reaxff potential/topcon.control
 pair_coeff	    * * potential/ffield_Nayir_SiO_2019.reax H O Si
 #Pair style reaxff requires use of exactly one of the fix qeq/reaxff or fix qeq/shielded or fix acks2/reaxff commands 
 
