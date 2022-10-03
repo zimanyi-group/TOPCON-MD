@@ -13,8 +13,8 @@ variable dt equal .5
 
 
 # ---------Create Atoms-------------------
-#read_data data/SilicaCrystal3k.data
-read_data data/aSiO2-nvtAnneal.data
+read_data data/SilicaCrystal3k.data
+# read_data data/aSiO2-nvtAnneal.data
 
 # ----------Define interatomic potential --------------
 #Pair style reaxff requires use of exactly one of the fix qeq/reaxff or fix qeq/shielded or fix acks2/reaxff commands 
@@ -30,50 +30,50 @@ timestep ${dt}
 
 
 thermo 10000
-thermo_style custom step temp density vol
+thermo_style custom step temp density vol flush yes
 
 dump d1 all custom 10000 ${output_folder}CreateAmorphSiO2.dump id type q x y z ix iy iz mass element vx vy vz
 dump_modify d1 element H O Si
 
-restart 20000 ${output_folder}SiO2Restart*.data
+#restart 20000 ${output_folder}SiO2Restart*.data
 
 #qeq/reax uses the Rappe and Goddard QEq technique which was used in the potential in Fogarty2010(p2) that this current potential is. based on 
 fix r1 all qeq/reax 1 0.0 10.0 1e-6 reaxff
 
 
 # initial temperature of the bulk c-SiO2 is set at 7000 K
-# velocity all create 5000.0 4928459 rot yes dist gaussian
+velocity all create 5000.0 4928459 rot yes dist gaussian
 
 
 #'The bulk was equilibrated at such high temperature for 50 ps in an NVT ensemble'
-# fix f1 all nvt temp 7000 7000 100
-# run $(50000*(1/v_dt))#divide by timestep to make the run time in fs
-# unfix f1
+fix f1 all nvt temp 5000 5000 100
+run $(50000*(1/v_dt))#divide by timestep to make the run time in fs
+unfix f1
 
-# #'cool down to 300 K in 100 ps' 
-# fix f1 all nvt temp 7000 300 100
-# run $(100000*(1/v_dt))
-# unfix f1
+#'cool down to 300 K in 100 ps' 
+fix f1 all nvt temp 5000 300 100
+run $(100000*(1/v_dt))
+unfix f1
 
-# #'relax at 300 K for 500ps'
-# fix f1 all nvt temp 300 300 100
-# run $(500000*(1/v_dt))
-# unfix f1
+#'relax at 300 K for 500ps'
+fix f1 all nvt temp 300 300 100
+run $(500000*(1/v_dt))
+unfix f1
 
 write_data ${output_folder}aSiO2-nvtAnneal.data
 
 #'again heated at 7000 K for 100 ps'
-fix f1 all npt temp 5000 5000 100 aniso 1 1 5000
+fix f1 all npt temp 5000 5000 100 aniso 0 0 5000
 run $(100000*(1/v_dt))
 unfix f1
 
 #'cooled down 300 K for 200 ps'
-fix f1 all npt temp 5000 300 100 aniso 1 1 5000
+fix f1 all npt temp 5000 300 100 aniso 0 0 5000
 run $(200000*(1/v_dt))
 unfix f1
 
 #'amorphous structure was relaxed in the NPT ensemble for 100ps'
-fix f1 all npt temp 300 300 100 aniso 1 1 5000
+fix f1 all npt temp 300 300 100 aniso 0 0 5000
 run $(100000*(1/v_dt))
 unfix f1
 
