@@ -49,7 +49,7 @@ dump d1 all custom ${printevery} ${output_folder}CreateAmorphSiOx.dump id type q
 dump_modify d1 element H O Si
 
 thermo ${printevery}
-thermo_style custom step temp density vol flush yes
+thermo_style custom step temp density vol# flush yes
 
 restart ${restartevery} ${output_folder}SiOxRestart*.data
 
@@ -72,7 +72,7 @@ unfix f1
 write_data ${output_folder}SiOx-nvt-end.data
 
 
-fix f1 all npt temp 5000 5000 100 aniso 1 1 5000
+fix f1 all npt temp 3000 3000 100 aniso 1 1 5000
 run $(300000*(1/v_dt))
 unfix f1
 write_data ${output_folder}SiOx-npt-heat1.data

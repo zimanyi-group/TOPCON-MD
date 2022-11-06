@@ -3,7 +3,7 @@
 #! -j y
 #! -S /bin/bash
 #SBATCH -D ./
-#SBATCH --job-name=a-SiO2
+#SBATCH --job-name=a-SiO2ws
 #SBATCH --partition=high2 # Partition you are running on. Options: low2, med2, high2
 #SBATCH --output=/home/agoga/sandbox/lammps/topcon/slurm-output/SiO-%j.txt
 #SBATCH --mail-user="adgoga@ucdavis.edu"

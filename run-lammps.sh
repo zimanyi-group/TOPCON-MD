@@ -3,20 +3,18 @@
 #! -j y
 #! -S /bin/bash
 #SBATCH -D ./
-#SBATCH --job-name=a-SiO2
+#SBATCH --job-name=EQa-SiOx
 #SBATCH --partition=high2 # Partition you are running on. Options: low2, med2, high2
 #SBATCH --output=/home/agoga/sandbox/lammps/topcon/slurm-output/SiO-%j.txt
 #SBATCH --mail-user="adgoga@ucdavis.edu"
 #SBATCH --mail-type=FAIL,END
-
-
 
 #======
 #SBATCH --ntasks=128
 #SBATCH --ntasks-per-node=128
 #SBATCH --cpus-per-task=1 
 #SBATCH --mem=64G
-#SBATCH -t 4-00:00
+#SBATCH -t 10-00:00
 
 ###COMMAND LINE ARGUMENTS
 ###1ST FILE NAME
