@@ -5,6 +5,7 @@ from matplotlib import pyplot as plt
 import pandas as pd
 import numpy as np
 from scipy.signal import find_peaks
+from matplotlib.animation import FuncAnimation 
 
 
 def coordinationTimeseries(file,coordList):
@@ -19,7 +20,7 @@ def coordinationTimeseries(file,coordList):
     pipeline.modifiers.append(m.SelectTypeModifier(property = 'Particle Type', types = {'Si'}))
     pipeline.modifiers.append(m.CoordinationAnalysisModifier(cutoff = 2, number_of_bins = 200,partial=True))
     pipeline.modifiers.append(m.HistogramModifier(bin_count=200, property='Coordination',only_selected=True))
-    #pipeline.modifiers.append(m.TimeSeriesModifier(operate_on='HistogramModifier.Coordination'))
+    #pipeline.modifiers.append(m.TimeSeriesModifier(operate_on='HistogramModifier.Coordination'))11
     
     
     ts=np.empty([numframes,l]) 
@@ -65,8 +66,70 @@ def coordinationTimeseries(file,coordList):
     return ts
     
     
-        
+def rdfTimeseries(file,range,out):
+    # fig = plt.figure() 
     
+    # # marking the x-axis and y-axis
+    # axis = plt.axes(xlim =(0, 4)) 
+    
+    # # initializing a line variable
+    # line, = axis.plot([], [], lw = 3) 
+
+
+    pipeline = import_file(file)
+    
+    numframes=pipeline.source.num_frames
+
+
+    # Print the list of input particle types.
+    # They are represented by ParticleType objects attached to the 'Particle Type' particle property.
+    # for t in pipeline.compute().particles.particle_types.types:
+    #     print("Type %i: %s" % (t.id, t.name))
+
+    # Calculate partial RDFs:
+    pipeline.modifiers.append(m.CoordinationAnalysisModifier(cutoff=5.0, number_of_bins=100, partial=True))
+    for i in np.arange(numframes):
+            
+        # Access the output DataTable:
+        rdf_table = pipeline.compute(i).tables['coordination-rdf']
+
+        # The y-property of the data points of the DataTable is now a vectorial property.
+        # Each vector component represents one partial RDF.
+        rdf_names = rdf_table.y.component_names
+        t=rdf_table.xy()[:,0]
+        # Print a list of partial g(r) functions.
+        for component, name in enumerate(rdf_names):
+            # print("g(r) for pair-wise type combination %s:" % name)
+            plt.plot(t,rdf_table.y[:,component],label=name)
+        numstr=''
+        if i < 10:
+            numstr+='00'+str(i) 
+        elif i < 100:
+            numstr='0'+str(i) 
+        else:
+           numstr=str(i)  
+        plt.legend(loc='upper left',title='Pairs')
+        plt.xlabel('Pair separation distance(angstroms)')
+        plt.ylabel('g(r)')
+        plt.ylim(bottom=0,top=25)
+        plt.xlim(left=2,right=3)
+        plt.title('RDF - timestep ' + numstr)
+        plt.savefig(out+'coordts-'+numstr)
+        plt.clf()
+
+
+    # The DataTable.xy() method yields everthing as one combined NumPy table.
+    # This includes the 'r' values in the first array column, followed by the
+    # tabulated g(r) partial functions in the remaining columns. 
+    # print(rdf_table.xy()[:,0])
+
+    
+    # def init(file):
+    #     return file
+    
+    # def animate(i):
+    #     return i
+        
     
         
 def bondAnalysis(file):
@@ -75,8 +138,8 @@ def bondAnalysis(file):
         
         numframes=pipeline.source.num_frames
     
-        pipeline.modifiers.append(CreateBondsModifier(cutoff = 2))
-        pipeline.modifiers.append(BondAnalysisModifier(partition=BondAnalysisModifier.Partition.ByParticleType,bins = 200))
+        pipeline.modifiers.append(m.CreateBondsModifier(cutoff = 2))
+        pipeline.modifiers.append(m.BondAnalysisModifier(partition=m.BondAnalysisModifier.Partition.ByParticleType,bins = 200))
         
         # Export bond angle distribution to an output text file.
         #export_file(pipeline, 'output/bond_angles.txt', 'txt/table', key='bond-angle-distr', end_frame=1)
