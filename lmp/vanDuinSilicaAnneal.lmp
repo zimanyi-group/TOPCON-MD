@@ -24,13 +24,13 @@ compute t1 all temp
 compute p1 all pressure t1
 
 thermo 10000
-thermo_style custom step time temp etotal pe press ke vol
+thermo_style custom step temp density vol pe ke etotal
 
 dump d1 all custom 10000 ${output_folder}silicaanneal.dump id type q x y z ix iy iz mass element vx vy vz
 dump_modify d1 element H O Si
 
 # initial temperature of the bulk c-SiO2 is set at 7000 K
-velocity all create 7000.0 4928459 rot yes dist gaussian
+velocity all create 4000.0 4928459 rot yes dist gaussian
 
 #qeq/reax uses the Rappe and Goddard QEq technique which was used in the potential in Fogarty2010(p2) that this current potential is. based on 
 fix r1 all qeq/reax 1 0.0 10.0 1e-6 reaxff
@@ -39,12 +39,12 @@ run 0#set thermo variables etc
 
 
 #and the bulk was equilibrated at such high temperature for 50 ps in an NVT ensemble
-fix f1 all nvt temp 7000 7000 100
+fix f1 all nvt temp 5000 5000 100
 run $(50000*(1/v_dt))#divide by timestep to make the run time in fs
 unfix f1
 
 #cool down to 300 K in 100 ps 
-fix f1 all nvt temp 7000 300 100
+fix f1 all nvt temp 5000 300 100
 run $(100000*(1/v_dt))
 unfix f1
 
@@ -57,12 +57,12 @@ write_data ${output_folder}SiO2-nvtCycle.data
 
 
 #again heated at 7000 K for 100 ps
-fix f1 all npt temp 7000 7000 100 aniso 0 0 5000
+fix f1 all npt temp 5000 5000 100 aniso 0 0 5000
 run $(100000*(1/v_dt))
 unfix f1
 
 #cooled down 300 K for 200 ps
-fix f1 all npt temp 7000 300 100 aniso 0 0 5000
+fix f1 all npt temp 5000 300 100 aniso 0 0 5000
 run $(200000*(1/v_dt))
 unfix f1
 
@@ -71,5 +71,9 @@ fix f1 all npt temp 300 300 100 aniso 0 0 5000
 run $(100000*(1/v_dt))
 unfix f1
 
+write_data ${output_folder}SiO2-premin.data
+
+min_style hftn
+minimize 1.0e-6 1.0e-6 10000 10000
 
 write_data ${output_folder}SiO2-nptCycle.data

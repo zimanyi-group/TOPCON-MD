@@ -8,7 +8,7 @@ from scipy.signal import find_peaks
 from matplotlib.animation import FuncAnimation 
 
 
-def coordinationTimeseries(file,coordList):
+def coordinationTimeseries(file,coordList,timestepLabels=[],title=''):
 
     l=len(coordList)
     # try: 
@@ -20,7 +20,7 @@ def coordinationTimeseries(file,coordList):
     pipeline.modifiers.append(m.SelectTypeModifier(property = 'Particle Type', types = {'Si'}))
     pipeline.modifiers.append(m.CoordinationAnalysisModifier(cutoff = 2, number_of_bins = 200,partial=True))
     pipeline.modifiers.append(m.HistogramModifier(bin_count=200, property='Coordination',only_selected=True))
-    #pipeline.modifiers.append(m.TimeSeriesModifier(operate_on='HistogramModifier.Coordination'))11
+    #pipeline.modifiers.append(m.TimeSeriesModifier(operate_on='HistogramModifier.Coordination'))
     
     
     ts=np.empty([numframes,l]) 
@@ -28,9 +28,9 @@ def coordinationTimeseries(file,coordList):
     for i in t:
         
         data = pipeline.compute(i)
-    # # print(data.objects.Count)
-    # for o in data.objects:
-    #     print(o)
+        # # print(data.objects.Count)
+        # for o in data.objects:
+        #     print(o)
         
         ea = np.array(data.tables['histogram[Coordination]'].xy())
         e=ea[:,0]
@@ -39,19 +39,33 @@ def coordinationTimeseries(file,coordList):
             ind=np.argmin(np.abs(e-coordList[n]))
             ts[i,n]=ea[ind][1]
 
-        
+    fig = plt.figure()
     for n in np.arange(l):
         val=ts[:,n]
         lstr=coordList[n]
         plt.plot(t,val,label=lstr)
 
-    plt.axvline(x=120)
-    plt.axvline(x=240)
-    plt.axvline(x=360)
-    plt.axvline(x=480)
-    plt.axvline(x=600)
+    ###### Plot the different labels for time regions
+    xaxislen=fig.gca().get_xlim()[1]
+    figwidth=fig.get_figwidth()
+    figwidth,figheight=fig.canvas.get_width_height()
+    yratio=.15
+    xbuff=15#pixels of buffer from text to vertical line
+    
+    #Ratio of all text's height on figure
+
+    for lbl in timestepLabels:
+        xpos=lbl[0]
+        xratio=xpos/xaxislen
+        
+        #print(str(xratio)+'*'+str(figwidth))        
+        plt.axvline(x=xpos)
+        plt.text(x=xpos+xbuff,y=yratio*figheight,s=lbl[1])
+
+
+    plt.title(title)
     plt.legend(loc='upper left',title='Coordination Number')
-    plt.xlabel('Timestep(2500fs)')
+    plt.xlabel('Timestep')
     plt.ylabel('Count')
     plt.show()
     # df = pd.DataFrame(e, columns=['word', 'frequency'])
@@ -111,7 +125,7 @@ def rdfTimeseries(file,range,out):
         plt.legend(loc='upper left',title='Pairs')
         plt.xlabel('Pair separation distance(angstroms)')
         plt.ylabel('g(r)')
-        plt.ylim(bottom=0,top=25)
+        plt.ylim(bottom=0,top=10)
         plt.xlim(left=2,right=3)
         plt.title('RDF - timestep ' + numstr)
         plt.savefig(out+'coordts-'+numstr)

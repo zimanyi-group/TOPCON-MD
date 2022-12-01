@@ -12,8 +12,9 @@ variable dt equal .5
 variable printevery equal 5000
 variable restartevery equal 0#500000
 variable Ti equal 1000
-variable dT equal 200
-variable i loop 10
+variable dT equal 50
+variable i loop 20
+variable loopruns equal 250000
 
 
 
@@ -56,7 +57,7 @@ variable eco equal c_reax[10]      #eco = conjugation energy
 variable ew equal c_reax[11]       #ew = van der Waals energy
 variable ep equal c_reax[12]       #ep = Coulomb energy
 variable efi equal c_reax[13]      #efi = electric field energy (always 0.0)
-variable eqeq equal c_reax[1]      #eqeq = charge equilibration energy
+variable eqeq equal c_reax[14]      #eqeq = charge equilibration energy
 # compute      myKE all ke/atom
 # compute      myPE all pe/atom
 # compute      myStress all stress/atom NULL virial
@@ -79,7 +80,7 @@ variable curT equal $(v_Ti + v_i*v_dT)
 print ${curT}
 
 fix f1 all nvt temp ${curT} ${curT} 100
-run $(1*(1/v_dt))
+run $(v_loopruns*(1/v_dt))
 unfix f1
 
 write_data ${output_folder}SiOx-nvt$(v_i).data

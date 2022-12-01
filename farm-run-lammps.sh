@@ -10,11 +10,11 @@
 #SBATCH --mail-type=FAIL,END
 
 
-#SBATCH --ntasks=128
-#SBATCH --ntasks-per-node=128
+#SBATCH --ntasks=256
+#SBATCH --ntasks-per-node=256
 #SBATCH --cpus-per-task=1 
 #SBATCH --mem=64G
-#SBATCH -t 4-00:00
+#SBATCH -t 10-00:00
 
 
 lmppre='lmp/'
