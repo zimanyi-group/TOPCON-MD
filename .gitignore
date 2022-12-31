@@ -3,6 +3,7 @@
 *.restart
 output/*
 output-save/*
+output-farm/*
 sandbox/*
 *.data
 density-matching/*
