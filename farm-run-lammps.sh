@@ -21,12 +21,13 @@ then
     exit 1
 fi
 
-
+#priority
 if [ -z "$4" ];
 then
     set -- "$@" 'med2' #modifies the command line argument 4  - https://stackoverflow.com/questions/61096448/how-to-modify-command-line-arguments-inside-bash-script-using-set
 fi
 
+#timelimit
 if [ -z "$5" ]; #if no time given then default to 4 days
 then
     set -- "$@" '4-0'
@@ -66,7 +67,7 @@ FILENAME=${1#"$lmppre"} #remove lmp/ from file if there
 
 NAME=\${FILENAME%.*}
 
-UNIQUE_TAG="-FARM-"\$SLURM_JOBID
+UNIQUE_TAG="-$2-"\$SLURM_JOBID
 
 OUT_FOLDER=$CWD"/output/"\${NAME}\${UNIQUE_TAG}"/"
 mkdir -p $CWD"/output/" #just in case output folder is not made
