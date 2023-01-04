@@ -16,17 +16,8 @@ variable dt equal .5 #timestep
 
 shell mkdir ${datapath}
 
-# ------- Create boxs --------
-lattice 	diamond 5.43 orient x 1 0 0 orient y 0 1 0 orient z 0 0 1
-change_box	all z delta 0 ${chng} units lattice
-displace_atoms	all move 0 0 ${displ} units lattice
-
-region 		CrystallineBox block EDGE EDGE EDGE EDGE EDGE 2.0 units lattice
-region		AmorphousBox block EDGE EDGE EDGE EDGE ${displ} EDGE units lattice
-
-region		heating block EDGE EDGE EDGE EDGE 2.0 EDGE units lattice
-
 # ---------Create Atoms-------------------
+
 
 
 # ----------Define interatomic potential --------------
@@ -71,6 +62,10 @@ thermo ${printevery}
 thermo_style custom step temp density vol pe ke etotal #flush yes
 #thermo_style custom step temp density ke epair etotal v_eb v_ea v_elp v_ev v_epen v_ecoa v_ehb v_et v_eco v_ew v_ep v_eqeq
 #restart ${restartevery} ${output_folder}data/SiOxRestart*.data
+
+
+
+
 
 # ---------Molecular Dynamics-------------------
 
