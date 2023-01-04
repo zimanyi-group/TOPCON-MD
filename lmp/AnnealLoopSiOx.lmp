@@ -9,7 +9,7 @@ atom_style  charge
 #timestep of 0.5 femptoseconds
 variable printevery equal 50000
 variable restartevery equal 0#500000
-variable datapath equal ""
+variable datapath string "${output_folder}data/"
 
 variable dt equal .5 #timestep
 variable Ti equal 1000 #Starting temp
@@ -18,8 +18,8 @@ variable dT equal 25 #delta temp
 variable i loop 30 #number of loops
 variable loopruns equal 10
 
-
-shell mkdir ${output_folder}/data/
+shell mkdir ${datapath}
+#shell mkdir ${output_folder}/data/
 
 
 # ---------Create Atoms-------------------
@@ -90,7 +90,8 @@ fix f1 all nvt temp ${curT} ${curT} 100
 run $(v_loopruns*(1/v_dt))
 unfix f1
 
-write_data ${output_folder}data/SiOx-slowish$(v_i).data
+write_data ${datapath}SiOx-slowish$(v_i).data
+#write_data ${output_folder}data/SiOx-slowish$(v_i).data
 # fix f1 all nve
 # run $(150000*(1/v_dt))
 # unfix f1

@@ -9,22 +9,12 @@ atom_style  charge
 
 variable printevery equal 50000
 variable restartevery equal 0#500000
-variable datapath string "${output_folder}data/"
 
 #timestep of 0.5 femptoseconds
 variable dt equal .5 #timestep
 
-shell mkdir ${datapath}
+shell mkdir ${output_folder}/data/
 
-# ------- Create boxs --------
-lattice 	diamond 5.43 orient x 1 0 0 orient y 0 1 0 orient z 0 0 1
-change_box	all z delta 0 ${chng} units lattice
-displace_atoms	all move 0 0 ${displ} units lattice
-
-region 		CrystallineBox block EDGE EDGE EDGE EDGE EDGE 2.0 units lattice
-region		AmorphousBox block EDGE EDGE EDGE EDGE ${displ} EDGE units lattice
-
-region		heating block EDGE EDGE EDGE EDGE 2.0 EDGE units lattice
 
 # ---------Create Atoms-------------------
 
@@ -82,6 +72,6 @@ thermo_style custom step temp density vol pe ke etotal #flush yes
 # unfix f1
 
 
-write_data ${datapath}SiOx.data
+write_data ${output_folder}data/CreateInterfaceSiOx.data
 
 
