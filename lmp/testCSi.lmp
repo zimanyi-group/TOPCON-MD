@@ -6,33 +6,33 @@ boundary    p p p
 atom_style  charge
 #atom_modify map array #likely is not needed
 
-#timestep of 0.5 femptoseconds
+
 variable printevery equal 50000
 variable restartevery equal 0#500000
 variable datapath string "${output_folder}data/"
 
+variable massSi equal 28.0855 #Si
+variable massO equal 15.9991 #O
+variable massH equal  1.00784 #H 
+#timestep of 0.5 femptoseconds
 variable dt equal .5 #timestep
-variable Ti equal 1000 #Starting temp
-variable Tf equal 1800 
-variable totSteps equal 30
 
-variable i loop ${totSteps} #number of loops
-variable dT equal $((v_Tf-v_Ti)/v_totSteps) #delta temp
-
-variable loopruns equal 10
+variable extent equal 5
 
 shell mkdir ${datapath}
-#shell mkdir ${output_folder}/data/
-
 
 # ---------Create Atoms-------------------
-read_data data/SiOx.data
 
-#HYDROGEN CREATION
-#create a single hydrogen inside the pertubation
-create_atoms 1 random 15 1234567 NULL overlap .4 maxtry 10000
+lattice diamond 5.43 orient x 1 0 0 orient y 0 1 0 orient z 0 0 1
+region sim block 0 ${extent} 0 ${extent} 0 ${extent}
 
-# read_data data/SiOx-cool1.data
+create_box 3 sim
+
+mass         1 ${massH}
+mass         2 ${massO}
+mass         3 ${massSi}
+
+create_atoms 3 region sim
 
 # ----------Define interatomic potential --------------
 #Pair style reaxff requires use of exactly one of the fix qeq/reaxff or fix qeq/shielded or fix acks2/reaxff commands 
@@ -42,7 +42,6 @@ pair_coeff	    * * potential/ffield_Nayir_SiO_2019.reax H O Si
 #skin distance of 2 angstrom
 neighbor        2 bin
 neigh_modify    every 10 delay 0 check no
-
 
 timestep ${dt}
 
@@ -68,10 +67,7 @@ variable ew equal c_reax[11]       #ew = van der Waals energy
 variable ep equal c_reax[12]       #ep = Coulomb energy
 variable efi equal c_reax[13]      #efi = electric field energy (always 0.0)
 variable eqeq equal c_reax[1]      #eqeq = charge equilibration energy
-# compute      myKE all ke/atom
-# compute      myPE all pe/atom
-# compute      myStress all stress/atom NULL virial
-# compute      flux all heat/flux myKE myPE myStress
+
 
 dump d1 all custom ${printevery} ${output_folder}SlowishAnnealDT75.dump id type q x y z ix iy iz mass element vx vy vz
 dump_modify d1 element H O Si
@@ -79,27 +75,22 @@ dump_modify d1 element H O Si
 thermo ${printevery}
 thermo_style custom step temp density vol pe ke etotal #flush yes
 #thermo_style custom step temp density ke epair etotal v_eb v_ea v_elp v_ev v_epen v_ecoa v_ehb v_et v_eco v_ew v_ep v_eqeq
-#restart ${restartevery} ${output_folder}SiOxRestart*.data
+#restart ${restartevery} ${output_folder}data/SiOxRestart*.data
+
+
+
+
+
+# ---------Molecular Dynamics-------------------
 
 # min_style hftn
 # minimize 1.0e-6 1.0e-6 1000 1000
 
-
-label loopstart
-variable curT equal $(v_Ti + v_i*v_dT)
-print ${curT}
-
-fix f1 all nvt temp ${curT} ${curT} 100
-run $(v_loopruns*(1/v_dt))
-unfix f1
-
-write_data ${datapath}AnnealLoop$(v_i).data
-#write_data ${output_folder}data/SiOx-slowish$(v_i).data
-# fix f1 all nve
+# fix f1 all nvt 1000 1000 100
 # run $(150000*(1/v_dt))
 # unfix f1
 
-#write_data ${output_folder}SiOx-nve${i}.data
 
-next i
-jump SELF loopstart
+write_data ${datapath}SiOx.data
+
+

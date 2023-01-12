@@ -9,14 +9,54 @@ atom_style  charge
 
 variable printevery equal 50000
 variable restartevery equal 0#500000
+variable datapath string "${output_folder}data/"
+
+variable massSi equal 28.0855 #Si
+variable massO equal 15.9991 #O
+variable massH equal  1.00784 #H 
 
 #timestep of 0.5 femptoseconds
 variable dt equal .5 #timestep
 
-shell mkdir ${output_folder}/data/
+shell mkdir ${datapath}
+
+variable zwidth equal 'zhi-zlo'
+variable zwidth2 equal '(zhi-zlo)*2.2'
+variable disp equal 1
+variable zonehalfwidth equal 4
 
 
-# ---------Create Atoms-------------------
+# ------- Create boxs --------
+lattice diamond 5.43 orient x 1 0 0 orient y 0 1 0 orient z 0 0 1
+
+read_data data/SiOx.data group gSiOx
+
+change_box all z final 0 ${zwidth} remap units box
+
+region rSiOx block EDGE EDGE EDGE EDGE EDGE EDGE
+
+variable zzlo equal zlo
+variable zzhi equal zhi
+#width of annealing zone
+variable zonewidthlo equal ${zwidth}-4
+variable zonewidthhi equal ${zwidth}+4
+#@TODO z=0 needs a bit of annealing too
+
+change_box all z final 0 ${zwidth2} units box
+
+region sim block EDGE EDGE EDGE EDGE EDGE EDGE
+region rCSi intersect 2 sim rSiOx side out
+
+create_atoms 3 region rCSi
+group gCSi region rCSi
+
+#now add a little room to the current box to shift the atoms up 
+change_box gCSi z delta 0 ${disp} remap units box
+
+
+mass         1 ${massH}
+mass         2 ${massO}
+mass         3 ${massSi}
 
 
 # ----------Define interatomic potential --------------
@@ -72,6 +112,7 @@ thermo_style custom step temp density vol pe ke etotal #flush yes
 # unfix f1
 
 
-write_data ${output_folder}data/CreateInterfaceSiOx.data
+#write_data ${datapath}Interface-CSi-SiOx.data
+write_data data/Interface-CSi-SiOx.data
 
 

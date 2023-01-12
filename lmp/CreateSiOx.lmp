@@ -5,15 +5,15 @@ dimension     3
 boundary    p p p
 atom_style  charge
 
-shell mkdir 'data'
-
 #atom_modify map array
 variable seed equal 12345
 variable dt equal .5
 #timestep of 0.5 femptoseconds
 variable printevery equal 10000
 variable restartevery equal 0#500000
+variable datapath string "${output_folder}data/"
 
+shell mkdir ${datapath}
 
 variable massSi equal 28.0855 #Si
 variable massO equal 15.9991 #O
@@ -21,17 +21,25 @@ variable massH equal  1.00784 #H
 
 
 variable numSi equal 1000
-variable numO equal 1300
+variable numO equal 1500
 variable density equal 2.2 #approximate density
-variable volume equal $((v_numSi*v_massSi+v_numO*v_massO)/(v_density*100)) #Density calc
-variable extent equal $(v_volume^(1/3))
+variable latticeConst equal 5.43
 
+#below math to determine the correct x and y dimension which are multiples of 5.43 for
+#creating interfaces with c-Si in future
+variable volume equal $((v_numSi*v_massSi+v_numO*v_massO)/(v_density*100)) #Density calc
+
+variable xyE equal floor($(v_volume^(1/3)))
+
+variable zE equal $(v_volume/(v_xyE^2))
+
+print ${xyE}
 # print "$(v_extent)"
 # print "$(v_extent*5.43)"
 
-lattice diamond 5.43 #@TODO why does density*100 with a lattice of 5.43 work
+lattice diamond ${latticeConst} #@TODO why does density*100 with a lattice of 5.43 work
 
-region sim block 0 ${extent} 0 ${extent} 0 ${extent}
+region sim block 0 ${xyE} 0 ${xyE} 0 ${zE}
 
 create_box 3 sim
 
@@ -88,19 +96,24 @@ fix f1 all nvt temp 300 300 100
 run $(200000*(1/v_dt))#divide by timestep to make the run time in fs
 unfix f1
 
-fix f1 all npt temp 2500 2500 100 aniso 1 1 5000
+#only allow demorphing in the z dimension
+fix f1 all npt temp 2500 2500 100 z 1 1 5000
 run $(200000*(1/v_dt))#divide by timestep to make the run time in fs
 unfix f1
 
-fix f1 all npt temp 300 300 100 aniso 1 1 5000
+fix f1 all npt temp 2500 300 100 z 1 1 5000
 run $(200000*(1/v_dt))#divide by timestep to make the run time in fs
+unfix f1
+
+fix f1 all npt temp 300 300 100 z 1 1 5000
+run $(100000*(1/v_dt))#divide by timestep to make the run time in fs
 unfix f1
 
 min_style hftn
 minimize 1.0e-8 1.0e-8 100 100
 
 #must have made new dir data above
-write_data ${output_folder}a-SiOx.data
+write_data ${datapath}a-SiOx.data
 
 print 'done'
 
