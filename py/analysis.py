@@ -1,3 +1,4 @@
+#original file written by Andrew Diggs
 from ovito.io import import_file, export_file
 import ovito.modifiers as m#import BondAnalysisModifier, CreateBondsModifier,CoordinationAnalysisModifier,TimeSeriesModifier
 import glob, os
@@ -8,13 +9,17 @@ from scipy.signal import find_peaks
 from matplotlib.animation import FuncAnimation 
 from itertools import cycle
 lines = ["-","--",":","-."]
-colors = ["r","b","g","c","y"]
+colors = ["y","c","g","b","r"]
 
 
 def coordinationTimeseries(folderList,coordList,timestepLabels=[],title=''):
     pipelineList=[]
     linecycler = cycle(lines)
     colorcycler = cycle(colors)
+    
+    l=len(coordList)
+    fig = plt.figure()
+    
     # os.chdir(folder)
     for folder in folderList:
 
@@ -48,10 +53,11 @@ def coordinationTimeseries(folderList,coordList,timestepLabels=[],title=''):
     
 
 
-    l=len(coordList)
-    fig = plt.figure()
+    
     for pipeline in pipelineList:
-        curColor = next(colorcycler)
+        if len(pipelineList) > 1:
+            curColor = next(colorcycler)
+            
         #curLine = next(linecycler)
         numframes=pipeline.source.num_frames
 
@@ -80,9 +86,13 @@ def coordinationTimeseries(folderList,coordList,timestepLabels=[],title=''):
 
         
         for n in np.arange(l):
+            if len(pipelineList) > 1:
+                curLine=lines[n%4]
+            else:
+                curLine="-"
+                curColor = next(colorcycler)
             val=ts[:,n]
             lstr=coordList[n]
-            curLine=lines[n%4]
             plt.plot(t,val,curLine,color=curColor,label=lstr)
 
         ###### Plot the different labels for time regions

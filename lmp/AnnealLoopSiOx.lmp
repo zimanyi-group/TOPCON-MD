@@ -7,19 +7,19 @@ atom_style  charge
 #atom_modify map array #likely is not needed
 
 #timestep of 0.5 femptoseconds
-variable printevery equal 50000
+variable printevery equal 5000
 variable restartevery equal 0#500000
 variable datapath string "${output_folder}data/"
 
 variable dt equal .5 #timestep
-variable Ti equal 1000 #Starting temp
-variable Tf equal 1800 
+variable Ti equal 300 #Starting temp
+variable Tf equal 1500 
 variable totSteps equal 30
 
 variable i loop ${totSteps} #number of loops
 variable dT equal $((v_Tf-v_Ti)/v_totSteps) #delta temp
 
-variable loopruns equal 10
+variable stepsPerRun equal 100000
 
 shell mkdir ${datapath}
 #shell mkdir ${output_folder}/data/
@@ -30,7 +30,7 @@ read_data data/SiOx.data
 
 #HYDROGEN CREATION
 #create a single hydrogen inside the pertubation
-create_atoms 1 random 15 1234567 NULL overlap .4 maxtry 10000
+create_atoms 1 random 50 1234567 NULL overlap .4 maxtry 10000
 
 # read_data data/SiOx-cool1.data
 
@@ -90,7 +90,7 @@ variable curT equal $(v_Ti + v_i*v_dT)
 print ${curT}
 
 fix f1 all nvt temp ${curT} ${curT} 100
-run $(v_loopruns*(1/v_dt))
+run $(v_stepsPerRun*(1/v_dt))
 unfix f1
 
 write_data ${datapath}AnnealLoop$(v_i).data

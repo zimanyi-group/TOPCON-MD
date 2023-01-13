@@ -1,3 +1,4 @@
+#original file written by Andrew Diggs
 import ReadLAMMPS as rl
 import atom
 import sys, os
