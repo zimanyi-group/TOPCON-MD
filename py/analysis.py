@@ -6,13 +6,45 @@ from matplotlib import pyplot as plt
 import pandas as pd
 import numpy as np
 from scipy.signal import find_peaks
+from scipy.signal import lfilter
+from scipy.signal import savgol_filter
+import scipy.optimize as so
+
 from matplotlib.animation import FuncAnimation 
 from itertools import cycle
+from matplotlib.lines import Line2D
+import matplotlib.patches as mpatches
+
 lines = ["-","--",":","-."]
-colors = ["y","c","g","b","r"]
+colors = ["r","g","b","y","c"]
 
+##### This modifier function computes: ####
+#
+# **(1)** the total coordination number of **TypeA** within the specified cutoff radius
+# **(2)** the partial coordination number of **TypeB** around **TypeA** 
+# and **(3)** the atom fraction of **TypeB**
 
-def coordinationTimeseries(folderList,coordList,timestepLabels=[],title=''):
+from ovito.data import *
+import numpy as np
+from ovito.modifiers import *
+
+def modify(frame: int, data: DataCollection, typeA = 2, typeB = 1, cutoff_radius = 3.6):
+    
+    data.apply(SelectTypeModifier(types = {typeA}))
+    data.apply(ComputePropertyModifier(output_property = f'Type{typeA}-Type{typeB}-coord', only_selected = True, cutoff_radius = cutoff_radius, neighbor_expressions = (f'ParticleType == {typeB}',)))    
+    data.apply(ComputePropertyModifier(output_property = f'Type{typeA}-coord', only_selected = True, cutoff_radius = cutoff_radius, neighbor_expressions = ("1",)))  
+    
+    print(f"Average Type{typeA} coordination number: {np.sum(data.particles[f'Type{typeA}-coord']/data.attributes['SelectType.num_selected']):.2f}")
+    print(f"Average Type{typeA}-Type{typeB} coordination: {np.sum(data.particles[f'Type{typeA}-Type{typeB}-coord']/data.attributes['SelectType.num_selected']):.2f}")
+    
+    data.apply(SelectTypeModifier(types = {typeB}))
+    print(f"Fraction of Type{typeB} atoms: {data.attributes['SelectType.num_selected.2']/data.particles.count:.2f}")
+    
+
+def sillyBilly(t,v,A,C):
+    return A*(t**(1/3))+C
+
+def coordinationTimeseries(folderList,coordList,reduction=0,timestepLabels=[],title=''):
     pipelineList=[]
     linecycler = cycle(lines)
     colorcycler = cycle(colors)
@@ -35,14 +67,14 @@ def coordinationTimeseries(folderList,coordList,timestepLabels=[],title=''):
             
             #numframes=pipeline.source.num_frames
 
-            pipeline.modifiers.append(m.CreateBondsModifier(cutoff = 2))
-            pipeline.modifiers.append(m.BondAnalysisModifier(partition=m.BondAnalysisModifier.Partition.ByParticleType,bins = 200))
+            # pipeline.modifiers.append(m.CreateBondsModifier(cutoff = 2))
+            # pipeline.modifiers.append(m.BondAnalysisModifier(partition=m.BondAnalysisModifier.Partition.ByParticleType,bins = 200))
             
             # Export bond angle distribution to an output text file.
             #export_file(pipeline, 'output/bond_angles.txt', 'txt/table', key='bond-angle-distr', end_frame=1)
 
             # Convert bond length histogram to a NumPy array and print it to the terminal.
-            data = pipeline.compute()
+            #data = pipeline.compute()
             pipelineList.append(pipeline)
             
         except Exception as e:
@@ -52,8 +84,6 @@ def coordinationTimeseries(folderList,coordList,timestepLabels=[],title=''):
         
     
 
-
-    
     for pipeline in pipelineList:
         if len(pipelineList) > 1:
             curColor = next(colorcycler)
@@ -63,13 +93,13 @@ def coordinationTimeseries(folderList,coordList,timestepLabels=[],title=''):
 
     
         pipeline.modifiers.append(m.SelectTypeModifier(property = 'Particle Type', types = {'Si'}))
-        pipeline.modifiers.append(m.CoordinationAnalysisModifier(cutoff = 2, number_of_bins = 200,partial=True))
+        pipeline.modifiers.append(m.ComputePropertyModifier(output_property = f'Coordination', only_selected = True, cutoff_radius = 2, neighbor_expressions = (f'ParticleType == 2',)))
         pipeline.modifiers.append(m.HistogramModifier(bin_count=200, property='Coordination',only_selected=True))
-        #pipeline.modifiers.append(m.TimeSeriesModifier(operate_on='HistogramModifier.Coordination'))
+
         
+        ts=np.empty([numframes-reduction,l]) 
+        t=np.arange(numframes-reduction)
         
-        ts=np.empty([numframes,l]) 
-        t=np.arange(numframes)
         for i in t:
             
             data = pipeline.compute(i)
@@ -79,20 +109,32 @@ def coordinationTimeseries(folderList,coordList,timestepLabels=[],title=''):
             
             ea = np.array(data.tables['histogram[Coordination]'].xy())
             e=ea[:,0]
+
             
             for n in np.arange(l):
                 ind=np.argmin(np.abs(e-coordList[n]))
                 ts[i,n]=ea[ind][1]
-
+        
         
         for n in np.arange(l):
+            #if there's only one pipeline then we change colors but if more then we change style
             if len(pipelineList) > 1:
                 curLine=lines[n%4]
             else:
                 curLine="-"
                 curColor = next(colorcycler)
+                
             val=ts[:,n]
             lstr=coordList[n]
+            # h=15
+            # b=[1.0/h]*h
+            # a=1
+            # yy=lfilter(b,a,val)
+            # w=savgol_filter(val,50,4)
+            # vv=so.curve_fit(sillyBilly,t,val)
+            # print(vv[0][1])
+            # print(vv[0][2])
+            # #plt.plot(t,sillyBilly(t,val,vv[0][1],vv[0][2]),color=curColor)
             plt.plot(t,val,curLine,color=curColor,label=lstr)
 
         ###### Plot the different labels for time regions
@@ -107,21 +149,28 @@ def coordinationTimeseries(folderList,coordList,timestepLabels=[],title=''):
         for lbl in timestepLabels:
             xpos=lbl[0]
             xratio=xpos/xaxislen
-            
-            #print(str(xratio)+'*'+str(figwidth))        
+                 
             plt.axvline(x=xpos)
             plt.text(x=xpos+xbuff,y=yratio*figheight,s=lbl[1])
 
 
         plt.title(title)
-        plt.legend(loc='lower left',title='Coordination Number')
-        plt.xlabel('Timestep')
+        #plt.ylim(bottom=0,top=500)
+        legend_elements =[
+                          Line2D([0],[0],color=colors[0],linestyle=lines[0],label='0 added H'),
+                          Line2D([0],[0],color=colors[1],linestyle=lines[0],label='15 added H'),
+                          Line2D([0],[0],color=colors[2],linestyle=lines[0],label='50 added H')]
+                        #   mpatches.Patch(color='none',label='Coordination Number'),
+                        #   Line2D([0],[0],color=colors[0],linestyle=lines[0],label='4'),
+                        #   Line2D([0],[0],color=colors[0],linestyle=lines[3],label='3'),
+                        #   Line2D([0],[0],color=colors[0],linestyle=lines[2],label='2'),
+                        #   Line2D([0],[0],color=colors[0],linestyle=lines[1],label='1'),
+                        #   Line2D([0],[0],color=colors[0],linestyle=lines[0],label='0')]
+        plt.legend(bbox_to_anchor=(1.05,1),handles=legend_elements,loc='upper left',handlelength=3,title='Sample')
+        plt.xlabel('Temperature(K)')
         plt.ylabel('Count')
-        
-        # df = pd.DataFrame(e, columns=['word', 'frequency'])
-        # df.plot(kind='bar', x='word')
-        # print(data.tables['histogram[Coordination]'].xy())
-    
+
+
     
     plt.show()
     # except:
@@ -210,7 +259,7 @@ def bondAnalysis(folder,plot):
         
         #numframes=pipeline.source.num_frames
 
-        pipeline.modifiers.append(m.CreateBondsModifier(cutoff = 2))
+        pipeline.modifiers.append(m.CreateBondsModifier(cutoff = 2.7))
         pipeline.modifiers.append(m.BondAnalysisModifier(partition=m.BondAnalysisModifier.Partition.ByParticleType,bins = 200))
         
         # Export bond angle distribution to an output text file.
