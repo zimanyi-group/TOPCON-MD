@@ -7,3 +7,4 @@ output-farm/*
 sandbox/*
 *.data
 density-matching/*
+MD-Analyze-main/*
