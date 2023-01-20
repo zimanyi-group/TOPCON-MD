@@ -174,17 +174,17 @@ def Read_Data(infile):
 def set_vals(inst,lines,i):
     if(NUM.match(lines[i])):
         #print(lines[i])
-        inst.set_num(lines, i)
+        inst.set_Num(lines, i)
     elif(BB.match(lines[i])):
         #print(lines[i])
-        inst.set_bb(lines, i)
+        inst.set_BB_Dump(lines, i)
     elif(ATOMS.match(lines[i])):
         #print(lines[i])
         lst=lines[i+1:i+1+inst.num]
-        inst.set_atoms(lst)
+        inst.set_Atom(lst)
     elif(TIMESTEP.match(lines[i])):
-        #print(lines[i])
-        inst.set_timestep(lines, i)
+        print(lines[i])
+        inst.set_Timestep(lines[i], i)
     else:
         print("????")
         print(lines)
@@ -365,8 +365,8 @@ def test_regex(file, reg):
 
 if __name__ == "__main__":
     DatBox = re.compile(r'\d+\s+\d+\.\d+\s+[x-z]lo [x-z]hi')
-    test_file = "/Users/diggs/Desktop/TOPCon/out-1-6-23/SiOx-1.77.dat"
-    test_regex(test_file,DatBox)
+    test_file = "/home/agoga/topcon/output-farm/AnnealLoopSiOx-law50h-60429703-S/SlowishAnnealDT75.dump"
+    Read_Dump(test_file)
 #DatNum = re.compile(r'\d+\s+atoms')
 #DatTypes = re.compile(r'\d\s+atom types')
 #DatBoxx = re.compile(r'\d+\.\d+\s+\d+\.\d+\s+xlo xhi')
