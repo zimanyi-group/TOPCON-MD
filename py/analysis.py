@@ -130,12 +130,12 @@ def coordinationTimeseries(folderList,coordList,reduction=0,timestepLabels=[],ti
             # b=[1.0/h]*h
             # a=1
             # yy=lfilter(b,a,val)
-            # w=savgol_filter(val,50,4)
+            w=savgol_filter(val,15,3)
             # vv=so.curve_fit(sillyBilly,t,val)
             # print(vv[0][1])
             # print(vv[0][2])
             # #plt.plot(t,sillyBilly(t,val,vv[0][1],vv[0][2]),color=curColor)
-            plt.plot(t,val,curLine,color=curColor,label=lstr)
+            plt.plot(t,w,curLine,color=curColor,label=lstr)
 
         ###### Plot the different labels for time regions
         xaxislen=fig.gca().get_xlim()[1]
