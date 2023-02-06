@@ -29,17 +29,17 @@ variable latticeConst equal 5.43
 #creating interfaces with c-Si in future
 variable volume equal $((v_numSi*v_massSi+v_numO*v_massO)/(v_density*100)) #Density calc
 
-variable xyE equal floor($(v_volume^(1/3)))
+variable xyExtent equal floor($((v_volume/v_zExtent)^(1/2)))
 
-variable zE equal $(v_volume/(v_xyE^2))
+#variable zExtent equal $(v_volume/(v_xyExtent^2))
 
-print ${xyE}
+print ${xyExtent}
 # print "$(v_extent)"
 # print "$(v_extent*5.43)"
 
 lattice diamond ${latticeConst} #@TODO why does density*100 with a lattice of 5.43 work
 
-region sim block 0 ${xyE} 0 ${xyE} 0 ${zE}
+region sim block 0 ${xyExtent} 0 ${xyExtent} 0 ${zExtent}
 
 create_box 3 sim
 
@@ -110,7 +110,7 @@ run $(100000*(1/v_dt))#divide by timestep to make the run time in fs
 unfix f1
 
 min_style hftn
-minimize 1.0e-8 1.0e-8 100 100
+minimizextent 1.0e-8 1.0e-8 100 100
 
 #must have made new dir data above
 write_data ${datapath}a-SiOx.data
