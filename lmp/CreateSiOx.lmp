@@ -22,7 +22,7 @@ variable massH equal  1.00784 #H
 
 variable numSi equal 1000
 variable numO equal 1500
-variable density equal 2.2 #approximate density
+variable density equal 2.22 #approximate density
 variable latticeConst equal 5.43
 
 variable zExtent equal 18#$(v_volume/(v_xyExtent^2))
@@ -32,11 +32,10 @@ variable zExtent equal 18#$(v_volume/(v_xyExtent^2))
 variable volume equal $((v_numSi*v_massSi+v_numO*v_massO)/(v_density)) #Density calc
 
 print ${volume}
+print $((v_volume/v_zExtent)^(1/2))
 
-variable xyExtent equal floor($((v_volume/v_zExtent)^(1/2)))
+variable xyExtent equal $(round(((v_volume/v_zExtent)^(1/2))/v_latticeConst)*v_latticeConst)
 
-
-print ${xyExtent}
 # print "$(v_extent)"
 # print "$(v_extent*5.43)"
 
@@ -47,8 +46,8 @@ lattice diamond ${latticeConst} #@TODO why does density*100 with a lattice of 5.
 
 create_box 3 sim
 
-create_atoms 3 random ${numSi} ${seed} sim overlap .4 maxtry 100000
-create_atoms 2 random ${numO} ${seed} sim overlap .4 maxtry 100000
+create_atoms 3 random ${numSi} ${seed} sim overlap .3 maxtry 1000
+create_atoms 2 random ${numO} ${seed} sim overlap .3 maxtry 10000
 
 
 mass         1 ${massH}
