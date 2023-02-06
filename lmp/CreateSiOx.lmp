@@ -25,21 +25,25 @@ variable numO equal 1500
 variable density equal 2.2 #approximate density
 variable latticeConst equal 5.43
 
+variable zExtent equal 18#$(v_volume/(v_xyExtent^2))
+
 #below math to determine the correct x and y dimension which are multiples of 5.43 for
 #creating interfaces with c-Si in future
-variable volume equal $((v_numSi*v_massSi+v_numO*v_massO)/(v_density*100)) #Density calc
+variable volume equal $((v_numSi*v_massSi+v_numO*v_massO)/(v_density)) #Density calc
+
+print ${volume}
 
 variable xyExtent equal floor($((v_volume/v_zExtent)^(1/2)))
 
-#variable zExtent equal $(v_volume/(v_xyExtent^2))
 
 print ${xyExtent}
 # print "$(v_extent)"
 # print "$(v_extent*5.43)"
 
-lattice diamond ${latticeConst} #@TODO why does density*100 with a lattice of 5.43 work
 
 region sim block 0 ${xyExtent} 0 ${xyExtent} 0 ${zExtent}
+
+lattice diamond ${latticeConst} #@TODO why does density*100 with a lattice of 5.43 work
 
 create_box 3 sim
 
