@@ -7,9 +7,13 @@ atom_style  charge
 
 #atom_modify map array
 variable seed equal 12345
-variable dt equal .5
+variable NA equal 6.02e23
+
+variable dt equal 1
+variable latticeConst equal 5.43
+
 #timestep of 0.5 femptoseconds
-variable printevery equal 10000
+variable printevery equal 100
 variable restartevery equal 0#500000
 variable datapath string "${output_folder}data/"
 
@@ -23,18 +27,19 @@ variable massH equal  1.00784 #H
 variable numSi equal 1000
 variable numO equal 1500
 variable density equal 2.22 #approximate density
-variable latticeConst equal 5.43
 
 variable zExtent equal 18#$(v_volume/(v_xyExtent^2))
 
 #below math to determine the correct x and y dimension which are multiples of 5.43 for
 #creating interfaces with c-Si in future
-variable volume equal $((v_numSi*v_massSi+v_numO*v_massO)/(v_density)) #Density calc
+variable volume equal $(((10e7)^3)*(v_numSi*v_massSi+v_numO*v_massO)/(v_density*v_NA)) #Density calc
 
 print ${volume}
 print $((v_volume/v_zExtent)^(1/2))
 
 variable xyExtent equal $(round(((v_volume/v_zExtent)^(1/2))/v_latticeConst)*v_latticeConst)
+
+print ${xyExtent}
 
 # print "$(v_extent)"
 # print "$(v_extent*5.43)"
@@ -90,26 +95,30 @@ group Oxygen type 2
 # run $(30000*(1/v_dt))#divide by timestep to make the run time in fs
 # unfix f1
 
+fix f1 all npt temp 300 300 100 z 1 1 5000
+run $(10000*(1/v_dt))#divide by timestep to make the run time in fs
+unfix f1
+
 #heat way the f up
-fix f1 all nvt temp 7000 7000 100
-run $(200000*(1/v_dt))#divide by timestep to make the run time in fs
+fix f1 all nvt temp 3000 3000 100
+run $(20000*(1/v_dt))#divide by timestep to make the run time in fs
 unfix f1
 
 fix f1 all nvt temp 300 300 100
-run $(200000*(1/v_dt))#divide by timestep to make the run time in fs
+run $(20000*(1/v_dt))#divide by timestep to make the run time in fs
 unfix f1
 
 #only allow demorphing in the z dimension
 fix f1 all npt temp 2500 2500 100 z 1 1 5000
-run $(200000*(1/v_dt))#divide by timestep to make the run time in fs
+run $(20000*(1/v_dt))#divide by timestep to make the run time in fs
 unfix f1
 
 fix f1 all npt temp 2500 300 100 z 1 1 5000
-run $(200000*(1/v_dt))#divide by timestep to make the run time in fs
+run $(300000*(1/v_dt))#divide by timestep to make the run time in fs
 unfix f1
 
 fix f1 all npt temp 300 300 100 z 1 1 5000
-run $(100000*(1/v_dt))#divide by timestep to make the run time in fs
+run $(10000*(1/v_dt))#divide by timestep to make the run time in fs
 unfix f1
 
 min_style hftn
