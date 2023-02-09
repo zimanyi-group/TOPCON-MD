@@ -5,7 +5,7 @@ import shutil
 import analysis #md
 import matplotlib
 import numpy as np
-from ipyfilechooser import FileChooser
+from mpi4py import MPI
 from matplotlib import pyplot as plt
 
 def findZDim(file):
@@ -17,36 +17,44 @@ def findZDim(file):
                     return [float(s[0]),float(s[1])]
                 
 
-def mergeDataFiles(dfiles):
+def mergeDataFiles(dfiles,buffers=[]):
     zdims = []
     zextent=0
-    buffer = 1
+    default_buffer = .2
     fileOG = dfiles[0]
     
+    if len(buffers) == 0:
+        for i in range(len(dfiles)):
+            buffers.append(default_buffer)
     
     for f in dfiles:
         zdims.append(findZDim(f))
         
-    print(zdims)          
-    for z in zdims:
-        zextent = zextent + (z[1]-z[0]) + buffer
+    #print(zdims)          
+    for i in range(len(zdims)):
+        z=zdims[i]
+        zextent = zextent + (z[1]-z[0]) + buffers[i]
     
 
-    print(zextent)
+    #print(zextent)
 
     #finial z dimensions
     zf_lo = zdims[0][0]
     zf_hi = zf_lo + zextent
 
-
+    
+    
 ##LAMMPS SCRIPT
     L = lammps('mpi')
+    me = MPI.COMM_WORLD.Get_rank()
+    nprocs = MPI.COMM_WORLD.Get_size()
+    #print("Proc %d out of %d procs has" % (me,nprocs),L)
     L.commands_string(f'''
         shell cd topcon/
         clear
         units         real
         dimension     3
-        boundary    p p p
+        boundary    p p f
         atom_style  charge
 
         #atom_modify map array
@@ -80,13 +88,13 @@ def mergeDataFiles(dfiles):
         cz=zdims[i]
         zsize=cz[1]-cz[0]
         if i == 0:
-            shift = shift + zsize + buffer
+            shift = shift + zsize + buffers[i]
             continue
         
         f= dfiles[i]
         L.command(f'read_data {f} add append shift 0 0 {shift}')
 
-        shift = shift + zsize + buffer
+        shift = shift + zsize + buffers[i]
         
     L.commands_string(f'''
                       
@@ -103,12 +111,23 @@ def mergeDataFiles(dfiles):
         
         thermo $(v_printevery)
         thermo_style custom step temp density vol pe ke etotal #flush yes
+        thermo_modify lost ignore
+        
+        dump d1 all custom 1 py/CreateSiOx.dump id type q x y z ix iy iz mass element vx vy vz
+        dump_modify d1 element H O Si
+        
         
         
         fix r1 all qeq/reax 1 0.0 10.0 1e-6 reaxff
         
+        fix zwalls all wall/reflect zlo EDGE zhi EDGE
+        
+        delete_atoms overlap 1 all all
+        
         min_style hftn
-        # minimize 1.0e-8 1.0e-8 100 100
+        minimize 1.0e-8 1.0e-8 1000 1000
+        
+        
                       ''')
     
     L.command(f'write_data py/outdata.data')
@@ -117,7 +136,7 @@ def mergeDataFiles(dfiles):
 if __name__ == "__main__":
     
     cwd=os.getcwd()
-    cwd='/home/agoga/topcon'
+    cwd='/home/agoga/documents/code/topcon-md'
     # fc = FileChooser(cwd)
     # display(fc)
 
@@ -126,7 +145,7 @@ if __name__ == "__main__":
     folderpath=os.path.join(cwd,f)
 
     files=['a-SiOx_1-1.data','a-SiOx_1-3.data','a-SiOx_1-5.data','a-SiOx_1-6.data','a-SiOx_1-8.data']#
-
+    offsets=[0,0,0,0,0]
     folders=[]
 
     for f in files:
