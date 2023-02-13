@@ -1,0 +1,116 @@
+# ---------Initialize Simulation---------
+clear
+units         real
+dimension     3
+boundary    p p p
+atom_style  charge
+#atom_modify map array #likely is not needed
+
+
+variable printevery equal 50000
+variable restartevery equal 0#500000
+variable datapath string "${output_folder}data/"
+
+variable massSi equal 28.0855 #Si
+variable massO equal 15.9991 #O
+variable massH equal  1.00784 #H 
+
+#timestep of 0.5 femptoseconds
+variable dt equal .5 #timestep
+
+shell mkdir ${datapath}
+
+variable zwidth equal 'zhi-zlo'
+variable zwidth2 equal '(zhi-zlo)*2.2'
+variable disp equal 1
+variable zonehalfwidth equal 4
+
+
+# ------- Create boxes --------
+lattice diamond 5.43 orient x 1 0 0 orient y 0 1 0 orient z 0 0 1
+
+read_data data/SiOGrad.data group gSiOx
+
+
+mass         1 ${massH}
+mass         2 ${massO}
+mass         3 ${massSi}
+
+
+# ----------Define interatomic potential --------------
+#Pair style reaxff requires use of exactly one of the fix qeq/reaxff or fix qeq/shielded or fix acks2/reaxff commands 
+pair_style	    reaxff potential/topcon.control
+pair_coeff	    * * potential/ffield_Nayir_SiO_2019.reax H O Si
+
+#skin distance of 2 angstrom
+neighbor        2 bin
+neigh_modify    every 10 delay 0 check no
+
+timestep ${dt}
+
+
+#qeq/reax uses the Rappe and Goddard QEq technique which was used in the potential in Fogarty2010(p2) that this current potential is. based on 
+fix r1 all qeq/reax 1 0.0 10.0 1e-6 reaxff
+fix b1 all reaxff/bonds ${printevery} ${output_folder}bonds.dump
+run 0
+
+
+dump d1 all custom ${printevery} ${output_folder}Interface-CSi-SiOx.dump id type q x y z ix iy iz mass element vx vy vz
+dump_modify d1 element H O Si
+
+thermo ${printevery}
+thermo_style custom step temp density vol pe ke etotal #flush yes
+#thermo_style custom step temp density ke epair etotal v_eb v_ea v_elp v_ev v_epen v_ecoa v_ehb v_et v_eco v_ew v_ep v_eqeq
+#restart ${restartevery} ${output_folder}data/SiOxRestart*.data
+
+#setting origin at 0
+change_box all z final 0 ${zwidth} remap units box
+
+region rSiOx block EDGE EDGE EDGE EDGE EDGE EDGE
+group gSiOx region rSiOx
+
+variable zzlo equal zlo
+variable zzhi equal zhi
+#width of annealing zone
+variable zonewidthlo equal ${zwidth}-4
+variable zonewidthhi equal ${zwidth}+4
+#@TODO z=0 needs a bit of annealing too
+
+# ---------Molecular Dynamics-------------------
+
+# min_style hftn
+# minimize 1.0e-6 1.0e-6 1000 1000
+
+fix f1 all nvt temp 800 800 100
+run $(100*(1/v_dt))
+unfix f1
+
+fix f1 all npt temp 300 300 100 z 1 1 5000
+run $(200*(1/v_dt))#divide by timestep to make the run time in fs
+unfix f1
+
+
+change_box all z final 0 ${zwidth2} units box
+
+region sim block EDGE EDGE EDGE EDGE EDGE EDGE
+region rCSi intersect 2 sim rSiOx side out
+
+create_atoms 3 region rCSi
+group gCSi region rCSi
+
+# #now add a little room to the current box to shift the atoms up 
+# change_box gCSi z delta 0 ${disp} remap units box
+
+fix f1 gSiOx nvt temp 800 800 100
+run $(200*(1/v_dt))
+unfix f1
+
+fix f1 gSiOx nvt temp 300 300 100
+run $(200*(1/v_dt))
+unfix f1
+
+
+#write_data ${datapath}Interface-CSi-SiOx.data
+write_data ${datapath}Interface-CSi-SiOx.data
+
+
