@@ -41,18 +41,15 @@ variable xyExtent equal $(round(((v_volume/v_zExtent)^(1/2))/v_latticeConst)*v_l
 
 print ${xyExtent}
 
-# print "$(v_extent)"
-# print "$(v_extent*5.43)"
-
-
 region sim block 0 ${xyExtent} 0 ${xyExtent} 0 ${zExtent}
 
-lattice diamond ${latticeConst} #@TODO why does density*100 with a lattice of 5.43 work
+lattice diamond ${latticeConst}
 
 create_box 3 sim
 
 create_atoms 3 random ${numSi} ${seed} sim overlap .3 maxtry 1000
 create_atoms 2 random ${numO} ${seed} sim overlap .3 maxtry 10000
+
 
 
 mass         1 ${massH}
@@ -77,27 +74,14 @@ thermo ${printevery}
 thermo_style custom step temp density vol pe ke etotal #flush yes
 
 
-# velocity all create 1000.0 4928459 rot yes dist gaussian
-
 #qeq/reax uses the Rappe and Goddard QEq technique which was used in the potential in Fogarty2010(p2) that this current potential is. based on 
 fix r1 all qeq/reax 1 0.0 10.0 1e-6 reaxff
 
-# group gSi type 3
-# delete_atoms overlap 2 gSi all
 
 group Silicon type 3
-group Oxygen type 2
+group Oxygen type 2 
 
 
-# print "$(count(Oxygen)/count(Silicon))"
-
-# fix f1 all nve/limit 0.1
-# run $(30000*(1/v_dt))#divide by timestep to make the run time in fs
-# unfix f1
-
-fix f1 all npt temp 300 300 100 z 1 1 5000
-run $(10000*(1/v_dt))#divide by timestep to make the run time in fs
-unfix f1
 
 #heat way the f up
 fix f1 all nvt temp 3000 3000 100
@@ -122,14 +106,16 @@ run $(10000*(1/v_dt))#divide by timestep to make the run time in fs
 unfix f1
 
 min_style hftn
-minimizextent 1.0e-8 1.0e-8 100 100
+minimize 1.0e-8 1.0e-8 100 100
+
+
+
+variable nS equal count(Silicon)
+variable nO equal count(Oxygen)
+variable ratio equal $( v_nO / v_nS)
 
 #must have made new dir data above
-write_data ${datapath}a-SiOx.data
+# write_data ${datapath}a-SiO_$(v_ratio:%.2f).
+write_data a-SiO_$(v_ratio:%.2f).data
 
 print 'done'
-
-
-
-
-

@@ -7,7 +7,7 @@ atom_style  charge
 #atom_modify map array #likely is not needed
 
 
-variable printevery equal 50000
+variable printevery equal 5000
 variable restartevery equal 0#500000
 variable datapath string "${output_folder}data/"
 
@@ -88,21 +88,21 @@ thermo_style custom step temp density vol pe ke etotal #flush yes
 # min_style hftn
 # minimize 1.0e-6 1.0e-6 1000 1000
 
-fix f1 gSiOx nvt temp 600 600 100
-run $(100000*(1/v_dt))
+fix f1 gSiOx nvt temp 300 300 100
+run $(50000*(1/v_dt))
 unfix f1
 
-fix f1 gSiOx npt temp 300 300 100 z 1 1 5000
-run $(200000*(1/v_dt))#divide by timestep to make the run time in fs
-unfix f1
+# fix f1 gSiOx npt temp 300 300 100 z 1 1 5000
+# run $(200000*(1/v_dt))#divide by timestep to make the run time in fs
+# unfix f1
 
 
-fix f1 gSiOx nvt temp 800 800 100
-run $(200000*(1/v_dt))
+fix f1 gSiOx nvt temp 1100 1100 100
+run $(300000*(1/v_dt))
 unfix f1
 
 fix f1 gSiOx nvt temp 300 300 100
-run $(200000*(1/v_dt))
+run $(100000*(1/v_dt))
 unfix f1
 
 

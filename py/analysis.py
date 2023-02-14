@@ -15,7 +15,7 @@ from itertools import cycle
 from matplotlib.lines import Line2D
 import matplotlib.patches as mpatches
 
-lines = ["-","--",":","-."]
+lines = ["-","-.","--","-",":"]
 colors = ["r","g","b","y","c"]
 
 ##### This modifier function computes: ####
@@ -41,17 +41,13 @@ def modify(frame: int, data: DataCollection, typeA = 2, typeB = 1, cutoff_radius
     print(f"Fraction of Type{typeB} atoms: {data.attributes['SelectType.num_selected.2']/data.particles.count:.2f}")
     
 
-def sillyBilly(t,v,A,C):
-    return A*(t**(1/3))+C
+# def sillyBilly(t,v,A,C):
+#     return A*(t**(1/3))+C
 
-def coordinationTimeseries(folderList,coordList,reduction=0,timestepLabels=[],title=''):
+def coordinationTimeseries(folderList,coordList):
     pipelineList=[]
-    linecycler = cycle(lines)
-    colorcycler = cycle(colors)
-    
-    l=len(coordList)
-    fig = plt.figure()
-    
+    numCoordNumbers=len(coordList)
+
     # os.chdir(folder)
     for folder in folderList:
 
@@ -84,9 +80,12 @@ def coordinationTimeseries(folderList,coordList,reduction=0,timestepLabels=[],ti
         
     
 
-    for pipeline in pipelineList:
-        if len(pipelineList) > 1:
-            curColor = next(colorcycler)
+    numSamples = len(pipelineList)
+    tsData=np.empty(numSamples,dtype=object)
+    for p in range(numSamples):
+        pipeline=pipelineList[p]
+        # if len(pipelineList) > 1:
+        #     curColor = next(colorcycler)
             
         #curLine = next(linecycler)
         numframes=pipeline.source.num_frames
@@ -97,8 +96,8 @@ def coordinationTimeseries(folderList,coordList,reduction=0,timestepLabels=[],ti
         pipeline.modifiers.append(m.HistogramModifier(bin_count=200, property='Coordination',only_selected=True))
 
         
-        ts=np.empty([numframes-reduction,l]) 
-        t=np.arange(numframes-reduction)
+        vals=np.empty([numCoordNumbers,numframes]) 
+        t=np.arange(numframes)
         
         for i in t:
             
@@ -107,77 +106,95 @@ def coordinationTimeseries(folderList,coordList,reduction=0,timestepLabels=[],ti
             # for o in data.objects:
             #     print(o)
             
-            ea = np.array(data.tables['histogram[Coordination]'].xy())
-            e=ea[:,0]
+            hist = np.array(data.tables['histogram[Coordination]'].xy())
+            rawCoord=hist[:,0]
 
+            for n in np.arange(numCoordNumbers):
+                ind=np.argmin(np.abs(rawCoord-coordList[n]))
+                vals[n,i]=hist[ind][1]
+        
+        tsData[p]=(t,vals)
+        
+    return tsData
+
+def plotTimeSeries(data,coordList,reduction=0,timestepLabels=[],title=''):
+    fig = plt.figure()
+    linecycler = cycle(lines)
+    colorcycler = cycle(colors)
+    numCoordNumbers=len(coordList)
+    numSamples=data.size
+
+    for s in np.arange(numSamples):
+        if numSamples > 1:
+            curColor = next(colorcycler)
+        else:
+            curColor = colors[s%4]
             
-            for n in np.arange(l):
-                ind=np.argmin(np.abs(e-coordList[n]))
-                ts[i,n]=ea[ind][1]
-        
-        
-        for n in np.arange(l):
+        for n in np.arange(numCoordNumbers):
+            num=coordList[n]
+            d=data[s]
+            t=d[0]
+            val=d[1][n]
             #if there's only one pipeline then we change colors but if more then we change style
-            if len(pipelineList) > 1:
+            if numCoordNumbers > 1:
                 curLine=lines[n%4]
             else:
-                curLine="-"
-                curColor = next(colorcycler)
+                curLine='-'
                 
-            val=ts[:,n]
+            
+            
+            
+            # print(t)
+            # print(val)
             lstr=coordList[n]
             # h=15
             # b=[1.0/h]*h
             # a=1
             # yy=lfilter(b,a,val)
-            w=savgol_filter(val,15,3)
+            w=savgol_filter(val,25,3)
             # vv=so.curve_fit(sillyBilly,t,val)
             # print(vv[0][1])
             # print(vv[0][2])
             # #plt.plot(t,sillyBilly(t,val,vv[0][1],vv[0][2]),color=curColor)
+
             plt.plot(t,w,curLine,color=curColor,label=lstr)
 
-        ###### Plot the different labels for time regions
-        xaxislen=fig.gca().get_xlim()[1]
-        figwidth=fig.get_figwidth()
-        figwidth,figheight=fig.canvas.get_width_height()
-        yratio=.15
-        xbuff=15#pixels of buffer from text to vertical line
-        
-        #Ratio of all text's height on figure
+    ###### Plot the different labels for time regions
+    xaxislen=fig.gca().get_xlim()[1]
+    figwidth=fig.get_figwidth()
+    figwidth,figheight=fig.canvas.get_width_height()
+    yratio=.15
+    xbuff=15#pixels of buffer from text to vertical line
+    
+    #Ratio of all text's height on figure
 
-        for lbl in timestepLabels:
-            xpos=lbl[0]
-            xratio=xpos/xaxislen
-                 
-            plt.axvline(x=xpos)
-            plt.text(x=xpos+xbuff,y=yratio*figheight,s=lbl[1])
+    for lbl in timestepLabels:
+        xpos=lbl[0]
+        xratio=xpos/xaxislen
+                
+        plt.axvline(x=xpos)
+        plt.text(x=xpos+xbuff,y=yratio*figheight,s=lbl[1])
 
 
-        plt.title(title)
-        #plt.ylim(bottom=0,top=500)
-        legend_elements =[
-                          Line2D([0],[0],color=colors[0],linestyle=lines[0],label='0 added H'),
-                          Line2D([0],[0],color=colors[1],linestyle=lines[0],label='15 added H'),
-                          Line2D([0],[0],color=colors[2],linestyle=lines[0],label='50 added H')]
-                        #   mpatches.Patch(color='none',label='Coordination Number'),
-                        #   Line2D([0],[0],color=colors[0],linestyle=lines[0],label='4'),
-                        #   Line2D([0],[0],color=colors[0],linestyle=lines[3],label='3'),
-                        #   Line2D([0],[0],color=colors[0],linestyle=lines[2],label='2'),
-                        #   Line2D([0],[0],color=colors[0],linestyle=lines[1],label='1'),
-                        #   Line2D([0],[0],color=colors[0],linestyle=lines[0],label='0')]
-        plt.legend(bbox_to_anchor=(1.05,1),handles=legend_elements,loc='upper left',handlelength=3,title='Sample')
-        plt.xlabel('Temperature(K)')
-        plt.ylabel('Count')
-
+    plt.title(title)
+    #plt.ylim(bottom=0,top=500)
+    legend_elements =[
+                        Line2D([0],[0],color=colors[0],linestyle='-',label='0 added H'),
+                        Line2D([0],[0],color=colors[1],linestyle='-',label='25 added H'),
+                        Line2D([0],[0],color=colors[2],linestyle='-',label='50 added H'),
+                        Line2D([0],[0],color=colors[3],linestyle='-',label='100 added H')]
+                        # mpatches.Patch(color='none',label='Coordination Number'),
+                        # Line2D([0],[0],color=colors[0],linestyle=lines[0],label='4'),
+                        # Line2D([0],[0],color=colors[0],linestyle=lines[3],label='3'),
+                        # Line2D([0],[0],color=colors[0],linestyle=lines[2],label='2')]
+                    #   Line2D([0],[0],color=colors[0],linestyle=lines[1],label='1'),
+                    #   Line2D([0],[0],color=colors[0],linestyle=lines[0],label='0')]
+    plt.legend(bbox_to_anchor=(1.05,1),handles=legend_elements,loc='upper left',handlelength=3,title='Sample')
+    plt.xlabel('Time Step')
+    plt.ylabel('Count')
 
     
     plt.show()
-    # except:
-    #     print(' b ')
-    #print(data.tables['time-series'].xy())
-    return ts
-    
     
 def rdfTimeseries(file,range,out):
     # fig = plt.figure() 

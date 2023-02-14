@@ -76,23 +76,6 @@ fix r1 all qeq/reax 1 0.0 10.0 1e-6 reaxff
 fix b1 all reaxff/bonds ${printevery} ${output_folder}bonds.dump
 run 0
 
-compute reax all pair reaxff
-
-variable eb equal c_reax[1]        #eb = bond energy
-variable ea equal c_reax[2]        #ea = atom energy
-variable elp equal c_reax[3]       #elp = lone-pair energy
-variable emol equal c_reax[4]      #emol = molecule energy (always 0.0)
-variable ev equal c_reax[5]        #ev = valence angle energy
-variable epen equal c_reax[6]      #epen = double-bond valence angle penalty
-variable ecoa equal c_reax[7]      #ecoa = valence angle conjugation energy
-variable ehb equal c_reax[8]       #ehb = hydrogen bond energy
-variable et equal c_reax[9]        #et = torsion energy
-variable eco equal c_reax[10]      #eco = conjugation energy
-variable ew equal c_reax[11]       #ew = van der Waals energy
-variable ep equal c_reax[12]       #ep = Coulomb energy
-variable efi equal c_reax[13]      #efi = electric field energy (always 0.0)
-variable eqeq equal c_reax[1]      #eqeq = charge equilibration energy
-
 
 dump d1 all custom ${printevery} ${output_folder}SlowishAnnealDT75.dump id type q x y z ix iy iz mass element vx vy vz
 dump_modify d1 element H O Si
