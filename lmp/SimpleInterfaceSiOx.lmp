@@ -16,7 +16,7 @@ variable massO equal 15.9991 #O
 variable massH equal  1.00784 #H 
 
 #timestep of 0.5 femptoseconds
-variable dt equal 1 #timestep
+variable dt equal 0.5 #timestep
 
 shell mkdir ${datapath}
 
