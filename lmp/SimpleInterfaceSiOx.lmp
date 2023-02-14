@@ -16,7 +16,7 @@ variable massO equal 15.9991 #O
 variable massH equal  1.00784 #H 
 
 #timestep of 0.5 femptoseconds
-variable dt equal .5 #timestep
+variable dt equal 1 #timestep
 
 shell mkdir ${datapath}
 
@@ -89,7 +89,7 @@ thermo_style custom step temp density vol pe ke etotal #flush yes
 # minimize 1.0e-6 1.0e-6 1000 1000
 
 fix f1 gSiOx nvt temp 300 300 100
-run $(50000*(1/v_dt))
+run $(100000*(1/v_dt))
 unfix f1
 
 # fix f1 gSiOx npt temp 300 300 100 z 1 1 5000
@@ -98,7 +98,7 @@ unfix f1
 
 
 fix f1 gSiOx nvt temp 1100 1100 100
-run $(300000*(1/v_dt))
+run $(1000000*(1/v_dt))
 unfix f1
 
 fix f1 gSiOx nvt temp 300 300 100
