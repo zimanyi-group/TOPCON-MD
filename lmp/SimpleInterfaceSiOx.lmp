@@ -16,7 +16,7 @@ variable massO equal 15.9991 #O
 variable massH equal  1.00784 #H 
 
 #timestep of 0.5 femptoseconds
-variable dt equal 0.5 #timestep
+variable dt equal 1 #timestep
 
 shell mkdir ${datapath}
 
@@ -78,6 +78,7 @@ dump_modify d1 element H O Si
 
 thermo ${printevery}
 thermo_style custom step temp density vol pe ke etotal #flush yes
+thermo_modify lost ignore
 #thermo_style custom step temp density ke epair etotal v_eb v_ea v_elp v_ev v_epen v_ecoa v_ehb v_et v_eco v_ew v_ep v_eqeq
 #restart ${restartevery} ${output_folder}data/SiOxRestart*.data
 
