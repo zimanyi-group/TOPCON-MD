@@ -25,7 +25,7 @@ variable massH equal  1.00784 #H
 
 
 variable numSi equal 1000
-variable numO equal 1500
+variable numO equal 1700
 variable density equal 2.22 #approximate density
 
 variable zExtent equal 18#$(v_volume/(v_xyExtent^2))
@@ -116,6 +116,6 @@ variable ratio equal $( v_nO / v_nS)
 
 #must have made new dir data above
 # write_data ${datapath}a-SiO_$(v_ratio:%.2f).
-write_data a-SiO_$(v_ratio:%.2f).data
+write_data ${datapath}a-SiO_$(v_ratio:%.2f).data
 
 print 'done'
