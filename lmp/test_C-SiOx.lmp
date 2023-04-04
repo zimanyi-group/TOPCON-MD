@@ -16,7 +16,7 @@ variable massO equal 15.9991 #O
 variable massH equal  1.00784 #H 
 
 #timestep of 0.5 femptoseconds
-variable dt1 equal 1.0 #timestep
+variable dt1 equal 0.5 #timestep
 variable dt2 equal 1.25
 
 shell mkdir ${datapath}
@@ -24,7 +24,7 @@ shell mkdir ${datapath}
 variable zwidth equal 'zhi-zlo'
 variable zwidth2 equal '(zhi-zlo)*2.2'
 variable disp equal 1
-variable zonehalfwidth equal .25
+variable zonehalfwidth equal 0
 
 
 # ------- Create boxes --------
@@ -99,9 +99,7 @@ minimize 1.0e-6 1.0e-6 10000 10000
 
 velocity gSiOx create 1100.0 9872567 mom yes rot no dist gaussian
 
-# fix f1 gSiOx nvt temp 1100 1100 125
-# run 200000
-# unfix f1
+
 
 
 fix f1 gSiOx nvt temp 1100 1100 250
@@ -109,29 +107,7 @@ run 100000 #divide by timestep to make the run time in fs
 unfix f1
 
 fix f2 all momentum 100 linear 1 1 1
-fix f1 gSiOx npt temp 1100 300 250 z 1 1 1000 drag 1.0 mtk yes
+fix f1 gSiOx npt temp 1100 300 250 iso 0 0 1000 drag 1.0 mtk yes
 run 500000 #divide by timestep to make the run time in fs
 unfix f1
 unfix f2
-
-timestep ${dt2}
-
-fix f1 gSiOx nvt temp 1100 1100 125
-run 750000
-unfix f1
-
-# fix f1 gSiOx nvt temp 1100 1100 250
-# run 50000
-# unfix f1
-
-fix f1 gSiOx nvt temp 1100 300 125
-run 750000
-unfix f1
-
-min_style hftn
-minimize 1.0e-6 1.0e-6 10000 10000
-
-#write_data ${datapath}Interface-CSi-SiOx.data
-write_data ${datapath}Interface-CSi-SiOx.data
-
-

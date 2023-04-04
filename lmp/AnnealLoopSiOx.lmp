@@ -12,14 +12,14 @@ variable restartevery equal 0#500000
 variable datapath string "${output_folder}data/"
 
 variable dt equal .5 #timestep
-variable Ti equal 300 #Starting temp
-variable Tf equal 1500 
+variable Ti equal 0 #Starting temp
+variable Tf equal 1000 
 variable totSteps equal 30
 
 variable i loop ${totSteps} #number of loops
 variable dT equal $((v_Tf-v_Ti)/v_totSteps) #delta temp
 
-variable stepsPerRun equal 100000
+variable stepsPerRun equal 500000
 
 shell mkdir ${datapath}
 #shell mkdir ${output_folder}/data/
@@ -29,9 +29,8 @@ shell mkdir ${datapath}
 read_data data/SiOx.data
 
 #HYDROGEN CREATION
-#create a single hydrogen inside the pertubation
-create_atoms 1 random 50 12347 NULL overlap .4 maxtry 10000
-
+#create hydrogen inside the smaple for pertubation
+create_atoms 1 random 100 12347 NULL overlap .4 maxtry 10000
 # read_data data/SiOx-cool1.data
 
 # ----------Define interatomic potential --------------
@@ -49,25 +48,25 @@ timestep ${dt}
 
 #qeq/reax uses the Rappe and Goddard QEq technique which was used in the potential in Fogarty2010(p2) that this current potential is. based on 
 fix r1 all qeq/reax 1 0.0 10.0 1e-6 reaxff
-fix b1 all reaxff/bonds ${printevery} ${output_folder}bonds.dump
+# fix b1 all reaxff/bonds ${printevery} ${output_folder}bonds.dump
 run 0
 
-compute reax all pair reaxff
+# compute reax all pair reaxff
 
-variable eb equal c_reax[1]        #eb = bond energy
-variable ea equal c_reax[2]        #ea = atom energy
-variable elp equal c_reax[3]       #elp = lone-pair energy
-variable emol equal c_reax[4]      #emol = molecule energy (always 0.0)
-variable ev equal c_reax[5]        #ev = valence angle energy
-variable epen equal c_reax[6]      #epen = double-bond valence angle penalty
-variable ecoa equal c_reax[7]      #ecoa = valence angle conjugation energy
-variable ehb equal c_reax[8]       #ehb = hydrogen bond energy
-variable et equal c_reax[9]        #et = torsion energy
-variable eco equal c_reax[10]      #eco = conjugation energy
-variable ew equal c_reax[11]       #ew = van der Waals energy
-variable ep equal c_reax[12]       #ep = Coulomb energy
-variable efi equal c_reax[13]      #efi = electric field energy (always 0.0)
-variable eqeq equal c_reax[1]      #eqeq = charge equilibration energy
+# variable eb equal c_reax[1]        #eb = bond energy
+# variable ea equal c_reax[2]        #ea = atom energy
+# variable elp equal c_reax[3]       #elp = lone-pair energy
+# variable emol equal c_reax[4]      #emol = molecule energy (always 0.0)
+# variable ev equal c_reax[5]        #ev = valence angle energy
+# variable epen equal c_reax[6]      #epen = double-bond valence angle penalty
+# variable ecoa equal c_reax[7]      #ecoa = valence angle conjugation energy
+# variable ehb equal c_reax[8]       #ehb = hydrogen bond energy
+# variable et equal c_reax[9]        #et = torsion energy
+# variable eco equal c_reax[10]      #eco = conjugation energy
+# variable ew equal c_reax[11]       #ew = van der Waals energy
+# variable ep equal c_reax[12]       #ep = Coulomb energy
+# variable efi equal c_reax[13]      #efi = electric field energy (always 0.0)
+# variable eqeq equal c_reax[1]      #eqeq = charge equilibration energy
 # compute      myKE all ke/atom
 # compute      myPE all pe/atom
 # compute      myStress all stress/atom NULL virial

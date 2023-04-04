@@ -18,7 +18,7 @@ shell mkdir ${datapath}
 
 
 # ---------Create Atoms-------------------
-read_data data/AnnealLoop15H700K.data
+read_data data/AnnealLoop0H700K.data
 
 # ----------Define interatomic potential --------------
 #Pair style reaxff requires use of exactly one of the fix qeq/reaxff or fix qeq/shielded or fix acks2/reaxff commands 
@@ -35,7 +35,6 @@ timestep ${dt}
 
 #qeq/reax uses the Rappe and Goddard QEq technique which was used in the potential in Fogarty2010(p2) that this current potential is. based on 
 fix r1 all qeq/reax 1 0.0 10.0 1e-6 reaxff
-fix b1 all reaxff/bonds ${printevery} ${output_folder}bonds.dump
 run 0
 
 # compute reax all pair reaxff
@@ -83,4 +82,4 @@ fix f1 all nvt temp 700 700 100
 run $(2000000*(1/v_dt))
 unfix f1
 
-write_data ${datapath}AnnealLoop$(v_i).data
+write_data ${datapath}AnnealFinal.data
