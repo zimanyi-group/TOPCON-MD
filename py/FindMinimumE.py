@@ -10,7 +10,9 @@ from mpi4py import MPI
 from matplotlib import pyplot as plt
 from random import gauss
 import math
-
+from matplotlib.colors import LightSource
+from matplotlib import cbook
+from matplotlib import cm
 
 def fibonacci_sphere(r,samples=1000):
 
@@ -26,7 +28,7 @@ def fibonacci_sphere(r,samples=1000):
         x = math.cos(theta) * radius
         z = math.sin(theta) * radius
 
-        points.append([r*x, r*y, r*z])
+        points.append([x,y,z])
 
     return points
 
@@ -117,7 +119,7 @@ def wigglewiggle(file,atom):
 
         fix r1 all qeq/reax 1 0.0 10.0 1e-6 reaxff
         
-        minimize 1.0e-3 1.0e-3 5000 5000
+        #minimize 1.0e-3 1.0e-3 5000 5000
         
         compute c1 all property/atom x y z
         run 0
@@ -135,9 +137,13 @@ def wigglewiggle(file,atom):
     Ei = L.extract_compute('thermo_pe',0,0)
     
     points=[]
-    points = fibonacci_sphere(1,100)
-    points.extend(fibonacci_sphere(1.5,100))
-    points.extend(fibonacci_sphere(2,100))
+    radii=[1,2]
+    numP=2
+    for r in radii:
+        points.extend(fibonacci_sphere(r,numP))
+    # points = fibonacci_sphere(1,100)
+    # points.extend(fibonacci_sphere(1.5,100))
+    # points.extend(fibonacci_sphere(2,100))
     
     i=1
     Em=3000000
@@ -145,6 +151,8 @@ def wigglewiggle(file,atom):
     ym=23.780024633166196
     zm=25.442427850042495
     Ef=0
+    
+    res=np.array({0,(0,0,0)})
     for p in points:
         xf = xi + p[0]
         yf = yi + p[1]
@@ -152,17 +160,40 @@ def wigglewiggle(file,atom):
         L.commands_string(f'''
             set atom {atom} x {xf} y {yf} z {zf}
             print {i}
-            minimize 1.0e-5 1.0e-5 5000 5000
+            minimize 1.0e-2 1.0e-2 50 50
             ''')
         i+=1
         Ef = L.extract_compute('thermo_pe',0,0)
         dE=Ef-Ei
+        
+        tmp = np.asarray([dE,p],dtype=object)
+        res = np.append(res,tmp)
         if dE < Em:
             Em=dE
             (xm,ym,zm)=(xf,yf,zf)
             print('New min' + str(Em))
+            
     Em=Ef-Ei
     print(f"Final values\nEf={Ef}\nEi={Ei}\nEm={Em}\nxm={xm}\nym={ym}\nzm={zm}")
+    
+    
+    
+    fig, ax = plt.subplots(subplot_kw=dict(projection='3d'))
+    ls = LightSource(270, 45)
+    for d in res:
+        s = d[0]
+        x = d[1][0]
+        y = d[1][1]
+        z = d[1][2]
+        # To use a custom hillshading mode, override the built-in shading and pass
+        # in the rgb colors of the shaded surface calculated from "shade".
+        rgb = ls.shade(z, cmap=cm.gist_earth, vert_exag=0.1, blend_mode='soft')
+        surf = ax.plot_surface(x, y, z, rstride=1, cstride=1, facecolors=rgb,
+                            linewidth=0, antialiased=False, shade=False)
+    plt.show()
+        
+    
+    
     
 
 if __name__ == "__main__":
