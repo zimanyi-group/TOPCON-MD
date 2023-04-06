@@ -12,7 +12,7 @@ from random import gauss
 import math
 
 
-def fibonacci_sphere(samples=1000):
+def fibonacci_sphere(r,samples=1000):
 
     points = []
     phi = math.pi * (math.sqrt(5.) - 1.)  # golden angle in radians
@@ -26,7 +26,7 @@ def fibonacci_sphere(samples=1000):
         x = math.cos(theta) * radius
         z = math.sin(theta) * radius
 
-        points.append((x, y, z))
+        points.append([r*x, r*y, r*z])
 
     return points
 
@@ -35,6 +35,20 @@ def make_rand_vector(dims):
     mag = sum(x**2 for x in vec) ** .5
     return [x/mag for x in vec]
 
+#current low
+#-274000.38135801896
+#-102907.31548723357
+#6.520912860299781
+#23.780024633166196
+#25.442427850042495
+
+# Final values
+# Ef=-386070.54745449964
+# Ei=-274000.38135801896
+# Em=-112070.16609648068
+# xm=7.1409396250638375
+# ym=23.23457008771165
+# zm=24.896108758550668
 
 def wigglewiggle(file,atom):
  ##LAMMPS SCRIPT
@@ -103,7 +117,7 @@ def wigglewiggle(file,atom):
 
         fix r1 all qeq/reax 1 0.0 10.0 1e-6 reaxff
         
-        minimize 1.0e-5 1.0e-5 10000 10000
+        minimize 1.0e-3 1.0e-3 5000 5000
         
         compute c1 all property/atom x y z
         run 0
@@ -120,14 +134,17 @@ def wigglewiggle(file,atom):
     zi = L.extract_variable('zi')
     Ei = L.extract_compute('thermo_pe',0,0)
     
+    points=[]
+    points = fibonacci_sphere(1,100)
+    points.extend(fibonacci_sphere(1.5,100))
+    points.extend(fibonacci_sphere(2,100))
     
-    
-    points = 2*fibonacci_sphere(10)
     i=1
     Em=3000000
-    xm=0
-    ym=0
-    zm=0
+    xm=6.520912860299781
+    ym=23.780024633166196
+    zm=25.442427850042495
+    Ef=0
     for p in points:
         xf = xi + p[0]
         yf = yi + p[1]
@@ -135,17 +152,19 @@ def wigglewiggle(file,atom):
         L.commands_string(f'''
             set atom {atom} x {xf} y {yf} z {zf}
             print {i}
-            minimize 1.0e-5 1.0e-5 10 10
+            minimize 1.0e-5 1.0e-5 5000 5000
             ''')
         i+=1
         Ef = L.extract_compute('thermo_pe',0,0)
         dE=Ef-Ei
         if dE < Em:
-            print('new min')
             Em=dE
             (xm,ym,zm)=(xf,yf,zf)
-            
+            print('New min' + str(Em))
+    Em=Ef-Ei
+    print(f"Final values\nEf={Ef}\nEi={Ei}\nEm={Em}\nxm={xm}\nym={ym}\nzm={zm}")
     
+
 if __name__ == "__main__":
     
     cwd=os.getcwd()
