@@ -103,11 +103,14 @@ def wigglewiggle(file,atom):
 
         fix r1 all qeq/reax 1 0.0 10.0 1e-6 reaxff
         
+        minimize 1.0e-5 1.0e-5 10000 10000
+        
         compute c1 all property/atom x y z
         run 0
         variable xi equal x[{atom}]
         variable yi equal y[{atom}]
         variable zi equal z[{atom}]
+        
         print '$(v_xi)'
         
         ''')
@@ -116,26 +119,36 @@ def wigglewiggle(file,atom):
     yi = L.extract_variable('yi')
     zi = L.extract_variable('zi')
     Ei = L.extract_compute('thermo_pe',0,0)
-    points = fibonacci_sphere(10)
     
+    
+    
+    points = 2*fibonacci_sphere(10)
+    i=1
+    Em=3000000
+    xm=0
+    ym=0
+    zm=0
     for p in points:
         xf = xi + p[0]
         yf = yi + p[1]
         zf = zi + p[2]
         L.commands_string(f'''
             set atom {atom} x {xf} y {yf} z {zf}
-            print '$(v_xi)'
-            minimize 1.0e-5 1.0e-5 100 100
+            print {i}
+            minimize 1.0e-5 1.0e-5 10 10
             ''')
+        i+=1
         Ef = L.extract_compute('thermo_pe',0,0)
+        dE=Ef-Ei
+        if dE < Em:
+            print('new min')
+            Em=dE
+            (xm,ym,zm)=(xf,yf,zf)
+            
     
 if __name__ == "__main__":
     
     cwd=os.getcwd()
-    cwd='/home/agoga/documents/code/topcon-md'
-    cwd='/home/agoga/topcon'
-    # fc = FileChooser(cwd)
-    # display(fc)
 
     folder='/data/'
     f=cwd+folder
