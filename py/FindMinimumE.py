@@ -97,6 +97,8 @@ def wigglewiggle(file,atom):
         read_dump {file} 10000 x y z box yes add keep
         
         
+        
+        
         mass         3 $(v_massH)
         mass         2 $(v_massO)
         mass         1 $(v_massSi)
@@ -118,16 +120,21 @@ def wigglewiggle(file,atom):
         dump_modify d1 element H O Si
 
         fix r1 all qeq/reax 1 0.0 10.0 1e-6 reaxff
-        
-        #minimize 1.0e-3 1.0e-3 5000 5000
-        
         compute c1 all property/atom x y z
+        
         run 0
+        
+        write_data py/findMinInitial.data
+        
+        minimize 1.0e-5 1.0e-5 5000 5000
+        
+        thermo 1
+        thermo_style custom step temp density vol pe ke etotal #flush yes
+        thermo_modify lost ignore
+
         variable xi equal x[{atom}]
         variable yi equal y[{atom}]
         variable zi equal z[{atom}]
-        
-        print '$(v_xi)'
         
         ''')
     
@@ -137,8 +144,8 @@ def wigglewiggle(file,atom):
     Ei = L.extract_compute('thermo_pe',0,0)
     
     points=[]
-    radii=[1,2]
-    numP=2
+    radii=np.linspace(1.7,2.3,num=7)
+    numP=100
     for r in radii:
         points.extend(fibonacci_sphere(r,numP))
     # points = fibonacci_sphere(1,100)
@@ -147,50 +154,61 @@ def wigglewiggle(file,atom):
     
     i=1
     Em=3000000
-    xm=6.520912860299781
-    ym=23.780024633166196
-    zm=25.442427850042495
+    xm=6.52
+    ym=23.78
+    zm=25.44
     Ef=0
     
-    res=np.array({0,(0,0,0)})
+    res=[]
+    res.append(tuple((0,0,0,0)))
+
     for p in points:
         xf = xi + p[0]
         yf = yi + p[1]
         zf = zi + p[2]
         L.commands_string(f'''
             set atom {atom} x {xf} y {yf} z {zf}
-            print {i}
-            minimize 1.0e-2 1.0e-2 50 50
+            run 1
             ''')
         i+=1
         Ef = L.extract_compute('thermo_pe',0,0)
         dE=Ef-Ei
         
-        tmp = np.asarray([dE,p],dtype=object)
-        res = np.append(res,tmp)
+
+        res.append(tuple((dE,p[0],p[1],p[2])))
+ 
         if dE < Em:
+            print(f"New Min: {dE}")
             Em=dE
             (xm,ym,zm)=(xf,yf,zf)
-            print('New min' + str(Em))
+
             
     Em=Ef-Ei
     print(f"Final values\nEf={Ef}\nEi={Ei}\nEm={Em}\nxm={xm}\nym={ym}\nzm={zm}")
     
+    L.commands_string(f'''
+            set atom {atom} x {xm} y {ym} z {zm}
+            minimize 1.0e-5 1.0e-5 5000 5000
+            write_data py/findMinFinal.data
+            ''')
     
+    # print(res)
+    # fig, ax = plt.subplots(subplot_kw=dict(projection='3d'))
+    # ls = LightSource(270, 45)
+    # nl = list(map(list, zip(*res)))
+    # ml = np.array(nl)
     
-    fig, ax = plt.subplots(subplot_kw=dict(projection='3d'))
-    ls = LightSource(270, 45)
-    for d in res:
-        s = d[0]
-        x = d[1][0]
-        y = d[1][1]
-        z = d[1][2]
-        # To use a custom hillshading mode, override the built-in shading and pass
-        # in the rgb colors of the shaded surface calculated from "shade".
-        rgb = ls.shade(z, cmap=cm.gist_earth, vert_exag=0.1, blend_mode='soft')
-        surf = ax.plot_surface(x, y, z, rstride=1, cstride=1, facecolors=rgb,
-                            linewidth=0, antialiased=False, shade=False)
-    plt.show()
+    # pe=ml[0]
+    # xs=ml[1]
+    # ys=ml[2]
+    # zs=ml[3]
+    # print(pe)
+
+
+    # my_col = cm.jet(pe/np.amin(pe))
+    # surf = ax.plot_trisurf(xs, ys, zs, rstride=1, cstride=1, facecolors=my_col,
+    #                linewidth=0, antialiased=False)
+    # plt.show()
         
     
     
