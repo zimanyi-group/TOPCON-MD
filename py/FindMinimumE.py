@@ -57,7 +57,7 @@ def wigglewiggle(file,atom):
     L = lammps('mpi')
     me = MPI.COMM_WORLD.Get_rank()
     nprocs = MPI.COMM_WORLD.Get_size()
-    
+
  
     
     #print("Proc %d out of %d procs has" % (me,nprocs),L)
@@ -104,9 +104,9 @@ def wigglewiggle(file,atom):
         mass         1 $(v_massSi)
 
 
-        min_style fire
+        min_style quickmin
         
-        pair_style	    reaxff potential/topcon.control
+        pair_style	    reaxff potential/topcon.control# safezone 1.6 mincap 100
         pair_coeff	    * * potential/ffield_Nayir_SiO_2019.reax H O Si
 
         neighbor        2 bin
@@ -124,13 +124,12 @@ def wigglewiggle(file,atom):
         
         run 0
         
+        #write_data py/findMinInitial.data
+        
+        #minimize 1.0e-5 1.0e-5 5000 5000
+        
         write_data py/findMinInitial.data
         
-        minimize 1.0e-5 1.0e-5 5000 5000
-        
-        thermo 1
-        thermo_style custom step temp density vol pe ke etotal #flush yes
-        thermo_modify lost ignore
 
         variable xi equal x[{atom}]
         variable yi equal y[{atom}]
@@ -144,53 +143,84 @@ def wigglewiggle(file,atom):
     Ei = L.extract_compute('thermo_pe',0,0)
     
     points=[]
-    radii=np.linspace(1.7,2.3,num=7)
-    numP=100
-    for r in radii:
-        points.extend(fibonacci_sphere(r,numP))
-    # points = fibonacci_sphere(1,100)
-    # points.extend(fibonacci_sphere(1.5,100))
-    # points.extend(fibonacci_sphere(2,100))
+    
+    # #Spherical point creation
+    # radii=np.linspace(1.7,5,num=20)
+    # numP=100
+    # for r in radii:
+    #     points.extend(fibonacci_sphere(r,numP))
+
+
+    width = 4.1
+    step = .3
     
     i=1
     Em=3000000
-    xm=6.52
-    ym=23.78
-    zm=25.44
     Ef=0
     
     res=[]
     res.append(tuple((0,0,0,0)))
 
-    for p in points:
-        xf = xi + p[0]
-        yf = yi + p[1]
-        zf = zi + p[2]
-        L.commands_string(f'''
-            set atom {atom} x {xf} y {yf} z {zf}
-            run 1
-            ''')
-        i+=1
-        Ef = L.extract_compute('thermo_pe',0,0)
-        dE=Ef-Ei
+    xlist=np.arange(-width,width,step)
+    zlist=np.arange(-width,width,step)
+    
+    
+    xlen=len(xlist)
+    zlen=len(zlist)
+    
+    elist=np.zeros([xlen,zlen])
+    tot = xlen*zlen
+    i=1
+    for zi in range(zlen):
+        for xi in range(xlen):
         
+            y=0
+            
+            x=xlist[xi]
+            z=zlist[zi]
+            
+            xf = xi + x
+            yf = yi
+            zf = zi + z
+            print(f"Step {i}/{tot}")
+            
+            L.commands_string(f'''
+                set atom {atom} x {xf} y {yf} z {zf}
+                run 0
+                ''')
+            i+=1
+            Ef = L.extract_compute('thermo_pe',0,0)
+            dE=Ef-Ei
+            elist[zi,xi]=dE
 
-        res.append(tuple((dE,p[0],p[1],p[2])))
+            #res.append(tuple((dE,x,y,z)))
+            
  
-        if dE < Em:
-            print(f"New Min: {dE}")
-            Em=dE
-            (xm,ym,zm)=(xf,yf,zf)
+
+    # ml = np.array(nl
+    plt.contourf(zlist,xlist,elist,35,cmap='viridis')
+    plt.axis('scaled')
+    plt.xlabel('Δx(Å)')
+    plt.ylabel('Δz(Å)')
+    plt.colorbar()
+    plt.savefig(f"py/heatMap({atom}-0{int(10*step)}).png")
+    
+    
+    
+    #     if dE < Em:
+    #         #print(f"New Min: {dE}")
+    #         Em=dE
+    #         (xm,ym,zm)=(xf,yf,zf)
 
             
-    Em=Ef-Ei
-    print(f"Final values\nEf={Ef}\nEi={Ei}\nEm={Em}\nxm={xm}\nym={ym}\nzm={zm}")
+    # Em=Ef-Ei
+    # print(f"Final values\nEf={Ef}\nEi={Ei}\nEm={Em}\nxm={xm}\nym={ym}\nzm={zm}")
     
-    L.commands_string(f'''
-            set atom {atom} x {xm} y {ym} z {zm}
-            minimize 1.0e-5 1.0e-5 5000 5000
-            write_data py/findMinFinal.data
-            ''')
+    # L.commands_string(f'''
+    #         set atom {atom} x {xm} y {ym} z {zm}
+    #         #minimize 1.0e-5 1.0e-5 5000 5000
+    #         write_data py/findMinFinal.data
+    #         ''')
     
     # print(res)
     # fig, ax = plt.subplots(subplot_kw=dict(projection='3d'))
@@ -224,4 +254,7 @@ if __name__ == "__main__":
     file="Hy2-1400.dump"
     filepath=os.path.join(folderpath,file)
     
-    wigglewiggle(filepath,1085)
+    atomID=984
+    #Atom 4619 for middle of the c-Si 
+    #atoms: 1085(F), 332
+    wigglewiggle(filepath,atomID)
