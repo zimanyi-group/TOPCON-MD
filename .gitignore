@@ -1,6 +1,7 @@
 *.dump
 *.log
 *.restart
+*.png
 output/*
 output-save/*
 output-farm/*
