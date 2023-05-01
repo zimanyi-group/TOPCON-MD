@@ -113,8 +113,8 @@ def init_dump(L,file,out):
         thermo_style custom step temp density vol pe ke etotal #flush yes
         thermo_modify lost ignore
         
-        dump d1 all custom 1 py/CreateSiOx.dump id type q x y z ix iy iz mass element vx vy vz
-        dump_modify d1 element H O Si
+        # dump d1 all custom 1 py/CreateSiOx.dump id type q x y z ix iy iz mass element vx vy vz
+        # dump_modify d1 element H O Si
 
         log FindMinimumE.log
         
@@ -172,23 +172,37 @@ def init_dat(L,file,out):
         thermo_style custom step temp density vol pe ke etotal #flush yes
         thermo_modify lost ignore
         
-        dump d1 all custom 1 py/CreateSiOx.dump id type q x y z ix iy iz mass element vx vy vz
-        dump_modify d1 element H O Si
+        # dump d1 all custom 1 py/CreateSiOx.dump id type q x y z ix iy iz mass element vx vy vz
+        # dump_modify d1 element H O Si
 
         log FindMinimumE.log
         
         ''')
 
-def wigglewiggle(file,atom):
+def wigglewiggle(file,atom,nickname):
  ##LAMMPS SCRIPT
     L = lammps('mpi')
     L2 = lammps('mpi')
     L3= lammps('mpi')
     me = MPI.COMM_WORLD.Get_rank()
     nprocs = MPI.COMM_WORLD.Get_size()
+    
+    #size and step size of the region to create a PES from
+    xzhalfwidth = 10.1
+    yhwidth=1.5
+    step = .5
+    buff=1
 
-    full='py/findMinFull.data'
-    out='py/findMinInitial.data'
+    
+    fileIdent=f'{atom}-0{int(10*step)}'
+    datFolder=f'data/{nickname}/'
+    os.makedirs(datFolder,exist_ok=True)
+    
+    
+    full= datFolder+ f'{fileIdent}-Full.data'
+    out=datFolder+f'{fileIdent}-I.data'
+    neb=datFolder+f'{fileIdent}-F.data'
+    PESimage=datFolder+f"PES({fileIdent}).png"
     init_dump(L2,file,full)#do this to get around reaxff issues with deleting atoms and writing data
     
     init_dat(L,full,out)
@@ -208,10 +222,7 @@ def wigglewiggle(file,atom):
     yi = L.extract_variable('yi')
     zi = L.extract_variable('zi')
     
-    xzhalfwidth = 15.1
-    yhwidth=1.5
-    step = .5
-    buff=1
+    
     
     xrange = [max(xi-buff*xzhalfwidth,  bbox[0][0]),    min(xi+buff*xzhalfwidth,    bbox[0][1])]
     yrange = [max(yi-buff*yhwidth,      bbox[1][0]),    min(yi+buff*yhwidth,        bbox[1][1])]
@@ -271,6 +282,9 @@ def wigglewiggle(file,atom):
     elist=np.zeros([xlen,zlen])
     tot = xlen*zlen
     i=1
+    
+    eMin=10000
+    rMin=(0,0)
     for j in range(zlen):
         for k in range(xlen):
         
@@ -282,6 +296,7 @@ def wigglewiggle(file,atom):
             xf = xi + x
             yf = yi
             zf = zi + z
+            rf = (xi + x, yi, zi + z)
             # print(f"xf={xi}+{x}={xf}")
             # print(f"zf={zi}+{z}={zf}")
             print(f"Step {i}/{tot}")
@@ -293,8 +308,25 @@ def wigglewiggle(file,atom):
             i+=1
             Ef = L.extract_compute('thermo_pe',0,0)
             dE=Ef-Ei
+            if dE < eMin:
+                rMin=(x,z)
+                eMin=dE
             elist[j,k]=dE
+            
+            
 
+    #now create the lowest energy position data file for NEB.
+    L.commands_string(f'''
+                set atom {atom} x {xf} y {yf} z {zf}
+                run 0
+                write_data {neb}
+                ''')
+    
+    
+    
+    
+    
+    
     plt.rcParams["figure.autolayout"] = True
     
     fig = plt.figure(figsize=(12,6))
@@ -316,6 +348,7 @@ def wigglewiggle(file,atom):
     
 
     im=ax1.contourf(zlist,xlist,elist,20,cmap='viridis')
+    ax1.scatter([0,rMin[0]],[0,rMin[1]],marker='x',c='r')
     #####
     #####
     ax1.axis('scaled')
@@ -329,10 +362,16 @@ def wigglewiggle(file,atom):
     cbar.set_label('ΔE(kcal/mol)')
     
     ax1.set_title(f"Potential energy landscape around atom {atom}")
-    plt.savefig(f"py/PES({atom}-0{int(10*step)}).png")
+    plt.savefig(PESimage)
     
         
-    
+    #remove temporary files 
+    try:
+        os.remove(ovitoFig)
+        os.remove(full)
+    except:
+        i=0
+            
 
 
 
@@ -344,11 +383,13 @@ if __name__ == "__main__":
     f=cwd+folder
     folderpath=os.path.join(cwd,f)
     file="Hy2-1400.dump"
+    
+    dataFileNickname='HNEB1'
     filepath=os.path.join(folderpath,file)
     
     atomID=2661
     #Atom 4619 for middle of the c-Si 
     #Atom 4251 for right at interface
     #atoms: 1085(F), 332
-    wigglewiggle(filepath,atomID)
+    wigglewiggle(filepath,atomID,dataFileNickname)
 
