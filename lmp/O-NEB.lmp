@@ -1,0 +1,58 @@
+clear
+units         real
+dimension     3
+boundary    p p p
+atom_style  charge
+atom_modify map array
+
+#atom_modify map array
+
+variable massSi equal 28.0855 #Si
+variable massO equal 15.9991 #O
+variable massH equal  1.00784 #H 
+
+
+variable dt equal 0.5
+variable latticeConst equal 5.43
+
+#timestep of 0.5 femptoseconds
+variable printevery equal 100
+variable restartevery equal 0#500000
+variable datapath string "${output_folder}data/"
+
+shell mkdir ${datapath}
+
+read_data data/HNEB1/2661-05-I.data
+
+mass         1 ${massH}
+mass         2 ${massO}
+mass         3 ${massSi}
+
+pair_style	    reaxff potential/topcon.control
+pair_coeff	    * * potential/ffield_Nayir_SiO_2019.reax H O Si
+#Pair style reaxff requires use of exactly one of the fix qeq/reaxff or fix qeq/shielded or fix acks2/reaxff commands 
+min_style fire
+
+neighbor        2 bin
+neigh_modify    every 10 delay 0 check no
+
+timestep ${dt}
+
+
+dump d1 all custom ${printevery} ${output_folder}o-neb.dump id type q x y z ix iy iz mass element vx vy vz
+dump_modify d1 element H O Si
+thermo_style custom step pe ke etotal epair
+thermo ${printevery}
+# thermo_style custom step temp density vol pe ke etotal #flush yes
+
+
+#qeq/reax uses the Rappe and Goddard QEq technique which was used in the potential in Fogarty2010(p2) that this current potential is. based on 
+fix r1 all qeq/reax 1 0.0 10.0 1e-6 reaxff
+
+
+fix n1 all neb 2.5 parallel ideal perp 1.0
+dump  neb-dump nebatoms custom 100 ${output_folder}neb${name}.dump.$u id type x y z
+neb 0.0 0.001 20000 20000 100 final data/HNEB1/2661-05-F.data
+#write_dump all charge ${output_folder}NEB.dump
+
+print 'done'
