@@ -51,8 +51,8 @@ fix r1 all qeq/reax 1 0.0 10.0 1e-6 reaxff
 
 
 fix n1 all neb 2.5 parallel ideal perp 1.0
-dump  neb-dump nebatoms custom 100 ${output_folder}neb${name}.dump.$u id type x y z
+
 neb 0.0 0.001 20000 20000 100 final data/HNEB1/2661-05-F.data
-#write_dump all charge ${output_folder}NEB.dump
+
 
 print 'done'
