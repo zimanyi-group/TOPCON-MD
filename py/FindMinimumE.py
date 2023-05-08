@@ -33,7 +33,13 @@ class MidpointNormalize(mpl.colors.Normalize):
         x, y = [self.vmin, self.midpoint, self.vmax], [normalized_min, normalized_mid, normalized_max]
         return np.ma.masked_array(np.interp(value, x, y))
 
+def lmp_NEB(initial,final,folder):
+    args = ["-partition","4x1"]
+    
+    L = lammps('mpi',cmdargs=args)
 
+    me = MPI.COMM_WORLD.Get_rank()
+    nprocs = MPI.COMM_WORLD.Get_size()
 a=5.43
 def fibonacci_sphere(r,samples=1000):
 
@@ -58,8 +64,11 @@ def make_rand_vector(dims):
     mag = sum(x**2 for x in vec) ** .5
     return [x/mag for x in vec]
 
+def NEB_min(L):
+    return
+    L.commands_string(f'''minimize 1.0 1.0 2000 2000''')
 
-def init_dump(L,file,out):
+def init_dump(L,file,out,timestep):
     #Initialize and load the dump file
     L.commands_string(f'''
         shell cd topcon/
@@ -75,7 +84,7 @@ def init_dump(L,file,out):
         variable seed equal 12345
         variable NA equal 6.02e23
 
-        variable dt equal 1
+        variable dt equal 0.5
         variable latticeConst equal {a}
 
         #timestep of 0.5 femptoseconds
@@ -94,7 +103,7 @@ def init_dump(L,file,out):
 
         create_box 3 sim
 
-        read_dump {file} 10000 x y z box yes add keep
+        read_dump {file} {timestep} x y z box yes add keep
         
         mass         3 $(v_massH)
         mass         2 $(v_massO)
@@ -118,15 +127,22 @@ def init_dump(L,file,out):
 
         log FindMinimumE.log
         
+        
+        
         fix r1 all qeq/reax 1 0.0 10.0 1e-6 reaxff
-        compute c1 all property/atom x y z
+        compute c1 all property/atom x y z''')
+    
+    #NEB_min(L)
 
+        
+    L.commands_string(f'''
         write_data {out}
         ''')
     
 def init_dat(L,file,out):
+
     L.commands_string(f'''
-        shell cd topcon/
+
         clear
         units         real
         dimension     3
@@ -139,7 +155,7 @@ def init_dat(L,file,out):
         variable seed equal 12345
         variable NA equal 6.02e23
 
-        variable dt equal 1
+        variable dt equal 0.5
 
 
         #timestep of 0.5 femptoseconds
@@ -179,11 +195,11 @@ def init_dat(L,file,out):
         
         ''')
 
-def wigglewiggle(file,atom,nickname):
- ##LAMMPS SCRIPT
+def PESurface(file,atom,nickname,timestep,finalLoc=None):
+ ##LAMMPS SCRIPT    
     L = lammps('mpi')
     L2 = lammps('mpi')
-    L3= lammps('mpi')
+    L3 = lammps('mpi')
     me = MPI.COMM_WORLD.Get_rank()
     nprocs = MPI.COMM_WORLD.Get_size()
     
@@ -192,23 +208,30 @@ def wigglewiggle(file,atom,nickname):
     yhwidth=1.5
     step = .5
     buff=1
+    
+    searchRangeMin=0
+    searchRangeMax=.4
 
     
-    fileIdent=f'{atom}-0{int(10*step)}'
+    fileIdent=f'{atom}'
     datFolder=f'data/{nickname}/'
     os.makedirs(datFolder,exist_ok=True)
     
     
     full= datFolder+ f'{fileIdent}-Full.data'
-    out=datFolder+f'{fileIdent}-I.data'
-    neb=datFolder+f'{fileIdent}-F.data'
+    out=datFolder+f'{fileIdent}-NEBI.data'
+    neb=datFolder+f'{fileIdent}-NEBF.data'
+    xyz=datFolder+f'{fileIdent}-NEBFXYZ.data'
     PESimage=datFolder+f"PES({fileIdent}).png"
-    init_dump(L2,file,full)#do this to get around reaxff issues with deleting atoms and writing data
     
+    
+    init_dump(L2,file,full,timestep)#do this to get around reaxff issues with deleting atoms and writing data
+    
+
     init_dat(L,full,out)
+
     
-    
-    #now delete atoms 
+#Changing the simulation box and deleting all unnecessary atoms
     L.commands_string(f'''
         variable xi equal x[{atom}]
         variable yi equal y[{atom}]
@@ -221,8 +244,6 @@ def wigglewiggle(file,atom,nickname):
     xi = L.extract_variable('xi')
     yi = L.extract_variable('yi')
     zi = L.extract_variable('zi')
-    
-    
     
     xrange = [max(xi-buff*xzhalfwidth,  bbox[0][0]),    min(xi+buff*xzhalfwidth,    bbox[0][1])]
     yrange = [max(yi-buff*yhwidth,      bbox[1][0]),    min(yi+buff*yhwidth,        bbox[1][1])]
@@ -246,35 +267,31 @@ def wigglewiggle(file,atom,nickname):
         write_data {out}
                       ''')
     
-    
+
+    #Now create ovito plot of atoms for future use
     try:
         pipeline = import_file(out)
+        pipeline.modifiers.append(ExpressionSelectionModifier(expression = f'ParticleIdentifier=={atom}'))
+        data=pipeline.compute()
+        
+        pipeline.add_to_scene()
+        vp = Viewport()
+        vp.type = Viewport.Type.Front
+        vp.zoom_all()
+        
+        ovitoFig="py/ovitoFig.png"
+        vp.render_image(size=(800,600), filename=ovitoFig)
     except Exception as e:
         print(e)
-    pipeline.modifiers.append(ExpressionSelectionModifier(expression = f'ParticleIdentifier=={atom}'))
-    data=pipeline.compute()
     
-    pipeline.add_to_scene()
-    vp = Viewport()
-    vp.type = Viewport.Type.Front
-    #vp.camera_pos = (0, 100, 0)
-    vp.zoom_all()
-    #vp.camera_dir = (2, 3, -3)
-    #vp.fov = math.radians(60.0)
-    
-    ovitoFig="py/ovitoFig.png"
-    vp.render_image(size=(800,600), filename=ovitoFig)
     
 
     
     Ei = L.extract_compute('thermo_pe',0,0)
     Ef=0
-    
-
 
     xlist=np.arange(-xzhalfwidth,xzhalfwidth,step)
     zlist=np.arange(-xzhalfwidth,xzhalfwidth,step)
-    
     
     xlen=len(xlist)
     zlen=len(zlist)
@@ -289,7 +306,6 @@ def wigglewiggle(file,atom,nickname):
         for k in range(xlen):
         
             y=0
-            
             x=xlist[k]
             z=zlist[j]
             
@@ -297,8 +313,6 @@ def wigglewiggle(file,atom,nickname):
             yf = yi
             zf = zi + z
             rf = (xi + x, yi, zi + z)
-            # print(f"xf={xi}+{x}={xf}")
-            # print(f"zf={zi}+{z}={zf}")
             print(f"Step {i}/{tot}")
             
             L.commands_string(f'''
@@ -308,49 +322,78 @@ def wigglewiggle(file,atom,nickname):
             i+=1
             Ef = L.extract_compute('thermo_pe',0,0)
             dE=Ef-Ei
-            if dE < eMin:
+            
+            if finalLoc is not None:
+                dx=finalLoc[0]-x
+                dz=finalLoc[1]-z
+                dist = (dx*dx+dz*dz)**(1/2)
+            else:
+                dist = (x*x+z*z)**(1/2)
+            
+            #picking lowest energy within specific search range
+            if dE < eMin and dist<= searchRangeMax:
                 rMin=(x,z)
                 eMin=dE
             elist[j,k]=dE
             
-            
-
+    
+    # if finalLoc is not None:
+    #     #rMin=finalLoc
+    
     #now create the lowest energy position data file for NEB.
     L.commands_string(f'''
-                set atom {atom} x {xf} y {yf} z {zf}
+                set atom {atom} x {xi+rMin[0]} y {yf} z {zi+rMin[1]}
                 run 0
-                write_data {neb}
+                write_data {xyz}
+    ''')
+    
+    NEB_min(L)
+
+        
+    L.commands_string(f'''
+                write_dump all custom {neb} id x y z
                 ''')
     
+    ####Now clean up the dump file to be the correct format for NEB runs
+    if me == 0:## ONLY RUN ON ONE PROCESS
+
+        with open(neb, "r+") as f:
+            d = f.readlines()
+            f.seek(0)
+            i=0
+            for l in d:
+            #kill the specific lines of the xyz file that are not kosher
+                if i not in {0,1,2,4,5,6,7,8}:
+                    f.write(l)
+                i+=1
+            f.truncate()
     
     
     
     
-    
+#Plotting below
     plt.rcParams["figure.autolayout"] = True
     
     fig = plt.figure(figsize=(12,6))
     gs = gridspec.GridSpec(1, 2,width_ratios=[1,1.6])
-                
     ax1 = plt.subplot(gs[0])
     ax2 = plt.subplot(gs[1])
+    
+    #Load the atomistic view and put it in the second subplot
     ovitoImage=plt.imread(ovitoFig)
     ax2.axis('off')
     ax2.imshow(ovitoImage,cmap='gray')
     
     
-    #####
-    #####
-    #
-    # norm = MidpointNormalize(vmin=np.min(elist), vmax=np.max(elist), midpoint=0)
-    # cmap = 'RdBu_r' 
-    # im=ax1.contourf(zlist,xlist,elist,20,cmap=cmap,norm=norm)
+    redXPts=np.transpose([[0,0],[rMin[0],rMin[1]]])
     
-
+    
+    # if finalLoc is not None:
+    #     redXPts[1]=[finalLoc[0],finalLoc[1]]
+        
     im=ax1.contourf(zlist,xlist,elist,20,cmap='viridis')
-    ax1.scatter([0,rMin[0]],[0,rMin[1]],marker='x',c='r')
-    #####
-    #####
+    ax1.scatter(redXPts[0],redXPts[1],marker='x',c='r')
+
     ax1.axis('scaled')
     ax1.set_xlabel('Δx(Å)')
     ax1.set_ylabel('Δz(Å)')
@@ -360,21 +403,20 @@ def wigglewiggle(file,atom,nickname):
     cax = divider.append_axes('right', size='5%', pad=0.15)
     cbar=fig.colorbar(im,cax=cax,orientation='vertical')
     cbar.set_label('ΔE(kcal/mol)')
-    
     ax1.set_title(f"Potential energy landscape around atom {atom}")
     plt.savefig(PESimage)
     
         
-    #remove temporary files 
+#remove temporary files 
     try:
         os.remove(ovitoFig)
-        os.remove(full)
+        #os.remove(full)
     except:
         i=0
-            
-
-
-
+    
+    return {out,neb}#returning the file names of the initial position and the final neb xyz file
+    
+    
 if __name__ == "__main__":
     
     cwd=os.getcwd()
@@ -382,14 +424,27 @@ if __name__ == "__main__":
     folder='/data/'
     f=cwd+folder
     folderpath=os.path.join(cwd,f)
-    file="Hy2-1400.dump"
+
+
+    
+    withH=True
+    finalPos=None
+    
+    if withH:
+        file="SiOxNEB-H.dump"
+        timestep=10000
+        finalPos=[-3,3]
+    else:
+        file="SiOxNEB-NOH.dump"
+        timestep=30001
+        finalPos=[3.5,-5]
+        
+    atomID=sys.argv[1]
+
     
     dataFileNickname='HNEB1'
     filepath=os.path.join(folderpath,file)
+    nebFiles = PESurface(filepath,atomID,dataFileNickname,timestep,finalPos)
     
-    atomID=2661
-    #Atom 4619 for middle of the c-Si 
-    #Atom 4251 for right at interface
-    #atoms: 1085(F), 332
-    wigglewiggle(filepath,atomID,dataFileNickname)
+    
 

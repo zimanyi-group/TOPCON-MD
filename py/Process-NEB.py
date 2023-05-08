@@ -15,6 +15,9 @@ plt.rcParams['lines.linewidth'] = 6.0
 plt.rcParams['font.size'] = 22
 plt.rcParams['font.family'] =  'sans-serif'
 
+
+#conversion from kcal/mol to eV
+conv=0.043361254529175
 #I need to read a reax.dat file and a reax.log file and get values from both.
 
 
@@ -58,15 +61,15 @@ def MEP(file):
     #there are 9 elements before RD1
     last= read_log(file)
     prev = read_log(file,mod=1)
-    R=last[9::2]
-    mep=last[10::2]
-    ms = mep - np.min(mep)
-    efb=last[6]
-    erb=last[7]
-    RD=last[8]
+    R=last[9::2]                #points in replica space, RD1-RDN
+    mep=last[10::2]*conv            #actual pE values, PE1-PEN
+    ms = mep - np.min(mep)      #normalizing MEP
+    efb=last[6]*conv               #forward barrier
+    erb=last[7]*conv               #reverse barrier
+    RD=last[8]                  #total reaction cood space
     return R, ms , efb, erb, RD
 
-def plot_mep(path,file,hnum, xo= 0.01):
+def plot_mep(path,file,fileID,hnum=0, xo= 0.01):
     r,pe,EF,ER, RD = MEP(file)
     my_barriers=[]
     points=[]
@@ -83,7 +86,8 @@ def plot_mep(path,file,hnum, xo= 0.01):
             print(mytext.format(feb,reb))
             my_barriers.append([feb,reb])
             points.append([r[a], r[b], r[c]])
-    name=file[len(path):-4]
+    name=fileID
+
     fig = plt.figure(figsize=[10,7])
     plt.scatter(r,pe, marker = '^', color = 'darkgreen', s=180)
     #plt.plot(r,pe, linestyle = '--', linewidth = 3.0, color = 'darkgreen')
@@ -96,28 +100,32 @@ def plot_mep(path,file,hnum, xo= 0.01):
     #plt.title("MEP")
     plt.ylabel("PE (eV)")
     plt.xlabel(r'$x_{replica} $')
-    plt.draw()
-    plt.waitforbuttonpress(1)
-    #print("Do you want to use this barrier?")
-    choice = input("Do you want to use original barrier?") # this will wait for indefinite time
-    if(choice == "y"):
-        write_dat(EF,ER,hnum)
-    elif(choice == 'm'):
-        c2 = input("which Barriers?")
-        for v in c2.split():
-            i = int(v)
-            feb, reb = my_barriers[i]
-            write_dat(feb, reb, hnum)
-    elif(choice =='s'):
-        plt.savefig(name +".png")
-    elif(choice == 'q'):
-        exit()
-    plt.close(fig)
+    plt.savefig(path+name +"-NEB.png")
+    #plt.draw()
+    # plt.waitforbuttonpress(1)
+    # #print("Do you want to use this barrier?")
+    
+    
+    # choice = input("Do you want to use original barrier?") # this will wait for indefinite time
+    # if(choice == "y"):
+    #     write_dat(EF,ER,hnum)
+    # elif(choice == 'm'):
+    #     c2 = input("which Barriers?")
+    #     for v in c2.split():
+    #         i = int(v)
+    #         feb, reb = my_barriers[i]
+    #         write_dat(feb, reb, hnum)
+    # elif(choice =='s'):
+    #     plt.savefig(name +".png")
+    # elif(choice == 'q'):
+    #     exit()
+    # plt.close(fig)
     return 
 
 
 def calc_barrier(file):
     r, pe, ef, er, rd = MEP(file)
+    pe=pe
     low = pe[0]
     emin = 0
     peak = 0
@@ -229,9 +237,12 @@ def get_num(path, file):
 
 
 if __name__=='__main__':
-    pth=sys.argv[1]
-    hnum=get_num(pth,sys.argv[2])
-    plot_mep(pth, sys.argv[2],hnum)
+    #from tkinter.filedialog import askopenfilename
+    fileID=sys.argv[1]
+    file=f"/home/agoga/documents/code/topcon-md/data/HNEB1/logs/{fileID}.log"
+    dirname="/home/agoga/documents/code/topcon-md/data/HNEB1/"#os.path.dirname(os.path.realpath(pth))
+    #hnum=get_num(pth,sys.argv[2])
+    plot_mep(dirname,file,fileID)#,hnum)
 
 
 
