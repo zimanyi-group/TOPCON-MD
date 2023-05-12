@@ -6,21 +6,24 @@ from datetime import datetime
 import sys
 import re
 import pdb
+from matplotlib.ticker import MaxNLocator
+
 plt.style.use('seaborn-deep')
 plt.rcParams['axes.prop_cycle'] = plt.cycler(color=['mediumblue', 'crimson','darkgreen', 'darkorange','crimson', 'darkorchid'])
-plt.rcParams['figure.figsize'] = [12,8]
+#plt.rcParams['figure.figsize'] = [12,8]
 plt.rcParams['axes.linewidth'] = 1.7
 plt.rcParams['lines.linewidth'] = 6.0
 #plt.rcParams['axes.grid'] = True
-plt.rcParams['font.size'] = 22
+plt.rcParams['font.size'] = 12
 plt.rcParams['font.family'] =  'sans-serif'
-
+plt.rcParams["figure.autolayout"] = True
 
 #conversion from kcal/mol to eV
 conv=0.043361254529175
 #I need to read a reax.dat file and a reax.log file and get values from both.
 
-
+etol=sys.argv[3]
+timestep=sys.argv[4]
 def read_dat(file):
     my_list = []
     with open(file) as f:
@@ -86,40 +89,26 @@ def plot_mep(path,file,fileID,hnum=0, xo= 0.01):
             print(mytext.format(feb,reb))
             my_barriers.append([feb,reb])
             points.append([r[a], r[b], r[c]])
+            
     name=fileID
 
-    fig = plt.figure(figsize=[10,7])
+    fig = plt.figure(figsize=[6,6])
     plt.scatter(r,pe, marker = '^', color = 'darkgreen', s=180)
     #plt.plot(r,pe, linestyle = '--', linewidth = 3.0, color = 'darkgreen')
     #plt.scatter(points,vals, color='r', s=20)
     txt=(r"Forward E$_A $ = {0:.2f} eV"+"\n"
         + r"Reverse E$_A $ = {1:.2f} eV"+"\n").format(EF, ER)
-    txt2 = "Replica distance\n{0:.2f}".format(RD) + r"$\AA $"
-    plt.text(xo, np.max(pe)*0.8, txt, fontsize = 18)
-    #plt.text(xo, np.max(pe)*0.68, txt2)
-    #plt.title("MEP")
+    txt2 = "Replica distance={0:.2f}".format(RD) + r"$\AA $"
+    plt.text(xo, np.max(pe)*0.8, txt, fontsize = 14)
+    
+    plt.text(xo, np.max(pe)*0.68, txt2,fontsize=14)
+    plt.title(f"MEP with energy tolerance: {etol} and timestep: {timestep}")
     plt.ylabel("PE (eV)")
     plt.xlabel(r'$x_{replica} $')
+    #plt.axes().yaxis.set_major_locator(MaxNLocator(integer=True))
+    plt.grid('on',axis='y',linewidth=1)
     plt.savefig(path+name +"-NEB.png")
-    #plt.draw()
-    # plt.waitforbuttonpress(1)
-    # #print("Do you want to use this barrier?")
     
-    
-    # choice = input("Do you want to use original barrier?") # this will wait for indefinite time
-    # if(choice == "y"):
-    #     write_dat(EF,ER,hnum)
-    # elif(choice == 'm'):
-    #     c2 = input("which Barriers?")
-    #     for v in c2.split():
-    #         i = int(v)
-    #         feb, reb = my_barriers[i]
-    #         write_dat(feb, reb, hnum)
-    # elif(choice =='s'):
-    #     plt.savefig(name +".png")
-    # elif(choice == 'q'):
-    #     exit()
-    # plt.close(fig)
     return 
 
 
@@ -182,67 +171,47 @@ def calc_barrier(file):
     else:
         return [0,0,0] , [0,0,0] , 0
 
-def get_z(hnum):
-    Dname="sample{0}-{1}.dump.{2}"
-    dmp1=pth + Dname.format(sys.argv[4],hnum,'01')
-    dmp2=pth + Dname.format(sys.argv[4],hnum,'15')
-    c1=read_dump(dmp1,hnum)
-    c2=read_dump(dmp2,hnum)
-    z1, z2= c1[3], c2[3]
-    delta=c2 - c1
-    dist = np.sqrt(np.sum(delta*delta))
-    print(z1,z2)
-    print(dist)
-    return z1,z2,dist
-
-
-def neb_dump(first, num_procs,outfile):
-    of=open(outfile, 'w')
-    ts=re.compile("ITEM: TIMESTEP")
-    for i in range(1,num_procs):
-        file= (first + "{0:02d}").format(i)
-        with open(file) as f:
-            lines=f.readlines()
-            tot=len(lines)
-            itr=0
-            for l in lines:
-                if(ts.match(l)):
-                    itr+=1
-                    continue
-            block= int(tot/itr)
-            start=int(tot - block)
-            print(lines[start])
-            of.writelines(lines[start:tot])
-    of.close()
-    return
-#==================================================================
-
-
-def write_dat(feb, reb, hnum):
-    ofile=sys.argv[5]
-    z1, z2, delta = get_z(hnum)
-    line="{0} {1:.4f} {2:.4f}\n".format(int(hnum), feb, reb)
-    outfile = open( ofile, "a")
-    outfile.write(line)
-    outfile.close()
-    return 
-
-
-def get_num(path, file):
-    p1 = len(path)
-    prefix="S{0}-H".format(sys.argv[4])
-    p2=len(prefix)
-    offset=p1+p2
-    return int(file[offset:-4])
-
-
 if __name__=='__main__':
     #from tkinter.filedialog import askopenfilename
-    fileID=sys.argv[1]
-    file=f"/home/agoga/documents/code/topcon-md/data/HNEB1/logs/{fileID}.log"
+    
+    fileID=sys.argv[2]
+    
     dirname="/home/agoga/documents/code/topcon-md/data/HNEB1/"#os.path.dirname(os.path.realpath(pth))
-    #hnum=get_num(pth,sys.argv[2])
+    
+    
+    dirname=sys.argv[1]
+    file=f"{dirname}logs/{fileID}neb.log"
+    
+    
+    
     plot_mep(dirname,file,fileID)#,hnum)
+    
+    
+    import numpy as np
+    import PIL
+    from PIL import Image
+
+    list_im = [dirname+f"{fileID}-NEB.png",dirname+f"PES({fileID}).png",dirname+f"{fileID}-Ovito.png"]
+    imgs    = [ Image.open(i) for i in list_im ]
+    # pick the image which is the smallest, and resize the others to match it (can be arbitrary image shape here)
+    min_shape = sorted( [(np.sum(i.size), i.size ) for i in imgs])[0][1]
+    imgs_comb = np.hstack([i.resize(min_shape) for i in imgs])
+
+    # save that beautiful picture
+    imgs_comb = Image.fromarray( imgs_comb)
+    imgs_comb.save(dirname+f"NEB-PES-{fileID}.png")    
+    
+    splt=dirname[:-1].split("/")
+    tname=splt[-1]
+    second="/".join(splt[:-1])
+
+    imgs_comb.save(second+"/NEB/"+tname[3:] +".png")
+    
+    # for p in list_im:
+    #     try:
+    #         os.remove(p)
+    #     except:
+    #         i=0
 
 
 
