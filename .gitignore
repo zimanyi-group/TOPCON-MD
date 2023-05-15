@@ -1,5 +1,6 @@
 *.dump
 *.log
+*log*
 *.restart
 *.png
 output/*

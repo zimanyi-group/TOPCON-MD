@@ -12,7 +12,7 @@ variable massO equal 15.9991 #O
 variable massH equal  1.00784 #H 
 
 
-variable dt equal 0.5
+variable dt equal ${ts}
 variable latticeConst equal 5.43
 
 #timestep of 0.5 femptoseconds
@@ -20,11 +20,11 @@ variable printevery equal 1000
 variable restartevery equal 0#500000
 variable datapath string "${output_folder}data/"
 
-
+variable i equal part
 
 shell mkdir ${datapath}
 
-read_data data/HNEB1/${fileID}-NEBI.data
+read_data ${output_folder}${fileID}-NEBI.data
 
 mass         3 ${massH}
 mass         2 ${massO}
@@ -41,7 +41,6 @@ neigh_modify    every 10 delay 0 check no
 timestep ${dt}
 min_style quickmin
 
-# minimize 1.0e-4 1 1000 1000
 
 dump d1 all custom ${printevery} ${output_folder}o-neb.dump id type q x y z ix iy iz mass element vx vy vz
 dump_modify d1 element H O Si
@@ -53,7 +52,13 @@ thermo ${printevery}
 fix r1 all qeq/reax 1 0.0 10.0 1e-6 reaxff
 
 
-fix n1 all neb 1 parallel ideal perp 1
+
+group gNEB id ${atom_id}
+
+fix n1 gNEB neb 1 parallel ideal perp 1
 
 
-neb 1 1 1000 1000 1000 final data/HNEB1/${fileID}-NEBF.data
+neb ${etol} 1 1000 1000 1000 final ${output_folder}${fileID}-NEBF.data
+
+write_dump all atom ${output_folder}o-neb.dump.$i
+run 0

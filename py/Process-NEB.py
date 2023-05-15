@@ -7,6 +7,7 @@ import sys
 import re
 import pdb
 from matplotlib.ticker import MaxNLocator
+import csv 
 
 plt.style.use('seaborn-deep')
 plt.rcParams['axes.prop_cycle'] = plt.cycler(color=['mediumblue', 'crimson','darkgreen', 'darkorange','crimson', 'darkorchid'])
@@ -24,6 +25,7 @@ conv=0.043361254529175
 
 etol=sys.argv[3]
 timestep=sys.argv[4]
+
 def read_dat(file):
     my_list = []
     with open(file) as f:
@@ -109,7 +111,7 @@ def plot_mep(path,file,fileID,hnum=0, xo= 0.01):
     plt.grid('on',axis='y',linewidth=1)
     plt.savefig(path+name +"-NEB.png")
     
-    return 
+    return (EF,ER,my_barriers)
 
 
 def calc_barrier(file):
@@ -171,6 +173,23 @@ def calc_barrier(file):
     else:
         return [0,0,0] , [0,0,0] , 0
 
+
+def savecsv(data,filename,col_names=None):
+
+    csv_name=filename+'.csv'
+
+
+    file_exists = os.path.isfile(filename)
+
+    #data=runname+','+data+''
+    with open(filename,'a',newline='', encoding='utf-8') as fd:
+        csv_writer=csv.writer(fd)
+
+        if file_exists is False and col_names is not None:
+            csv_writer.writerow(col_names)
+            
+        csv_writer.writerow(data)
+
 if __name__=='__main__':
     #from tkinter.filedialog import askopenfilename
     
@@ -184,7 +203,8 @@ if __name__=='__main__':
     
     
     
-    plot_mep(dirname,file,fileID)#,hnum)
+    
+    ret=plot_mep(dirname,file,fileID)#,hnum)
     
     
     import numpy as np
@@ -206,7 +226,15 @@ if __name__=='__main__':
     second="/".join(splt[:-1])
 
     imgs_comb.save(second+"/NEB/"+tname[3:] +".png")
+    csvfile=second+"/NEB/"+fileID+".csv"
+    col_names=["etol","ts","FEB","REB"]
+    dat=[etol,timestep,ret[0],ret[1]]
     
+    for l in ret[2]:
+        dat.append(l[0])
+        dat.append(l[1])
+        
+    savecsv(dat,csvfile,col_names)
     # for p in list_im:
     #     try:
     #         os.remove(p)

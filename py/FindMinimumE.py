@@ -91,13 +91,8 @@ def init_dump(L,file,out,dumpstep):
         thermo $(v_printevery)
         thermo_style custom step temp density vol pe ke etotal #flush yes
         thermo_modify lost ignore
-        
-        # dump d1 all custom 1 py/CreateSiOx.dump id type q x y z ix iy iz mass element vx vy vz
-        # dump_modify d1 element H O Si
 
         log none
-        
-        
         
         fix r1 all qeq/reax 1 0.0 10.0 1e-6 reaxff
         compute c1 all property/atom x y z''')
@@ -164,6 +159,9 @@ def init_dat(L,file,out):
 
         ''')
 
+def create_sub_region(file,loc,outfile):
+    return
+
 def PESurface(file,atom,nickname,dumpstep,outfolder,finalLoc=None):
  ##LAMMPS SCRIPT    
     L = lammps('mpi')
@@ -194,6 +192,11 @@ def PESurface(file,atom,nickname,dumpstep,outfolder,finalLoc=None):
     PESimage=outfolder+f"PES({fileIdent}).png"
     ovitoFig=outfolder+f"{fileIdent}-Ovito.png"
     
+    
+    
+    
+    
+    
     init_dump(L2,file,full,dumpstep)#do this to get around reaxff issues with deleting atoms and writing data
     
 
@@ -219,7 +222,7 @@ def PESurface(file,atom,nickname,dumpstep,outfolder,finalLoc=None):
     zrange = [max(zi-buff*xzhalfwidth,  bbox[2][0]),    min(zi+buff*xzhalfwidth,    bbox[2][1])]
 
     L.commands_string(f'''
-        create_atoms 3 single {xi-.7} {yi} {zi+.7}
+        #create_atoms 3 single {xi-.7} {yi} {zi+.7}
         
         region sim block EDGE EDGE EDGE EDGE EDGE EDGE
         region ins block {xrange[0]} {xrange[1]} {yrange[0]} {yrange[1]} {zrange[0]} {zrange[1]} units box 
@@ -446,7 +449,7 @@ if __name__ == "__main__":
         dumpstep=1#40001
         #finalPos=[3,2]
         finalPos=[-1.75,-4.5]#1
-        finalPos=[3,-2]
+        finalPos=[1.5,3]
     
     outfolder=sys.argv[1] 
     atomID=sys.argv[2]
