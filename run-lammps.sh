@@ -30,7 +30,8 @@ mkdir $OUT_FOLDER #Now make folder where all the output will go
 
 
 IN_FILE=$CWD"/"$FILE
-LOG_FILE=$OUT_FOLDER$NAME".log"
+#LOG_FILE=$OUT_FOLDER$NAME".log"
+LOG_FILE="/home/agoga/documents/code/topcon-md/data/HNEB1/2661-05.log"
 cp $IN_FILE $OUT_FOLDER
 
 s=$OUT_FOLDER$NAME"_SLURM.txt"
@@ -45,5 +46,5 @@ export OMP_NUM_THREADS=1
 # export OMP_PROC_BIND=true
 
 
-mpirun -np 2 lmp_mpi -nocite -log $LOG_FILE -in $OUT_FOLDER$FILENAME -var output_folder $OUT_FOLDER
-
+mpirun -np 16 --oversubscribe lmp_mpi -partition 16x1 -nocite -log $LOG_FILE -in $OUT_FOLDER$FILENAME -var output_folder $OUT_FOLDER -pscreen $OUT_FOLDER/screen
+#lmp_mpi -partition 1x1 -nocite -log $LOG_FILE -in $OUT_FOLDER$FILENAME -var output_folder $OUT_FOLDER
