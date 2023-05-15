@@ -18,11 +18,24 @@ from ovito.vis import Viewport
 import matplotlib.gridspec as gridspec
 import matplotlib as mpl
  
+
+dt=sys.argv[4]
+etol=sys.argv[3]
+
 a=5.43
 #conversion from kcal/mol to eV
 conv=0.043361254529175
-dt=sys.argv[4]
-etol=sys.argv[3]
+
+xzhalfwidth = 10.1
+yhwidth=5.1
+step = .5
+buff=1
+
+xlist=np.arange(-xzhalfwidth,xzhalfwidth,step)
+zlist=np.arange(-xzhalfwidth,xzhalfwidth,step)
+
+xlen=len(xlist)
+zlen=len(zlist)
 
 class MidpointNormalize(mpl.colors.Normalize):
     def __init__(self, vmin, vmax, midpoint=0, clip=False):
@@ -35,6 +48,19 @@ class MidpointNormalize(mpl.colors.Normalize):
         normalized_mid = 0.5
         x, y = [self.vmin, self.midpoint, self.vmax], [normalized_min, normalized_mid, normalized_max]
         return np.ma.masked_array(np.interp(value, x, y))
+
+def find_atom_position(L,atomID):
+    L.commands_string(f'''
+        variable xi equal x[{atomID}]
+        variable yi equal y[{atomID}]
+        variable zi equal z[{atomID}]
+        ''')
+
+    x = L.extract_variable('xi')
+    y = L.extract_variable('yi')
+    z = L.extract_variable('zi')
+    
+    return (x,y,z)
 
 def NEB_min(L):
     L.commands_string(f'''minimize {etol} 1.0 2000 2000''')
@@ -159,10 +185,30 @@ def init_dat(L,file,out):
 
         ''')
 
-def create_sub_region(file,loc,outfile):
-    return
+def create_ovito_plot(infile,figureName,r,atomID):
+    slabwidth=3#ang
+    try:
+        y=r[1]
+        pipeline = import_file(infile)
+        pipeline.modifiers.append(ExpressionSelectionModifier(expression = f'ParticleIdentifier=={atomID}'))
+        pipeline.modifiers.append(AssignColorModifier(color=(0, 1, 0)))
+        pipeline.modifiers.append(SliceModifier(normal=(0,1,0),distance=y,slab_width=slabwidth))
+        #@TODO change atom type 
+        data=pipeline.compute()
+        
+        pipeline.add_to_scene()
+        vp = Viewport()
+        vp.type = Viewport.Type.Front
+        vp.zoom_all()
+        
+        
+        vp.render_image(size=(600,600), filename=figureName)
+    except Exception as e:
+        print(e)
+        
+def reduce_sim_box(L,)
 
-def PESurface(file,atom,nickname,dumpstep,outfolder,finalLoc=None):
+def create_PES(file,dumpstep,atom,outfolder,finalLoc=None):
  ##LAMMPS SCRIPT    
     L = lammps('mpi')
     L2 = lammps('mpi')
@@ -171,18 +217,14 @@ def PESurface(file,atom,nickname,dumpstep,outfolder,finalLoc=None):
     nprocs = MPI.COMM_WORLD.Get_size()
     plt.rcParams["figure.autolayout"] = True
     #size and step size of the region to create a PES from
-    xzhalfwidth = 10.1
-    yhwidth=5.1
-    step = .5
-    buff=1
+    
     
     searchRangeMin=0
     searchRangeMax=.5
 
     
     fileIdent=f'{atom}'
-    #datFolder=f'data/{nickname}/'
-    #os.makedirs(datFolder,exist_ok=True)
+
     
     
     full= outfolder+ f'{fileIdent}-Full.data'
@@ -196,33 +238,25 @@ def PESurface(file,atom,nickname,dumpstep,outfolder,finalLoc=None):
     
     
     
+    #do this first initialize to get around reaxff issues with deleting atoms and writing data
+    init_dump(L2,file,full,dumpstep)
     
-    init_dump(L2,file,full,dumpstep)#do this to get around reaxff issues with deleting atoms and writing data
-    
-
     init_dat(L,full,out)
 
     
 #Changing the simulation box and deleting all unnecessary atoms
-    L.commands_string(f'''
-        variable xi equal x[{atom}]
-        variable yi equal y[{atom}]
-        variable zi equal z[{atom}]
-        ''')
+    xi, yi, zi = find_atom_position(L,atom)
+    ri=(xi,yi,zi)
     
     bbox= L.extract_box()
     bbox=[[bbox[0][0],bbox[1][0]],[bbox[0][1],bbox[1][1]],[bbox[0][2],bbox[1][2]]]
     
-    xi = L.extract_variable('xi')
-    yi = L.extract_variable('yi')
-    zi = L.extract_variable('zi')
     
     xrange = [max(xi-buff*xzhalfwidth,  bbox[0][0]),    min(xi+buff*xzhalfwidth,    bbox[0][1])]
     yrange = [max(yi-buff*yhwidth,      bbox[1][0]),    min(yi+buff*yhwidth,        bbox[1][1])]
     zrange = [max(zi-buff*xzhalfwidth,  bbox[2][0]),    min(zi+buff*xzhalfwidth,    bbox[2][1])]
 
     L.commands_string(f'''
-        #create_atoms 3 single {xi-.7} {yi} {zi+.7}
         
         region sim block EDGE EDGE EDGE EDGE EDGE EDGE
         region ins block {xrange[0]} {xrange[1]} {yrange[0]} {yrange[1]} {zrange[0]} {zrange[1]} units box 
@@ -231,11 +265,11 @@ def PESurface(file,atom,nickname,dumpstep,outfolder,finalLoc=None):
         
         change_box all x final {xrange[0]} {xrange[1]} y final {yrange[0]} {yrange[1]} z final {zrange[0]} {zrange[1]} units box 
         
-        
         fix r1 all qeq/reax 1 0.0 10.0 1e-6 reaxff
         compute c1 all property/atom x y z
         
         run 0''')
+
 
     NEB_min(L)
 
@@ -243,37 +277,14 @@ def PESurface(file,atom,nickname,dumpstep,outfolder,finalLoc=None):
         write_data {out}
         ''')
     
-
+    
+    
     #Now create ovito plot of atoms for future use
-    try:
-        pipeline = import_file(out)
-        pipeline.modifiers.append(ExpressionSelectionModifier(expression = f'ParticleIdentifier=={atom}'))
-        pipeline.modifiers.append(AssignColorModifier(color=(0, 1, 0)))
-        pipeline.modifiers.append(SliceModifier(normal=(0,1,0),distance=yi,slab_width=3))
-        #@TODO change atom type 
-        data=pipeline.compute()
-        
-        pipeline.add_to_scene()
-        vp = Viewport()
-        vp.type = Viewport.Type.Front
-        vp.zoom_all()
-        
-        
-        vp.render_image(size=(600,600), filename=ovitoFig)
-    except Exception as e:
-        print(e)
-    
-    
-
+    create_ovito_plot(file,ovitoFig,ri,atom)
     
     Ei = L.extract_compute('thermo_pe',0,0)*conv
     Ef=0
 
-    xlist=np.arange(-xzhalfwidth,xzhalfwidth,step)
-    zlist=np.arange(-xzhalfwidth,xzhalfwidth,step)
-    
-    xlen=len(xlist)
-    zlen=len(zlist)
     
     elist=np.zeros([xlen,zlen])
     tot = xlen*zlen
@@ -292,6 +303,7 @@ def PESurface(file,atom,nickname,dumpstep,outfolder,finalLoc=None):
             yf = yi
             zf = zi + z
             rf = (xi + x, yi, zi + z)
+            
             print(f"Step {i}/{tot}")
             
             L.commands_string(f'''
@@ -301,7 +313,17 @@ def PESurface(file,atom,nickname,dumpstep,outfolder,finalLoc=None):
             i+=1
             Ef = L.extract_compute('thermo_pe',0,0)*conv
             dE=Ef-Ei
+            elist[j,k]=dE
             
+    erows=elist.shape[0]
+    ecols=elist.shape[1]
+       
+    
+    for j in range(0,ecols-1):
+        for k in range(erows-1):
+            x=xlist[k]
+            y=0
+            z=zlist[j]
             if finalLoc is not None:
                 dx=finalLoc[0]-x
                 dz=finalLoc[1]-z
@@ -313,9 +335,7 @@ def PESurface(file,atom,nickname,dumpstep,outfolder,finalLoc=None):
             if dE < eMin and dist<= searchRangeMax:
                 rMin=(x,z)
                 eMin=dE
-            elist[j,k]=dE
-            
-    
+                
    
     #now create the lowest energy position data file for NEB.
     L.commands_string(f'''
@@ -337,7 +357,6 @@ def PESurface(file,atom,nickname,dumpstep,outfolder,finalLoc=None):
     
     ####Now clean up the dump file to be the correct format for NEB runs
     if me == 0:## ONLY RUN ON ONE PROCESS
-
         with open(neb, "r+") as f:
             d = f.readlines()
             f.seek(0)
@@ -349,16 +368,30 @@ def PESurface(file,atom,nickname,dumpstep,outfolder,finalLoc=None):
                 i+=1
             f.truncate()
     
+
+    plottitle=f"Potential energy landscape around atom {atom}"
+    redXPts=np.transpose([[0,0],[rMin[0],rMin[1]]])
+    plot_PES(PESimage,redXPts,xlist,zlist,elist,plottitle)
+#remove temporary files 
+    # try:
+    #     #os.remove(ovitoFig)
+    #     #os.remove(full)
+    #     i=1
+    # except:
+    #     i=0
     
+    return {out,neb}#returning the file names of the initial position and the final neb xyz file
+
+def plot_PES(PESimage,redXPts,xlist,zlist,elist,title):
+    #Plotting below
+    fig,ax = plt.subplots(figsize=(6,6))
+    
+     # set maximum value of the PES to be twice the lowest E or 18eV, whichever is highest
     minE=np.min(elist)
     maxE=2*abs(minE)
     if maxE<18:
         maxE=18
     elist[elist>maxE]=maxE
-    
-#Plotting below
-    fig,ax = plt.subplots(figsize=(6,6))
-    redXPts=np.transpose([[0,0],[rMin[0],rMin[1]]])
     
     
     # if finalLoc is not None:
@@ -377,12 +410,11 @@ def PESurface(file,atom,nickname,dumpstep,outfolder,finalLoc=None):
     cax = divider.append_axes('right', size='5%', pad=0.05)
     cbar=fig.colorbar(im,cax=cax,orientation='vertical')
     cbar.set_label('ΔE(eV)')
-    ax.set_title(f"Potential energy landscape around atom {atom}")
+    ax.set_title(title)
     #ax.set_xticklabels(np.arange(-math.floor(xzhalfwidth),math.floor(xzhalfwidth)+1,2))
     plt.savefig(PESimage)
     
-    
-###OLD working double PES ovito
+    ###OLD working double PES ovito
     # fig = plt.figure(figsize=(12,6))
     # gs = gridspec.GridSpec(1, 2,width_ratios=[1,1.6])
     # ax1 = plt.subplot(gs[0])
@@ -415,17 +447,9 @@ def PESurface(file,atom,nickname,dumpstep,outfolder,finalLoc=None):
     # ax1.set_title(f"Potential energy landscape around atom {atom}")
     # plt.savefig(PESimage)
 ###
-        
-#remove temporary files 
-    try:
-        #os.remove(ovitoFig)
-        #os.remove(full)
-        i=1
-    except:
-        i=0
-    
-    return {out,neb}#returning the file names of the initial position and the final neb xyz file
-    
+
+def prep_neb_forcemove(file,atom):
+    return
     
 if __name__ == "__main__":
     
@@ -455,9 +479,8 @@ if __name__ == "__main__":
     atomID=sys.argv[2]
     
     
-    dataFileNickname='HNEB1'
     filepath=os.path.join(folderpath,file)
-    nebFiles = PESurface(filepath,atomID,dataFileNickname,dumpstep,outfolder,finalPos)
+    nebFiles = create_PES(filepath,dumpstep,atomID,outfolder,finalPos)
     
     
 
