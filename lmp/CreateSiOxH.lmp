@@ -1,0 +1,125 @@
+clear
+units         real
+dimension     3
+boundary    p p p
+atom_style  charge
+
+#atom_modify map array
+variable seed equal 12345
+variable NA equal 6.02e23
+
+variable dt equal .5
+variable latticeConst equal 5.43
+
+
+
+#timestep of 0.5 femptoseconds
+variable printevery equal 10000
+variable restartevery equal 0#500000
+variable datapath string "${output_folder}data/"
+
+shell mkdir ${datapath}
+
+
+variable massSi equal 28.0855 #Si
+variable massO equal 15.9991 #O
+variable massH equal  1.00784 #H 
+
+
+variable numSi equal 20
+variable numO equal 40
+variable numH equal 2
+variable density equal 2.22 #approximate density
+
+
+
+#below math to determine the correct x and y dimension which are multiples of 5.43 for
+#creating interfaces with c-Si in future
+variable volume equal $(((10e7)^3)*(v_numSi*v_massSi+v_numO*v_massO)/(v_density*v_NA)) #Density calc
+
+print ${volume}
+
+variable xyzExtent equal $((v_volume)^(1/3))
+
+print ${xyzExtent}
+
+
+region sim block 0 ${xyzExtent} 0 ${xyzExtent} 0 ${xyzExtent}
+
+
+lattice diamond ${latticeConst}
+
+
+create_box 3 sim
+
+create_atoms 1 random ${numSi} ${seed} sim overlap 1.2 maxtry 10000 units box
+create_atoms 2 random ${numO} ${seed} sim overlap 1.3 maxtry 100000 units box
+create_atoms 3 random ${numH} ${seed} sim overlap 1.2 maxtry 10000 units box
+
+
+mass         3 ${massH}
+mass         2 ${massO}
+mass         1 ${massSi}
+
+pair_style	    reaxff potential/topcon.control
+pair_coeff	    * * potential/ffield_Nayir_SiO_2019.reax Si O H
+#Pair style reaxff requires use of exactly one of the fix qeq/reaxff or fix qeq/shielded or fix acks2/reaxff commands 
+
+#Pair style reaxff requires use of exactly one of the fix qeq/reaxff or fix qeq/shielded or fix acks2/reaxff commands 
+
+
+neighbor        2 bin
+neigh_modify    every 10 delay 0 check no
+
+timestep ${dt}
+
+
+dump d1 all custom ${printevery} ${output_folder}CreateSiOx.dump id type q x y z ix iy iz mass element vx vy vz
+dump_modify d1 element H O Si
+
+thermo ${printevery}
+thermo_style custom step temp density vol pe ke etotal #flush yes
+
+
+#qeq/reax uses the Rappe and Goddard QEq technique which was used in the potential in Fogarty2010(p2) that this current potential is. based on 
+fix r1 all qeq/reax 1 0.0 10.0 1e-6 reaxff
+
+
+
+group Silicon type 1
+group Oxygen type 2 
+group Hydrogen type 3
+group gSiOx region rSiOx
+
+velocity gSiOx create 2000.0 9872567 mom yes rot no dist gaussian
+run 0
+
+#heat way the f up
+fix f1 gSiOx nvt temp 2000 2000 100
+run $(500*(1/v_dt))#divide by timestep to make the run time in fs
+unfix f1
+
+fix f1 gSiOx nvt temp 300 300 100
+run $(500*(1/v_dt))#divide by timestep to make the run time in fs
+unfix f1
+
+fix f2 gSiOx momentum 100 linear 1 1 1
+
+fix f1 gSiOx npt temp 300 300 100 iso 1 1 1000 drag 2.0
+run $(10000*(1/v_dt))#divide by timestep to make the run time in fs
+unfix f1
+unfix f2
+
+min_style hftn
+minimize 1.0e-8 1.0e-8 100 100
+
+variable nS equal count(Silicon)
+variable nO equal count(Oxygen)
+variable nH equal count(Hydrogen)
+variable ratio equal $( v_nO / v_nS)
+
+#must have made new dir data above
+write_data ${datapath}a-SiO_$(v_ratio:%.2f)_$(v_nH)H.data
+
+print 'done'
+
