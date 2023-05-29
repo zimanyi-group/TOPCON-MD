@@ -26,12 +26,13 @@ shell mkdir ${datapath}
 
 read_data ${output_folder}${fileID}-NEBI.data
 
-mass         3 ${massH}
-mass         2 ${massO}
 mass         1 ${massSi}
+mass         2 ${massO}
+mass         3 ${massH}
+
 
 pair_style	    reaxff potential/topcon.control
-pair_coeff	    * * potential/ffield_Nayir_SiO_2019.reax H O Si
+pair_coeff	    * * potential/ffield_Nayir_SiO_2019.reax Si O H
 #Pair style reaxff requires use of exactly one of the fix qeq/reaxff or fix qeq/shielded or fix acks2/reaxff commands 
 
 
@@ -43,7 +44,7 @@ min_style quickmin
 
 
 dump d1 all custom ${printevery} ${output_folder}o-neb.dump id type q x y z ix iy iz mass element vx vy vz
-dump_modify d1 element H O Si
+dump_modify d1 element Si O H
 thermo_style custom step pe ke etotal epair
 thermo ${printevery}
 # thermo_style custom step temp density vol pe ke etotal #flush yes
@@ -58,7 +59,7 @@ group gNEB id ${atom_id}
 fix n1 gNEB neb 1 parallel ideal perp 1
 
 
-neb ${etol} 1 1000 1000 1000 final ${output_folder}${fileID}-NEBF.data
+neb ${etol} 0.00001 1000 10 100 final ${output_folder}${fileID}-NEBF.data
 
 write_dump all atom ${output_folder}o-neb.dump.$i
 run 0

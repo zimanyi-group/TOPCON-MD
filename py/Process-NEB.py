@@ -104,7 +104,7 @@ def plot_mep(path,file,fileID,hnum=0, xo= 0.01):
     plt.text(xo, np.max(pe)*0.8, txt, fontsize = 14)
     
     plt.text(xo, np.max(pe)*0.68, txt2,fontsize=14)
-    plt.title(f"MEP with energy tolerance: {etol} and timestep: {timestep}")
+    plt.title(f"MEP with E-tol': {etol} & timestep: {timestep}")
     plt.ylabel("PE (eV)")
     plt.xlabel(r'$x_{replica} $')
     #plt.axes().yaxis.set_major_locator(MaxNLocator(integer=True))
@@ -190,12 +190,23 @@ def savecsv(data,filename,col_names=None):
             
         csv_writer.writerow(data)
 
+def catch(func, *args, handle=lambda e : e, **kwargs):
+    try:
+        return func(*args, **kwargs)
+    except Exception as e:
+        #print(handle(e))
+        return None
+
 if __name__=='__main__':
     #from tkinter.filedialog import askopenfilename
+    atomID=sys.argv[2]
+    removeID=sys.argv[5]
     
-    fileID=sys.argv[2]
+    fileID=atomID
     
-    dirname="/home/agoga/documents/code/topcon-md/data/HNEB1/"#os.path.dirname(os.path.realpath(pth))
+    csvID=str(atomID)+'-'+str(removeID)
+    
+    #dirname="/home/agoga/documents/code/topcon-md/data/HNEB1/"#os.path.dirname(os.path.realpath(pth))
     
     
     dirname=sys.argv[1]
@@ -212,22 +223,33 @@ if __name__=='__main__':
     from PIL import Image
 
     list_im = [dirname+f"{fileID}-NEB.png",dirname+f"PES({fileID}).png",dirname+f"{fileID}-Ovito.png"]
-    imgs    = [ Image.open(i) for i in list_im ]
+    
+    imgs=[]
+    for i in list_im:
+        im=catch(Image.open,i)
+        if im is not None:
+            imgs.append(im)
+            
+            
     # pick the image which is the smallest, and resize the others to match it (can be arbitrary image shape here)
     min_shape = sorted( [(np.sum(i.size), i.size ) for i in imgs])[0][1]
     imgs_comb = np.hstack([i.resize(min_shape) for i in imgs])
 
     # save that beautiful picture
-    imgs_comb = Image.fromarray( imgs_comb)
+    imgs_comb = Image.fromarray(imgs_comb)
     imgs_comb.save(dirname+f"NEB-PES-{fileID}.png")    
     
     splt=dirname[:-1].split("/")
-    tname=splt[-1]
+    tname=splt[-1]#name of the output folder 'NEB125_1-0.01_11'
     second="/".join(splt[:-1])
-
     imgs_comb.save(second+"/NEB/"+tname[3:] +".png")
-    csvfile=second+"/NEB/"+fileID+".csv"
-    col_names=["etol","ts","FEB","REB"]
+    
+    
+    
+    
+    
+    csvfile=second+"/NEB/"+csvID+".csv"
+    col_names=["etol","ts","FEB","REB","A","B","C","D","E","F","G","H"]
     dat=[etol,timestep,ret[0],ret[1]]
     
     for l in ret[2]:
