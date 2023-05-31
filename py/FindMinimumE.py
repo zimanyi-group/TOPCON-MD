@@ -176,8 +176,12 @@ def init_dat(L,file,out):
         thermo_style custom step temp density press vol pe ke etotal #flush yes
         thermo_modify lost ignore
         
-        log none
+        region sim block EDGE EDGE EDGE EDGE EDGE EDGE
         
+        log none 
+        
+        fix r1 all qeq/reax 1 0.0 10.0 1e-6 reaxff
+        compute c1 all property/atom x y z
 
         ''')
 
@@ -227,15 +231,11 @@ def reduce_sim_box(L,rpos):
 
     L.commands_string(f'''
         
-        region sim block EDGE EDGE EDGE EDGE EDGE EDGE
         region ins block {xrange[0]} {xrange[1]} {yrange[0]} {yrange[1]} {zrange[0]} {zrange[1]} units box 
         region outs intersect 2 sim ins side out
         delete_atoms region outs compress no
         
         change_box all x final {xrange[0]} {xrange[1]} y final {yrange[0]} {yrange[1]} z final {zrange[0]} {zrange[1]} units box 
-        
-        fix r1 all qeq/reax 1 0.0 10.0 1e-6 reaxff
-        compute c1 all property/atom x y z
         
         run 0''')
 
@@ -492,6 +492,7 @@ def prep_neb_swap(file,dumpstep,atomI,outfolder,atomF):
     searchRangeMax=.5
     
     fileIdent=f'{atomI}'
+    dataFolder=f'data/{atomI}-{atomF}'
     out=outfolder+f'{fileIdent}-NEBI.data'
     neb=outfolder+f'{fileIdent}-NEBF.data'
     PESimage=outfolder+f"PES({fileIdent}).png"
@@ -511,7 +512,10 @@ def prep_neb_swap(file,dumpstep,atomI,outfolder,atomF):
         xi, yi, zi = find_atom_position(L,atomI)
         ri=(xi,yi,zi)
         
-        reduce_sim_box(L,ri)
+        #reduce_sim_box(L,ri)
+        
+        
+        
     elif file.endswith(".data"):
         init_dat(L,full,out)
     else:
@@ -519,9 +523,14 @@ def prep_neb_swap(file,dumpstep,atomI,outfolder,atomF):
     
     NEB_min(L)
 
+
+
     L.commands_string(f'''
     write_data {out}
     ''')
+    
+    
+    
     
     xi, yi, zi = find_atom_position(L,atomI)
     ri=(xi,yi,zi)
@@ -618,12 +627,12 @@ if __name__ == "__main__":
         finalPos=[-3,3]
     else:
         file="SiOxNEB-NOH.dump"
-        dumpstep=0#400010
+        dumpstep=1#400010
         #finalPos=[3,2]
         # finalPos=[-1.75,-4.5]#1
         # finalPos=[3,-2]
         
-        file="aQ-SiO2.dump"
+        #file="aQ-SiO2.dump"
 
         
         

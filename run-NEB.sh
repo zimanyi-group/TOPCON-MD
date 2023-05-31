@@ -17,29 +17,25 @@ j=$SLURM_JOB_ID
 REPLICAS=9
 
 
-ATOMNUM=125 #4090 #1649 #2776 #1659 
+ATOMNUM=3898 #3924 #4090 #1649 #2776 #1659 
 
-#126,344,339
-#134,124,133
-ATOMREMOVE=133
+#4624 4030
 
-#mirror pairs
-#126 133 
-#344 134
-#339 124
 
 ETOL=0.01
 TIMESTEP=1
 SKIPPES=1
+numruns=0
+start=`date +%s`
 
-for TIMESTEP in 0.5 #0.8 0.9 1.0 #0.1 0.2 0.3 0.5 0.4 0.6 0.7  #1.2 1.4 1.1 1.3 1.5 1.6 1.7 1.8 1.9 2.0 #0.01 0.05 0.07 0.03
-do
-    #  
-    for ETOL in 0.000000001 # 0.00000005 0.000000005 #0.0001 0.00001 0.00005 0.000001 0.000005 0.0000001 0.0000005 # #0.01 0.05 .005 0.001 0.0005 
+for ETOL in  1e-5 7e-6 5e-6 # 3e-6 1e-6 #1e-4 1e-5 5e-5 1e-6 5e-6 # #5e-9 1e-9 #5e-5 1e-5 5e-6 #5e-4 1e-5 5e-5 1e-6 5e-6 
+do 
+    for TIMESTEP in 0.4 #$(seq 0.2 0.05 0.6) #0.1 0.2 0.3 0.4 #1.2 1.4 1.1 1.3 1.5 1.6 1.7 1.8 1.9 2.0 #0.01 0.05 0.07 0.03
     do
     #134 124 133
-        for ATOMREMOVE in 133 #134 124 133 #126 344 339 
+        for ATOMREMOVE in 3715 #3880 #1547 #1548 1545 3955 3632 3599
         do
+            ((numruns++))
             NAME=${FILENAME%.*}
 
 
@@ -68,12 +64,20 @@ do
             #export OMP_NUM_THREADS=1
 
 
-
+            echo "----------------Prepping NEB----------------"
             python3 /home/agoga/documents/code/topcon-md/py/FindMinimumE.py $OUT_FOLDER $ATOMNUM $ETOL $TIMESTEP $SKIPPES $ATOMREMOVE
-
+            echo "----------------Running NEB----------------"
             mpirun -np 11 --oversubscribe lmp_mpi -partition 11x1 -nocite -log $LOG_FILE -in $OUT_FOLDER$FILENAME -var atom_id ${ATOMNUM} -var output_folder $OUT_FOLDER -var fileID $ATOMNUM -var etol $ETOL -var ts $TIMESTEP -pscreen $OUT_FOLDER/screen
-
+            echo "----------------Post NEB----------------"
             python3 /home/agoga/documents/code/topcon-md/py/Process-NEB.py $OUT_FOLDER $ATOMNUM $ETOL $TIMESTEP $ATOMREMOVE
         done
     done
 done
+
+end=`date +%s`
+
+runtime=$( echo "$end-$start" | bc -l)
+runtimeMin=$( echo "$runtime/60" | bc -l)
+runtimeAvg=$( echo "$runtimeMin/$numruns" | bc -l)
+echo "Total runtime:" $runtimeMin"m"
+echo "AVG run time:" $runtimeAvg"m"
