@@ -204,7 +204,7 @@ def create_ovito_plot(infile,figureName,r,atomID,selection=None):
         pipeline.modifiers.append(ExpressionSelectionModifier(expression = expr))
         pipeline.modifiers.append(AssignColorModifier(color=(0, 1, 0)))
         pipeline.modifiers.append(SliceModifier(normal=(0,1,0),distance=y,slab_width=slabwidth))
-        #@TODO change atom type 
+  
         data=pipeline.compute()
         
         pipeline.add_to_scene()
@@ -239,8 +239,6 @@ def reduce_sim_box(L,rpos):
         
         run 0''')
 
-
-    
 
 def create_PES(L,atom):
 
@@ -478,6 +476,23 @@ def prep_neb_forcemove(file,dumpstep,atom,outfolder,finalLoc=None):
             
     return
 
+def recenter_sim(L,r):
+    
+    return
+    bbox= L.extract_box()
+    #bbox=[[bbox[0][0],bbox[1][0]],[bbox[0][1],bbox[1][1]],[bbox[0][2],bbox[1][2]]]
+    
+    xhlen=abs(bbox[1][0]-bbox[0][0])/2
+    yhlen=abs(bbox[1][1]-bbox[0][1])/2
+    zhlen=abs(bbox[1][2]-bbox[0][2])/2
+    
+    
+    L.commands_string(f'''
+        
+        displace_atoms all move {xhlen-r[0]} {yhlen-r[1]} {zhlen-r[2]}
+        
+        run 0''')
+
 def prep_neb_swap(file,dumpstep,atomI,outfolder,atomF):
     me = MPI.COMM_WORLD.Get_rank()
     nprocs = MPI.COMM_WORLD.Get_size()
@@ -509,8 +524,7 @@ def prep_neb_swap(file,dumpstep,atomI,outfolder,atomF):
         
         init_dat(L,full,out)
         
-        xi, yi, zi = find_atom_position(L,atomI)
-        ri=(xi,yi,zi)
+        
         
         #reduce_sim_box(L,ri)
         
@@ -520,6 +534,14 @@ def prep_neb_swap(file,dumpstep,atomI,outfolder,atomF):
         init_dat(L,full,out)
     else:
         print("File is not a .data or .dump")
+    
+    xi, yi, zi = find_atom_position(L,atomI)
+    ri=(xi,yi,zi)
+    
+    recenter_sim(L,ri)
+    
+    xi, yi, zi = find_atom_position(L,atomI)
+    ri=(xi,yi,zi)
     
     NEB_min(L)
 
@@ -565,12 +587,14 @@ def prep_neb_swap(file,dumpstep,atomI,outfolder,atomF):
         write_data {out}
         ''')
     
+    #@TODO do two seperate pipelines so that we don't minimize after removing the neighbor atom then place the original atom
+    # in a place where things will may have moved around. 
     
     #xi, yi, zi = ri[0], ri[1], ri[2] #find_atom_position(L,atom)
     
     
     xyz=outfolder+f'{fileIdent}-NEBFXYZ.data'
-     #now create the lowest energy position data file for NEB.
+    #now create the lowest energy position data file for NEB.
     L.commands_string(f'''
                 set atom {atomID} x {xf} y {yf} z {zf}
                 
@@ -618,12 +642,12 @@ if __name__ == "__main__":
 
 
     
-    withH=False
+    withH=True
     finalPos=None
     
     if withH:
         file="SiOxNEB-H.dump"
-        dumpstep=10000
+        dumpstep=8
         finalPos=[-3,3]
     else:
         file="SiOxNEB-NOH.dump"
@@ -633,12 +657,10 @@ if __name__ == "__main__":
         # finalPos=[3,-2]
         
         #file="aQ-SiO2.dump"
+        #dumpstep=0
 
         
         
-        
-        
-    
     outfolder=sys.argv[1] 
     atomID=sys.argv[2]
     atomRemove=sys.argv[6]

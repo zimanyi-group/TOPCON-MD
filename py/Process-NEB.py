@@ -93,7 +93,7 @@ def plot_mep(path,file,fileID,hnum=0, xo= 0.01):
             points.append([r[a], r[b], r[c]])
             
     name=fileID
-
+    
     fig = plt.figure(figsize=[6,6])
     plt.scatter(r,pe, marker = '^', color = 'darkgreen', s=180)
     #plt.plot(r,pe, linestyle = '--', linewidth = 3.0, color = 'darkgreen')
@@ -111,7 +111,7 @@ def plot_mep(path,file,fileID,hnum=0, xo= 0.01):
     plt.grid('on',axis='y',linewidth=1)
     plt.savefig(path+name +"-NEB.png")
     
-    return (EF,ER,my_barriers)
+    return (EF,ER,my_barriers,RD)
 
 
 def calc_barrier(file):
@@ -248,9 +248,11 @@ if __name__=='__main__':
     
     
     
-    csvfile=second+"/NEB/"+csvID+".csv"
-    col_names=["etol","ts","FEB","REB","A","B","C","D","E","F","G","H"]
-    dat=[etol,timestep,ret[0],ret[1]]
+    #csvfile=second+"/NEB/"+csvID+".csv"
+    csvfile=second+"/NEB/pairs.csv"
+    
+    col_names=["pair","etol","ts","dist","FEB","REB","A","B","C","D","E","F","G","H"]
+    dat=[csvID,etol,timestep,ret[3],ret[0],ret[1]]
     
     for l in ret[2]:
         dat.append(l[0])
