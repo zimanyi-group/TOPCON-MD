@@ -500,7 +500,8 @@ def prep_neb_swap(file,dumpstep,atomI,outfolder,atomF):
     plt.rcParams["figure.autolayout"] = True
     
     L = lammps('mpi')
-    L2 = lammps('mpi')
+    L2= lammps('mpi')
+    LT = lammps('mpi')
     
     
     searchRangeMin=0
@@ -520,42 +521,40 @@ def prep_neb_swap(file,dumpstep,atomI,outfolder,atomF):
     #initilize the data files 
     if file.endswith(".dump"):
         #do this first initialize to get around reaxff issues
-        init_dump(L2,file,full,dumpstep)
+        init_dump(LT,file,full,dumpstep)
         
         init_dat(L,full,out)
-        
-        
-        
-        #reduce_sim_box(L,ri)
+        init_dat(L2,full,out)
         
         
         
     elif file.endswith(".data"):
         init_dat(L,full,out)
+        init_dat(L2,full,out)
     else:
         print("File is not a .data or .dump")
     
-    xi, yi, zi = find_atom_position(L,atomI)
-    ri=(xi,yi,zi)
-    
+    ri = find_atom_position(L,atomI)
     recenter_sim(L,ri)
-    
-    xi, yi, zi = find_atom_position(L,atomI)
-    ri=(xi,yi,zi)
-    
+    ri = find_atom_position(L,atomI)
     NEB_min(L)
-
-
-
     L.commands_string(f'''
+    write_data {out}
+    ''')
+    
+    #####L2
+    ri = find_atom_position(L2,atomI)
+    recenter_sim(L2,ri)
+    ri = find_atom_position(L2,atomI)
+    NEB_min(L2)
+    L2.commands_string(f'''
     write_data {out}
     ''')
     
     
     
+    ri = find_atom_position(L,atomI)
     
-    xi, yi, zi = find_atom_position(L,atomI)
-    ri=(xi,yi,zi)
     
     #Now create ovito plot of atoms for future use
     create_ovito_plot(out,ovitoFig,ri,atomI,selection)
@@ -565,9 +564,12 @@ def prep_neb_swap(file,dumpstep,atomI,outfolder,atomF):
     elist=ret[1]
 
     
-    xf, yf, zf = find_atom_position(L,atomF)
+    rf = find_atom_position(L,atomF)
     ri = find_atom_position(L,atomI)
-
+    
+    ri2 = find_atom_position(L2,atomI)
+    rf2 = find_atom_position(L2,atomF)
+    
     #delete the output file so that we can rewrite it without the atom
     try:
         os.remove(out)
@@ -579,9 +581,14 @@ def prep_neb_swap(file,dumpstep,atomI,outfolder,atomF):
     L.commands_string(f'''
         group gFAtom id {atomF}
         delete_atoms group gFAtom compress no
-        
+    ''')
+    L2.commands_string(f'''
+        group gFAtom id {atomF}
+        delete_atoms group gFAtom compress no
     ''')
     
+    
+    #ONLY MINIMIZE FOR THE INITIAL SET DATA
     NEB_min(L)
     L.commands_string(f'''
         write_data {out}
@@ -595,16 +602,16 @@ def prep_neb_swap(file,dumpstep,atomI,outfolder,atomF):
     
     xyz=outfolder+f'{fileIdent}-NEBFXYZ.data'
     #now create the lowest energy position data file for NEB.
-    L.commands_string(f'''
-                set atom {atomID} x {xf} y {yf} z {zf}
+    L2.commands_string(f'''
+                set atom {atomID} x {rf2[0]} y {rf2[1]} z {rf2[2]}
                 
                 run 0
                 write_data {xyz}
     ''')
     
-    NEB_min(L)
+    NEB_min(L2)
     
-    L.commands_string(f'''
+    L2.commands_string(f'''
                 write_dump all custom {neb} id x y z
                 ''')
     
@@ -648,16 +655,11 @@ if __name__ == "__main__":
     if withH:
         file="SiOxNEB-H.dump"
         dumpstep=8
-        finalPos=[-3,3]
+
     else:
         file="SiOxNEB-NOH.dump"
         dumpstep=1#400010
-        #finalPos=[3,2]
-        # finalPos=[-1.75,-4.5]#1
-        # finalPos=[3,-2]
-        
-        #file="aQ-SiO2.dump"
-        #dumpstep=0
+
 
         
         

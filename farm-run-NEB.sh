@@ -1,11 +1,19 @@
-#!/bin/bash -l
-#! -cwd
-#! -j y
-#! -S /bin/bash
+#!/bin/sh
+#SBATCH -D ./
+#SBATCH --job-name=nebtest
+#SBATCH --partition=high2 # Partition you are running on. Options: low2, med2, high2
+#SBATCH --output=/home/agoga/sandbox/topcon/slurm-output/j-%j.txt
+#SBATCH --mail-user="adgoga@ucdavis.edu"
+#SBATCH --mail-type=FAIL,END
 
 
-###COMMAND LINE ARGUMENTS
-###1ST FILE NAME
+#SBATCH --ntasks=256
+#SBATCH --ntasks-per-node=256
+#SBATCH --cpus-per-task=1 
+#SBATCH --mem=64G
+#SBATCH -t 4-0
+
+j=\$SLURM_JOB_ID
 
 lmppre='lmp/'
 FILE=$1
@@ -33,9 +41,9 @@ start=`date +%s`
 #     ATOMNUM=${pair% *}
 #     ATOMREMOVE=${pair#* }
 ATOMREMOVE=1638
-for ETOL in 1e-5 1e-6 1e-7 #3e-5 7e-5 7e-6 5e-6 3e-6 1e-6 7e-7 5e-7 3e-7 1e-7
+for ETOL in 1e-5 #1e-6 1e-7 #3e-5 7e-5 7e-6 5e-6 3e-6 1e-6 7e-7 5e-7 3e-7 1e-7
 do 
-    for TIMESTEP in $(seq 0.1 0.1 0.9) 
+    for TIMESTEP in 0.5 #$(seq 0.1 0.1 0.9) 
     do
     # for ATOMREMOVE in 3090 #4929 #3715 # 3341 # 3880  #1548 1545 3955 3632 3599
     # do
@@ -68,12 +76,12 @@ do
 
 
         echo "----------------Prepping NEB----------------"
-        python3 /home/agoga/documents/code/topcon-md/py/FindMinimumE.py $OUT_FOLDER $ATOMNUM $ETOL $TIMESTEP $SKIPPES $ATOMREMOVE
+        srun /share/apps/conda3/miniconda3/bin/python3 //home/agoga/sandbox/topcon/py/FindMinimumE.py $OUT_FOLDER $ATOMNUM $ETOL $TIMESTEP $SKIPPES $ATOMREMOVE
         echo "----------------Running NEB----------------"
         
-        mpirun -np 13 --oversubscribe lmp_mpi -partition 13x1 -nocite -log $LOG_FILE -in $OUT_FOLDER$FILENAME -var atom_id ${ATOMNUM} -var output_folder $OUT_FOLDER -var fileID $ATOMNUM -var etol $ETOL -var ts $TIMESTEP -pscreen $OUT_FOLDER/screen
+        #mpirun -np 13 --oversubscribe lmp_mpi -partition 13x1 -nocite -log $LOG_FILE -in $OUT_FOLDER$FILENAME -var atom_id ${ATOMNUM} -var output_folder $OUT_FOLDER -var fileID $ATOMNUM -var etol $ETOL -var ts $TIMESTEP -pscreen $OUT_FOLDER/screen
         echo "----------------Post NEB----------------"
-        python3 /home/agoga/documents/code/topcon-md/py/Process-NEB.py $OUT_FOLDER $ATOMNUM $ETOL $TIMESTEP $ATOMREMOVE
+        #srun /share/apps/conda3/miniconda3/bin/python3 /home/agoga/sandbox/topcon/py/Process-NEB.py $OUT_FOLDER $ATOMNUM $ETOL $TIMESTEP $ATOMREMOVE
     
     done
 done
