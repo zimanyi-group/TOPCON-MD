@@ -7,10 +7,10 @@ import matplotlib.pyplot as plt
 from skspatial.objects import Line, Sphere
 
 
-dfile="/home/agoga/documents/code/topcon-md/data/SiOxNEB-NOH.dump"
+dfile="/home/agoga/documents/code/topcon-md/data/SiOxNEB-H-minimized.data"
 
 with open(dfile) as lammps_dump_fl_obj:
-    atoms = ase.io.read(lammps_dump_fl_obj, format="lammps-dump-text", index=0)
+    atoms = ase.io.read(lammps_dump_fl_obj,format="lammps-data",style='charge',units='real',sort_by_id=True)#, format="lammps-data", index=0)
     
 r=atoms.get_positions()
 numAtoms=len(r)
@@ -23,12 +23,14 @@ print('loaded')
 anums=np.zeros(numAtoms)
 anums[atoms.get_atomic_numbers()==1]=14
 anums[atoms.get_atomic_numbers()==2]=8
+anums[atoms.get_atomic_numbers()==3]=1
 atoms.set_atomic_numbers(anums)
 
         
 cut=np.zeros(numAtoms)
 cut[atoms.get_atomic_numbers()==8]=1.5
 cut[atoms.get_atomic_numbers()==14]=1.05
+cut[atoms.get_atomic_numbers()==1]=0
 
 nl=ase.neighborlist.NeighborList(cut,self_interaction=False)#{('H', 'H'): .1, ('H', 'He'): .1, ('He', 'He'): 3})
 nl.update(atoms)
@@ -39,11 +41,14 @@ zmax=28
 
 pairs=[]
 counts=np.zeros(numAtoms)
-debugatom=3487
+debugatom=4
 for i in range(numAtoms):
     cur=atoms[i]
     curtype=cur.symbol
     cpos=cur.position
+    
+    if i == debugatom:
+        print(f'Debug - zpos:{cpos[2]}')
     
     #don't look too close to the interface
     if cpos[2]<zmin or cpos[2]>zmax:
@@ -127,7 +132,7 @@ print(f"Ids with 6 pairs: {str(ids)}")
 ids = [j+1 for j in range(numAtoms) if counts[j]==5]
 print(f"Number of ids with 5 pairs: {str(len(ids))}")
 
-pairfile="/home/agoga/documents/code/topcon-md/data/noHpairs-v1.txt"
+pairfile="/home/agoga/documents/code/topcon-md/data/Hpairs-v1.txt"
 with open(pairfile,"w") as tf:
     for p in pairs:
         tf.write(f"{p[0]} {p[1]}\n")

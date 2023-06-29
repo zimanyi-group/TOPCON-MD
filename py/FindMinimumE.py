@@ -1,15 +1,13 @@
- 
+#!/usr/bin/env python
 from lammps import lammps
 import sys
 import os
-import shutil
-import analysis #md
-import matplotlib
+
 import numpy as np
 from mpi4py import MPI
 from matplotlib import pyplot as plt
 from random import gauss
-import math
+
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from ovito.io import import_file, export_file
 from ovito.data import *
@@ -19,7 +17,8 @@ import matplotlib.gridspec as gridspec
 import matplotlib as mpl
  
 
-
+comm = MPI.COMM_WORLD
+rank = comm.Get_rank()
 #dt=1
 etol=sys.argv[3]
 dt=sys.argv[4]
@@ -39,6 +38,7 @@ zlist=np.arange(-xzhalfwidth,xzhalfwidth,step)
 
 xlen=len(xlist)
 zlen=len(zlist)
+
 
 class MidpointNormalize(mpl.colors.Normalize):
     def __init__(self, vmin, vmax, midpoint=0, clip=False):
@@ -186,9 +186,12 @@ def init_dat(L,file,out):
         ''')
 
 def create_ovito_plot(infile,figureName,r,atomID,selection=None):
-    slabwidth=5#ang
+    yslabwidth=5#ang
+    xzslabwidth=20
     try:
+        x=r[0]
         y=r[1]
+        z=r[2]
         pipeline = import_file(infile)
         if selection == None:
             selection=[atomID]
@@ -203,8 +206,10 @@ def create_ovito_plot(infile,figureName,r,atomID,selection=None):
                 
         pipeline.modifiers.append(ExpressionSelectionModifier(expression = expr))
         pipeline.modifiers.append(AssignColorModifier(color=(0, 1, 0)))
-        pipeline.modifiers.append(SliceModifier(normal=(0,1,0),distance=y,slab_width=slabwidth))
-  
+        #pipeline.modifiers.append(SliceModifier(normal=(1,0,0),distance=x,slab_width=xzslabwidth))
+        pipeline.modifiers.append(SliceModifier(normal=(0,1,0),distance=y,slab_width=yslabwidth))  
+        #pipeline.modifiers.append(SliceModifier(normal=(0,0,1),distance=z,slab_width=xzslabwidth))
+        
         data=pipeline.compute()
         
         pipeline.add_to_scene()
@@ -212,6 +217,11 @@ def create_ovito_plot(infile,figureName,r,atomID,selection=None):
         vp.type = Viewport.Type.Front
         vp.zoom_all()
         
+        # for i in range(20):
+        #     print(vp.camera_pos)
+        # vp.__setattr__("camera_pos",(x,vp.camera_pos[1],z))
+        # vp.camera_pos[0]=x
+        # vp.camera_pos[2]=z
         
         vp.render_image(size=(600,600), filename=figureName)
     except Exception as e:
@@ -478,7 +488,6 @@ def prep_neb_forcemove(file,dumpstep,atom,outfolder,finalLoc=None):
 
 def recenter_sim(L,r):
     
-    return
     bbox= L.extract_box()
     #bbox=[[bbox[0][0],bbox[1][0]],[bbox[0][1],bbox[1][1]],[bbox[0][2],bbox[1][2]]]
     
@@ -489,8 +498,8 @@ def recenter_sim(L,r):
     
     L.commands_string(f'''
         
-        displace_atoms all move {xhlen-r[0]} {yhlen-r[1]} {zhlen-r[2]}
-        
+        #displace_atoms all move {xhlen-r[0]} {yhlen-r[1]} {zhlen-r[2]}
+        displace_atoms all move {xhlen-r[0]} {yhlen-r[1]} 0
         run 0''')
 
 def prep_neb_swap(file,dumpstep,atomI,outfolder,atomF):
@@ -520,17 +529,15 @@ def prep_neb_swap(file,dumpstep,atomI,outfolder,atomF):
     
     #initilize the data files 
     if file.endswith(".dump"):
-        #do this first initialize to get around reaxff issues
+        #do this first initialize to get around reaxff issues(charge stuff I think)
         init_dump(LT,file,full,dumpstep)
         
         init_dat(L,full,out)
         init_dat(L2,full,out)
         
-        
-        
     elif file.endswith(".data"):
-        init_dat(L,full,out)
-        init_dat(L2,full,out)
+        init_dat(L,file,out)
+        init_dat(L2,file,out)
     else:
         print("File is not a .data or .dump")
     
@@ -570,12 +577,15 @@ def prep_neb_swap(file,dumpstep,atomI,outfolder,atomF):
     ri2 = find_atom_position(L2,atomI)
     rf2 = find_atom_position(L2,atomF)
     
+    
     #delete the output file so that we can rewrite it without the atom
     try:
-        os.remove(out)
+        if me == 0:
+            os.remove(out)
+        
     except:
+        print("bad os fail - Proc %d out of %d procs" % (comm.Get_rank(),comm.Get_size()))
         return
-    
     
     #delete the atom at the final location
     L.commands_string(f'''
@@ -636,6 +646,7 @@ def prep_neb_swap(file,dumpstep,atomI,outfolder,atomF):
                     f.write(l)
                 i+=1
             f.truncate()
+
             
     return
     
@@ -655,6 +666,7 @@ if __name__ == "__main__":
     if withH:
         file="SiOxNEB-H.dump"
         dumpstep=8
+        file="SiOxNEB-H-minimized.data"
 
     else:
         file="SiOxNEB-NOH.dump"
@@ -667,9 +679,8 @@ if __name__ == "__main__":
     atomID=sys.argv[2]
     atomRemove=sys.argv[6]
     
-    
     filepath=os.path.join(folderpath,file)
     nebFiles =prep_neb_swap(filepath,dumpstep,atomID,outfolder,atomRemove)#prep_neb_forcemove(filepath,dumpstep,atomID,outfolder,finalPos)
-    
-    
-
+    #print("Got here - Proc %d out of %d procs" % (comm.Get_rank(),comm.Get_size()))
+    MPI.Finalize()
+    exit()
