@@ -54,7 +54,7 @@ cut[atoms.get_atomic_numbers()==8]=1.5
 cut[atoms.get_atomic_numbers()==14]=1.05
 cut[atoms.get_atomic_numbers()==1]=0.01
 
-nl=ase.neighborlist.NeighborList(cut,self_interaction=False)#{('H', 'H'): .1, ('H', 'He'): .1, ('He', 'He'): 3})
+nl=ase.neighborlist.NeighborList(cut,self_interaction=False)
 nl.update(atoms)
 
 SiRad=10

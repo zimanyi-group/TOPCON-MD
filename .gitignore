@@ -11,3 +11,7 @@ sandbox/*
 density-matching/*
 MD-Analyze/*
 andrew-methods/*
+*.in
+andrew-1900-4-6.txt
+*.zip
+data/zeke/*

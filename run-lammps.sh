@@ -46,5 +46,5 @@ export OMP_NUM_THREADS=1
 # export OMP_PROC_BIND=true
 
 
-mpirun -np 16 --oversubscribe lmp_mpi -partition 16x1 -nocite -log $LOG_FILE -in $OUT_FOLDER$FILENAME -var output_folder $OUT_FOLDER -pscreen $OUT_FOLDER/screen
+mpirun -np 4 lmp_mpi -nocite -log $LOG_FILE -in $OUT_FOLDER$FILENAME -var output_folder $OUT_FOLDER
 #lmp_mpi -partition 1x1 -nocite -log $LOG_FILE -in $OUT_FOLDER$FILENAME -var output_folder $OUT_FOLDER

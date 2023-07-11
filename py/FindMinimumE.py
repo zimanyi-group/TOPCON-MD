@@ -71,7 +71,6 @@ def NEB_min(L):
 def init_dump(L,file,out,dumpstep):
     #Initialize and load the dump file
     L.commands_string(f'''
-        shell cd topcon/
         clear
         units         real
         dimension     3
@@ -116,8 +115,6 @@ def init_dump(L,file,out,dumpstep):
         thermo $(v_printevery)
         thermo_style custom step temp density press vol pe ke etotal #flush yes
         thermo_modify lost ignore
-
-        log none
         
         fix r1 all qeq/reax 1 0.0 10.0 1e-6 reaxff
         compute c1 all property/atom x y z''')
@@ -129,10 +126,9 @@ def init_dump(L,file,out,dumpstep):
         write_data {out}
         ''')
     
-def init_dat(L,file,log):
+def init_dat(L,file):
 
     L.commands_string(f'''
-
         clear
         units         real
         dimension     3
@@ -177,8 +173,6 @@ def init_dat(L,file,log):
         thermo_modify lost ignore
         
         region sim block EDGE EDGE EDGE EDGE EDGE EDGE
-        
-        log {log} 
         
         fix r1 all qeq/reax 1 0.0 10.0 1e-6 reaxff
         compute c1 all property/atom x y z
@@ -509,12 +503,13 @@ def prep_neb_swap(file,dumpstep,atomI,outfolder,atomF):
     plt.rcParams["figure.autolayout"] = True
     
     #Need two lammps instances so that when removing an atom and minimizing we don't increase time for final NEB image minimization
-    L = lammps('mpi')
-    L2= lammps('mpi')
+    L2= lammps('mpi',["-log",f'{outfolder}/logs/PrepNEB-F.log'])
+    LT = lammps('mpi',["-log",f'{outfolder}/logs/PrepNEB-LT.log'])
+    L = lammps('mpi',["-log",f'{outfolder}/logs/PrepNEB-I.log'])
     
-    LT = lammps('mpi')#temp L
-    
-
+    # L2= lammps('mpi',["-log","/home/agoga/sandbox/topcon/log2.log"])
+    # LT = lammps('mpi',["-log","/home/agoga/sandbox/topcon/logT.log"])
+    # L = lammps('mpi',["-log","/home/agoga/sandbox/topcon/log1.log"])
     
     fileIdent=f'{atomI}'
 
@@ -533,17 +528,17 @@ def prep_neb_swap(file,dumpstep,atomI,outfolder,atomF):
         #do this first initialize to get around reaxff issues(charge stuff I think)
         init_dump(LT,file,full,dumpstep)
         
-        init_dat(L,full,f'{outfolder}/logs/PrepNEB-I.log')
-        init_dat(L2,full,f'{outfolder}/logs/PrepNEB-F.log')
+        init_dat(L,full)
+        init_dat(L2,full)
         
     elif file.endswith(".data"):
-        init_dat(L,file,f'{outfolder}/logs/PrepNEB-I.log')
-        init_dat(L2,file,f'{outfolder}/logs/PrepNEB-F.log')
+        init_dat(L,file)
+        init_dat(L2,file)
     else:
         print("File is not a .data or .dump")
     
     
-    #####L1
+    ##### L1 - create the initial NEB data file
     ri = find_atom_position(L,atomI)
     recenter_sim(L,ri)
     
@@ -553,35 +548,19 @@ def prep_neb_swap(file,dumpstep,atomI,outfolder,atomF):
     write_data {nebI}
     ''')
     
-    #####L2
-    ri = find_atom_position(L2,atomI)
-    recenter_sim(L2,ri)
-    
-    ri = find_atom_position(L2,atomI)
-    NEB_min(L2)
-    L2.commands_string(f'''
-    write_data {nebI}
-    ''')
-    
-    
-    
     ri = find_atom_position(L,atomI)
     
+     
+    if me == 0:
+        #Now create ovito plot of atoms for future use
+        create_ovito_plot(nebI,ovitoFig,ri,atomI,selection)
     
-    #Now create ovito plot of atoms for future use
-    create_ovito_plot(nebI,ovitoFig,ri,atomI,selection)
-    
-    
+        
     ret = create_PES(L,atomI)
     elist=ret[1]
-
     
     rf = find_atom_position(L,atomF)
     ri = find_atom_position(L,atomI)
-    
-    ri2 = find_atom_position(L2,atomI)
-    rf2 = find_atom_position(L2,atomF)
-    
     
     #delete the output file so that we can rewrite it without the atom
     try:
@@ -597,22 +576,32 @@ def prep_neb_swap(file,dumpstep,atomI,outfolder,atomF):
         group gFAtom id {atomF}
         delete_atoms group gFAtom compress no
     ''')
-    L2.commands_string(f'''
-        group gFAtom id {atomF}
-        delete_atoms group gFAtom compress no
-    ''')
     
-    
-    #ONLY MINIMIZE FOR THE INITIAL SET DATA
     NEB_min(L)
+    
     L.commands_string(f'''
         write_data {nebI}
         ''')
     
-    #@TODO do two seperate pipelines so that we don't minimize after removing the neighbor atom then place the original atom
-    # in a place where things will may have moved around. 
     
-    #xi, yi, zi = ri[0], ri[1], ri[2] #find_atom_position(L,atom)
+    
+    
+    #####L2 - create the final NEB data file
+    ri = find_atom_position(L2,atomI)
+    recenter_sim(L2,ri)
+    
+    ri = find_atom_position(L2,atomI)
+    NEB_min(L2)
+
+    
+    rf2 = find_atom_position(L2,atomF)
+    
+    
+    #delete the atom at the final location
+    L2.commands_string(f'''
+        group gFAtom id {atomF}
+        delete_atoms group gFAtom compress no
+    ''')
     
     
     xyz=outfolder+f'{fileIdent}-NEBFXYZ.data'
@@ -626,34 +615,43 @@ def prep_neb_swap(file,dumpstep,atomI,outfolder,atomF):
     
     NEB_min(L2)
     
-    L2.commands_string(f'''
-                write_dump all custom {nebF} id x y z
-                ''')
+    rf2 = find_atom_position(L2,atomID)
     
+    # #@TODO remove all the other atoms that are not the specific atom moving
+    # L2.commands_string(f'''
+    #             write_dump all custom {nebF} id x y z
+    #             ''')
     
-    
+
     plottitle=f"Potential energy landscape around atom {atomID}"
     redXPts=np.transpose([[0,0]])
     allPts=[['x',redXPts]]
-    if skipPES != 1:
+    
+    if skipPES != 1 and me==0:
         plot_PES(PESimage,allPts,xlist,zlist,elist,plottitle)
     
     
     ####Now clean up the dump file to be the correct format for NEB runs
     if me == 0:## ONLY RUN ON ONE PROCESS
-        with open(nebF, "r+") as f:
-            d = f.readlines()
-            f.seek(0)
-            i=0
-            for l in d:
-            #kill the specific lines of the xyz file that are not kosher
-                if i not in {0,1,2,4,5,6,7,8}:
-                    f.write(l)
-                i+=1
-            f.truncate()
-
-            
+        
+        with open(nebF,'w+') as f:
+            f.write(f"1 \n{atomID} {rf2[0]} {rf2[1]} {rf2[2]}")
+        # with open(nebF, "r+") as f:
+        #     d = f.readlines()
+        #     f.seek(0)
+        #     i=0
+        #     for l in d:
+                
+        #         #kill the specific lines of the xyz file that are not kosher
+        #         if i not in {0,1,2,4,5,6,7,8}:
+        #             if l.startswith(str(atomID)):
+        #                 f.write(l)
+        #         i+=1
+                
+            # f.truncate()
     return
+    
+    
     
 if __name__ == "__main__":
     

@@ -9,20 +9,54 @@ atom_style	    charge
 variable dt equal 1
 
 
+variable massSi equal 28.0855 #Si
+variable massO equal 15.9991 #O
+variable massH equal  1.00784 #H 
+
+
+lattice custom 1.0 a1 4.8560000 -2.4280000 0.00000000 &
+a2 0.0000000 4.8560000 0.00000000 &
+a3 0.00000000 0.00000000 5.31600000 &
+basis 0.46970 0.00000 0.00000 &
+basis 0.00000 0.46970 0.66667 &
+basis 0.53030 0.53030 0.33333 &
+basis 0.41330 0.26720 0.11880 &
+basis 0.73280 0.14610 0.78547 &
+basis 0.85390 0.58670 0.45213 &
+basis 0.26720 0.41330 0.54787 &
+basis 0.14610 0.73280 0.88120 &
+basis 0.58670 0.85390 0.21453
+
+region sim block -4 4 -3 3 -4 4
+
+create_box 3 sim
+
+create_atoms 1 region sim &
+basis 1 1 &
+basis 2 1 &
+basis 3 1 &
+basis 4 2 &
+basis 5 2 &
+basis 6 2 &
+basis 7 2 &
+basis 8 2 &
+basis 9 2
+
+
+mass         1 ${massSi}
+mass         2 ${massO}
+mass         3 ${massH}
 
 #region sim block $(-v_boxdim/2) $(v_boxdim/2) $(-v_boxdim/2) $(v_boxdim/2) $(-v_boxdim/2) $(v_boxdim/2) 
-#region top block 2 3 2 3 2 3
+
 #region bot block 0 2 0 2 0 2 
 #read_data data/BCristobaliteSilicaUnitCell.data# add append
-read_data data/SilicaUnitCell.data
-replicate 6 6 6
+# read_data data/SilicaUnitCell.data
+# replicate 6 6 6
 
 
-#====================================================
 
-# mass         1 28.0855 #Si
-# mass         2 15.9991 #O
-# mass         3 1.00784 #H
+
 
 
 

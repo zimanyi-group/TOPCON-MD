@@ -49,16 +49,15 @@ dump_modify d1 element H O Si
 
 fix r1 all qeq/reaxff 1 0.0 10.0 1e-6 reaxff maxiter 400
 
-min_style hftn
-minimize 1.0e-6 1.0e-6 1000 1000
 
-
-#velocity all create 300.0 4928459 rot yes dist gaussian
 
 fix f1 all nvt temp 300 300 100
 run $(5000*(1/v_dt))#divide by timestep to make the run time in fs
 unfix f1
 
+
+min_style hftn
+minimize 1.0e-6 1.0e-6 1000 1000
 
 write_data ${output_folder}postequib.data
 

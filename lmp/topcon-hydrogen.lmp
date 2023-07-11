@@ -1,0 +1,102 @@
+# ---------Initialize Simulation---------
+clear
+units         real
+dimension     3
+boundary    p p p
+atom_style  charge
+lattice diamond 5.43
+variable rand equal 123345
+variable seed equal ${rand}
+
+
+variable datapath string "${output_folder}data/"
+
+shell mkdir ${datapath}
+
+read_data data/stack-1.68.dat
+ 
+region rcrystal block EDGE EDGE EDGE EDGE EDGE 3 units lattice
+# group bot_cSi region bottom_wafer
+
+# region top_wafer block EDGE EDGE EDGE EDGE 7.0 EDGE units lattice
+# group top_cSi region top_wafer
+
+# region poly block EDGE EDGE EDGE EDGE 6.0 7.0 units lattice
+
+lattice diamond 5.43 origin 0.193547 0.193547 0.232256
+#create_atoms 3 region poly subset ${num_H} ${rand} 
+
+
+group SILICON type 1
+group OXYGEN type 2
+group HYDROGEN type 3
+group gcrystal region rcrystal
+
+#group cSi subtract crystal OXYGEN
+
+group mobile subtract all gcrystal
+
+
+
+variable dt equal 0.7
+
+# ----------Define interatomic potential --------------
+#Pair style reaxff requires use of exactly one of the fix qeq/reaxff or fix qeq/shielded or fix acks2/reaxff commands 
+pair_style	    reaxff potential/topcon.control
+pair_coeff	    * * potential/ffield_Nayir_SiO_2019.reax Si O H
+
+#skin distance of 2 angstrom
+neighbor        2 bin
+neigh_modify    every 10 delay 0 check no
+
+
+
+
+timestep ${dt}
+thermo 5000
+
+
+
+
+#qeq/reax uses the Rappe and Goddard QEq technique which was used in the potential in Fogarty2010(p2) that this current potential is. based on 
+fix r1 all qeq/reax 10 0.0 10.0 1e-3 reaxff
+run 0
+
+
+# delete_atoms overlap 1.0 HYDROGEN all
+
+
+dump d1 all atom 5000 ${datapath}melt.dump
+
+
+
+min_style cg
+minimize 1.0e-3 1.0e-3 1000 1000
+
+
+compute MobTemp mobile temp/com
+thermo_style custom step temp density c_MobTemp etotal
+thermo_modify lost ignore
+
+velocity mobile create 2000 $(v_seed) mom yes rot no 
+
+fix settle mobile nvt temp 2000 2000.0 $(50.0 * dt)
+run 2000
+unfix settle
+
+
+# For Better Thermostatting I am going to use the fix temp/cvsr with NVE integrator.
+fix integ mobile nve
+fix heat mobile temp/csvr 2000.0 3000.0 $(60.0 * dt) $(v_seed + 1)
+fix_modify heat temp MobTemp
+run 2000000
+unfix heat
+
+
+
+write_data ${datapath}melt-quenched.dat
+
+
+
+
+
