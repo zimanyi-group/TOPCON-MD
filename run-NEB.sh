@@ -30,9 +30,9 @@ do
     ATOMNUM=${pair% *}
     ATOMREMOVE=${pair#* }
 
-    for ETOL in 7e-6 # 7e-5 5e-5 3e-5 1e-5 7e-6 5e-6 3e-6 1e-6 #7e-7 5e-7 3e-7 1e-7
+    for ETOL in 1e-5 7e-6 5e-6 #1e-7 7e-8 5e-8 3e-8 1e-8 #7e-5 5e-5 3e-5 1e-5 7e-6 5e-6 3e-6 1e-6 7e-7 5e-7 3e-7 #
     do 
-        for TIMESTEP in 0.5 #$(seq 0.15 0.1 0.55) 
+        for TIMESTEP in 0.5 #$(seq 0.2 0.05 0.85) 
         do
         # for ATOMREMOVE in 3090 #4929 #3715 # 3341 # 3880  #1548 1545 3955 3632 3599
         # do

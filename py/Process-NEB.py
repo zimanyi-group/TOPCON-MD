@@ -4,8 +4,6 @@ import matplotlib.pyplot as plt
 import os
 from datetime import datetime
 import sys
-import re
-import pdb
 from matplotlib.ticker import MaxNLocator
 import csv 
 
@@ -196,6 +194,67 @@ def catch(func, *args, handle=lambda e : e, **kwargs):
     except Exception as e:
         #print(handle(e))
         return None
+
+def calc_dist():
+    from mpl_toolkits.mplot3d import Axes3D
+    import matplotlib.pyplot as plt
+    import pandas
+    import numpy as np
+    import statistics
+
+    base="/home/agoga/documents/code/topcon-md/output/NEB/"#1000pairs-v2/"
+
+
+
+    d=base+"pairs.csv"
+    data = pandas.read_csv(d)
+
+
+    dist=[]
+    done=[]
+    bad=[]#["78-90","78-89","168-178","171-899","258-270","258-363","265-270"]
+    total=0
+    skip=0
+    for index,row in data.iterrows():
+
+        sum=0
+        over=0
+        pair = row['pair']
+        if pair not in done and pair not in bad:
+            for i,r in data[data.pair==pair].iterrows():
+                if r['dist'] < 3.6:
+                    feb = r['A']
+                    if feb < 6:
+                        sum += feb
+                        over+=1
+
+            if over >0:
+                avg = sum/over
+                dist.append(avg)
+            done.append(pair)
+            total+=1
+        else:
+            print(pair)
+            skip+=1
+            
+            
+    print(len(dist))
+    #counts,bins=np.histogram(dist)
+    print(total)
+    print(skip)
+
+    mean=statistics.mean(dist)
+    stddev=statistics.stdev(dist)
+    mstxt=f"Mean: {round(mean,2)}\nStd Dev: {round(stddev,2)}"
+
+    f,ax = plt.subplots()
+    plt.title(f'NEB Barrier Distribution for {total} runs')
+    plt.xlabel('FEB(eV)')
+    plt.ylabel('Counts')
+    plt.hist(dist,18)
+
+    plt.text(0.01,0.99,mstxt,ha='left',va='top', transform=ax.transAxes, fontsize = 10)
+    plt.show()
 
 if __name__=='__main__':
     #from tkinter.filedialog import askopenfilename

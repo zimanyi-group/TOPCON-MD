@@ -66,7 +66,7 @@ def find_atom_position(L,atomID):
     return (x,y,z)
 
 def NEB_min(L):
-    L.commands_string(f'''minimize {etol} {etol} 5000 5000''')
+    L.commands_string(f'''minimize {etol} {etol} 10000 10000''')
 
 def init_dump(L,file,out,dumpstep):
     #Initialize and load the dump file
@@ -129,7 +129,7 @@ def init_dump(L,file,out,dumpstep):
         write_data {out}
         ''')
     
-def init_dat(L,file,out):
+def init_dat(L,file,log):
 
     L.commands_string(f'''
 
@@ -178,7 +178,7 @@ def init_dat(L,file,out):
         
         region sim block EDGE EDGE EDGE EDGE EDGE EDGE
         
-        log none 
+        log {log} 
         
         fix r1 all qeq/reax 1 0.0 10.0 1e-6 reaxff
         compute c1 all property/atom x y z
@@ -504,24 +504,25 @@ def recenter_sim(L,r):
 
 def prep_neb_swap(file,dumpstep,atomI,outfolder,atomF):
     me = MPI.COMM_WORLD.Get_rank()
-    nprocs = MPI.COMM_WORLD.Get_size()
+
     
     plt.rcParams["figure.autolayout"] = True
     
+    #Need two lammps instances so that when removing an atom and minimizing we don't increase time for final NEB image minimization
     L = lammps('mpi')
     L2= lammps('mpi')
-    LT = lammps('mpi')
     
+    LT = lammps('mpi')#temp L
     
-    searchRangeMin=0
-    searchRangeMax=.5
+
     
     fileIdent=f'{atomI}'
-    dataFolder=f'data/{atomI}-{atomF}'
-    out=outfolder+f'{fileIdent}-NEBI.data'
-    neb=outfolder+f'{fileIdent}-NEBF.data'
-    PESimage=outfolder+f"PES({fileIdent}).png"
+
+    nebI=outfolder+f'{fileIdent}-NEBI.data'
+    nebF=outfolder+f'{fileIdent}-NEBF.data'
     full= outfolder+ f'{fileIdent}-Full.data'
+    
+    PESimage=outfolder+f"PES({fileIdent}).png"
     ovitoFig=outfolder+f"{fileIdent}-Ovito.png"
     
     selection=[atomI,atomF]
@@ -532,30 +533,34 @@ def prep_neb_swap(file,dumpstep,atomI,outfolder,atomF):
         #do this first initialize to get around reaxff issues(charge stuff I think)
         init_dump(LT,file,full,dumpstep)
         
-        init_dat(L,full,out)
-        init_dat(L2,full,out)
+        init_dat(L,full,f'{outfolder}/logs/PrepNEB-I.log')
+        init_dat(L2,full,f'{outfolder}/logs/PrepNEB-F.log')
         
     elif file.endswith(".data"):
-        init_dat(L,file,out)
-        init_dat(L2,file,out)
+        init_dat(L,file,f'{outfolder}/logs/PrepNEB-I.log')
+        init_dat(L2,file,f'{outfolder}/logs/PrepNEB-F.log')
     else:
         print("File is not a .data or .dump")
     
+    
+    #####L1
     ri = find_atom_position(L,atomI)
     recenter_sim(L,ri)
+    
     ri = find_atom_position(L,atomI)
     NEB_min(L)
     L.commands_string(f'''
-    write_data {out}
+    write_data {nebI}
     ''')
     
     #####L2
     ri = find_atom_position(L2,atomI)
     recenter_sim(L2,ri)
+    
     ri = find_atom_position(L2,atomI)
     NEB_min(L2)
     L2.commands_string(f'''
-    write_data {out}
+    write_data {nebI}
     ''')
     
     
@@ -564,7 +569,7 @@ def prep_neb_swap(file,dumpstep,atomI,outfolder,atomF):
     
     
     #Now create ovito plot of atoms for future use
-    create_ovito_plot(out,ovitoFig,ri,atomI,selection)
+    create_ovito_plot(nebI,ovitoFig,ri,atomI,selection)
     
     
     ret = create_PES(L,atomI)
@@ -581,7 +586,7 @@ def prep_neb_swap(file,dumpstep,atomI,outfolder,atomF):
     #delete the output file so that we can rewrite it without the atom
     try:
         if me == 0:
-            os.remove(out)
+            os.remove(nebI)
         
     except:
         print("bad os fail - Proc %d out of %d procs" % (comm.Get_rank(),comm.Get_size()))
@@ -601,7 +606,7 @@ def prep_neb_swap(file,dumpstep,atomI,outfolder,atomF):
     #ONLY MINIMIZE FOR THE INITIAL SET DATA
     NEB_min(L)
     L.commands_string(f'''
-        write_data {out}
+        write_data {nebI}
         ''')
     
     #@TODO do two seperate pipelines so that we don't minimize after removing the neighbor atom then place the original atom
@@ -622,7 +627,7 @@ def prep_neb_swap(file,dumpstep,atomI,outfolder,atomF):
     NEB_min(L2)
     
     L2.commands_string(f'''
-                write_dump all custom {neb} id x y z
+                write_dump all custom {nebF} id x y z
                 ''')
     
     
@@ -636,7 +641,7 @@ def prep_neb_swap(file,dumpstep,atomI,outfolder,atomF):
     
     ####Now clean up the dump file to be the correct format for NEB runs
     if me == 0:## ONLY RUN ON ONE PROCESS
-        with open(neb, "r+") as f:
+        with open(nebF, "r+") as f:
             d = f.readlines()
             f.seek(0)
             i=0
@@ -657,7 +662,7 @@ if __name__ == "__main__":
     folder='/data/'
     f=cwd+folder
     folderpath=os.path.join(cwd,f)
-
+    #nprocs = MPI.COMM_WORLD.Get_size()
 
     
     withH=True
@@ -665,8 +670,8 @@ if __name__ == "__main__":
     
     if withH:
         file="SiOxNEB-H.dump"
-        dumpstep=8
-        file="SiOxNEB-H-minimized.data"
+        dumpstep=9
+        file="/home/agoga/documents/code/topcon-md/data/pinhole-dump-files/Hcon-1500-440.dump"
 
     else:
         file="SiOxNEB-NOH.dump"
