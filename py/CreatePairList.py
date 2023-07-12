@@ -31,6 +31,8 @@ def check_for_h(atoms,id,hlist):
 
 dfile="/home/agoga/documents/code/topcon-md/data/pinhole-dump-files/Hcon-1500-440.data"
 
+dfile="/home/agoga/documents/code/topcon-md/data/SiOxNEB-H.data"
+dfile="/home/agoga/documents/code/topcon-md/data/SiOxNEB-NOH.data"
 with open(dfile) as lammps_dump_fl_obj:
     atoms = ase.io.read(lammps_dump_fl_obj,format="lammps-data",style='charge',units='real',sort_by_id=True)#, format="lammps-data", index=0)
     
@@ -63,6 +65,7 @@ zmax=28
 
 pairs=[]
 counts=np.zeros(numAtoms)
+
 
 for i in range(numAtoms):
     cur=atoms[i]
@@ -160,7 +163,7 @@ print(f"Ids with 6 pairs: {str(ids)}")
 ids = [j+1 for j in range(numAtoms) if counts[j]==5]
 print(f"Number of ids with 5 pairs: {str(len(ids))}")
 
-pairfile="/home/agoga/documents/code/topcon-md/data/Hpairs-v1.txt"
+pairfile=dfile[:-5]+"-pairlist.txt"
 with open(pairfile,"w") as tf:
     for p in pairs:
         tf.write(f"{p[0]} {p[1]}\n")

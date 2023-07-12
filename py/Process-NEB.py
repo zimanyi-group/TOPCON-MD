@@ -1,12 +1,23 @@
 import numpy as np
 import linecache as lc
+from mpi4py import MPI
 import matplotlib.pyplot as plt
 import os
 from datetime import datetime
 import sys
 from matplotlib.ticker import MaxNLocator
 import csv 
+# import itertools
+import collections
 
+comm = MPI.COMM_WORLD
+rank = comm.Get_rank()
+me = MPI.COMM_WORLD.Get_rank()
+
+if me !=0:
+    quit()
+    
+    
 plt.style.use('seaborn-deep')
 plt.rcParams['axes.prop_cycle'] = plt.cycler(color=['mediumblue', 'crimson','darkgreen', 'darkorange','crimson', 'darkorchid'])
 #plt.rcParams['figure.figsize'] = [12,8]
@@ -24,31 +35,6 @@ conv=0.043361254529175
 etol=sys.argv[3]
 timestep=sys.argv[4]
 
-def read_dat(file):
-    my_list = []
-    with open(file) as f:
-        for line in f.readlines():
-            x = line.split()
-            if(len(x) == 8):
-                vals = [int(x[0]), int(x[1]), float(x[2]),float(x[3]),float(x[4])]
-                my_list.append(vals)
-    f.close()
-    return np.asarray(sorted(my_list, key=lambda x:x[0]))
-
-def read_dump(file, hnum):
-    my_list=[]
-    with open(file) as f:
-        lines=f.readlines()
-        box = np.asarray([lines[5].split()[1],lines[6].split()[1],lines[7].split()[1]], dtype = float)
-        for line in lines:
-            x=line.split()
-            if(len(x)==5):
-                if(int(x[0]) == int(hnum)):
-                    f.close()
-                    return np.asarray([int(x[0]), float(x[2])*box[0], float(x[3])*box[1], float(x[4])*box[2]])
-    f.close()
-    return 
-
 
 def read_log(file, mod=0):
     ar=[]
@@ -59,7 +45,8 @@ def read_log(file, mod=0):
     for val in line:
         ar.append(float(val))
     return np.asarray(ar)
-#===============================================================
+
+
 def MEP(file):
     #there are 9 elements before RD1
     last= read_log(file)
@@ -256,88 +243,128 @@ def calc_dist():
     plt.text(0.01,0.99,mstxt,ha='left',va='top', transform=ax.transAxes, fontsize = 10)
     plt.show()
 
+
+
+
+#example sequence
+    #3000    57.299944    1038.8458.......
+    #Climbing replica = 6
+    #Step MaxReplicaForce MaxAtomForce.....
+    #3000    57.295123........
+#end example
+def check_convergence(filename,maxneb,maxclimbing,numpart=13):
+    
+    fsize=os.path.getsize(filename)
+    with open(filename,'r') as logF:
+        last = collections.deque(maxlen=1)
+        climbing=None
+        nebiter=None
+        climbing_iter_i=None
+        climbing_iter_f=None
+        for line in logF:
+            fsize -= len(line)
+            
+            if not fsize:#this line is the last line
+                climbing_iter_f=int(line.split()[0])
+                
+            elif line.startswith('Climbing'):
+                nebiter=int(last[0].split()[0])
+                climbing_iter_i=nebiter#if god loves us this is easy else use next=itertools.islice(logF,2)
+                climbing=int(line.split()[3])
+            
+            last.append(line)
+            
+        if climbing is None or nebiter is None or climbing_iter_f is None or climbing_iter_i is None:#cry
+            print('Big boy oppsie in "Process-NEB.py"')    
+            return False
+        elif climbing==numpart or climbing==0:
+            print('NEB did not converge because the climbing replica was the first or last replica.')  
+            return False
+        elif nebiter == maxneb:
+            print('NEB did not converge because the maximum NEB iterations were reached.')  
+            return False
+        elif (climbing_iter_f-climbing_iter_i) == maxclimbing:
+            print('NEB did not converge because the maximum climbing image iterations were reached.')  
+            return False
+        else:
+            return True
+    
+
 if __name__=='__main__':
-    #from tkinter.filedialog import askopenfilename
+    
+    
     atomID=sys.argv[2]
     removeID=sys.argv[5]
     
     fileID=atomID
     
     csvID=str(atomID)+'-'+str(removeID)
+    col_names=["pair","etol","ts","dist","FEB","REB","A","B","C","D","E","F","G","H"]
     
     #dirname="/home/agoga/documents/code/topcon-md/data/HNEB1/"#os.path.dirname(os.path.realpath(pth))
     
     
     dirname=sys.argv[1]
     file=f"{dirname}logs/{fileID}neb.log"
-    
-    
-    
-    
-    ret=plot_mep(dirname,file,fileID)#,hnum)
-    
-    
-    import numpy as np
-    import PIL
-    from PIL import Image
-
-    list_im = [dirname+f"{fileID}-NEB.png",dirname+f"PES({fileID}).png",dirname+f"{fileID}-Ovito.png"]
-    
-    imgs=[]
-    for i in list_im:
-        im=catch(Image.open,i)
-        if im is not None:
-            imgs.append(im)
-            
-            
-    # pick the image which is the smallest, and resize the others to match it (can be arbitrary image shape here)
-    min_shape = sorted( [(np.sum(i.size), i.size ) for i in imgs])[0][1]
-    imgs_comb = np.hstack([i.resize(min_shape) for i in imgs])
-
-    # save that beautiful picture
-    imgs_comb = Image.fromarray(imgs_comb)
-    imgs_comb.save(dirname+f"NEB-PES-{fileID}.png")    
-    
+    print(file)
     splt=dirname[:-1].split("/")
     tname=splt[-1]#name of the output folder 'NEB125_1-0.01_11'
     second="/".join(splt[:-1])
-    imgs_comb.save(second+"/NEB/"+tname[3:] +".png")
     
+    nebfolder=sys.argv[6] #second+"/NEB/"
     
+    csvfile=nebfolder+"pairs.csv"
     
-    
-    
-    #csvfile=second+"/NEB/"+csvID+".csv"
-    csvfile=second+"/NEB/pairs.csv"
-    
-    col_names=["pair","etol","ts","dist","FEB","REB","A","B","C","D","E","F","G","H"]
-    dat=[csvID,etol,timestep,ret[3],ret[0],ret[1]]
-    
-    for l in ret[2]:
-        dat.append(l[0])
-        dat.append(l[1])
+    if True: #check_convergence(file,3000,1000):
         
-    savecsv(dat,csvfile,col_names)
+    
+        ret=plot_mep(dirname,file,fileID)#,hnum)
+        
+        
+        import numpy as np
+        import PIL
+        from PIL import Image
+
+        list_im = [dirname+f"{fileID}-NEB.png",dirname+f"PES({fileID}).png",dirname+f"{fileID}-Ovito.png"]
+        
+        imgs=[]
+        for i in list_im:
+            im=catch(Image.open,i)
+            if im is not None:
+                imgs.append(im)
+                
+                
+        # pick the image which is the smallest, and resize the others to match it (can be arbitrary image shape here)
+        min_shape = sorted( [(np.sum(i.size), i.size ) for i in imgs])[0][1]
+        imgs_comb = np.hstack([i.resize(min_shape) for i in imgs])
+
+        # save that beautiful picture
+        imgs_comb = Image.fromarray(imgs_comb)
+        imgs_comb.save(dirname+f"NEB-PES-{fileID}.png")    
+        imgs_comb.save(nebfolder+tname[3:] +".png")
+        
+        
+        
+
+        
+        dat=[csvID,etol,timestep,ret[3],ret[0],ret[1]]
+        
+        for l in ret[2]:
+            dat.append(l[0])
+            dat.append(l[1])
+            
+        savecsv(dat,csvfile,col_names)
+    else:
+
+        dat=[csvID,etol,timestep]
+    
+            
+        savecsv(dat,csvfile,col_names)
     # for p in list_im:
     #     try:
     #         os.remove(p)
     #     except:
     #         i=0
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

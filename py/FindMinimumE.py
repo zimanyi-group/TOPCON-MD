@@ -19,6 +19,7 @@ import matplotlib as mpl
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
+me = MPI.COMM_WORLD.Get_rank()
 #dt=1
 etol=sys.argv[3]
 dt=sys.argv[4]
@@ -180,7 +181,7 @@ def init_dat(L,file):
         ''')
 
 def create_ovito_plot(infile,figureName,r,atomID,selection=None):
-    yslabwidth=5#ang
+    yslabwidth=7#ang
     xzslabwidth=20
     try:
         x=r[0]
@@ -280,8 +281,6 @@ def create_PES(L,atom):
                 Ef = L.extract_compute('thermo_pe',0,0)*conv
                 dE=Ef-Ei
                 elist[j,k]=dE
-    else:
-        print("Skipping PES")
             
     # #place the atom back where it came from!
     L.commands_string(f'''
@@ -497,7 +496,6 @@ def recenter_sim(L,r):
         run 0''')
 
 def prep_neb_swap(file,dumpstep,atomI,outfolder,atomF):
-    me = MPI.COMM_WORLD.Get_rank()
 
     
     plt.rcParams["figure.autolayout"] = True
@@ -663,17 +661,17 @@ if __name__ == "__main__":
     #nprocs = MPI.COMM_WORLD.Get_size()
 
     
-    withH=True
+    withH=False
     finalPos=None
     
-    if withH:
-        file="SiOxNEB-H.dump"
-        dumpstep=9
-        file="/home/agoga/documents/code/topcon-md/data/pinhole-dump-files/Hcon-1500-440.dump"
+    # if withH:
+    #     file="SiOxNEB-H.dump"
+    #     dumpstep=9
+    #     file="/home/agoga/documents/code/topcon-md/data/pinhole-dump-files/Hcon-1500-440.dump"
 
-    else:
-        file="SiOxNEB-NOH.dump"
-        dumpstep=1#400010
+    # else:
+    #     file="SiOxNEB-NOH.dump"
+    #     dumpstep=1#400010
 
 
         
@@ -681,8 +679,10 @@ if __name__ == "__main__":
     outfolder=sys.argv[1] 
     atomID=sys.argv[2]
     atomRemove=sys.argv[6]
-    
+    #file=sys.argv[7]
+    file='SiOxNEB-NOH.data'
     filepath=os.path.join(folderpath,file)
+    dumpstep=0
     nebFiles =prep_neb_swap(filepath,dumpstep,atomID,outfolder,atomRemove)#prep_neb_forcemove(filepath,dumpstep,atomID,outfolder,finalPos)
     #print("Got here - Proc %d out of %d procs" % (comm.Get_rank(),comm.Get_size()))
     MPI.Finalize()
