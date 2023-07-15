@@ -13,13 +13,13 @@ from ovito.io import import_file, export_file
 from ovito.data import *
 from ovito.modifiers import *
 from ovito.vis import Viewport
+from ovito.vis import TachyonRenderer
 import matplotlib.gridspec as gridspec
 import matplotlib as mpl
  
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
-me = MPI.COMM_WORLD.Get_rank()
 #dt=1
 etol=sys.argv[3]
 dt=sys.argv[4]
@@ -181,7 +181,7 @@ def init_dat(L,file):
         ''')
 
 def create_ovito_plot(infile,figureName,r,atomID,selection=None):
-    yslabwidth=7#ang
+    yslabwidth=5#ang
     xzslabwidth=20
     try:
         x=r[0]
@@ -218,7 +218,7 @@ def create_ovito_plot(infile,figureName,r,atomID,selection=None):
         # vp.camera_pos[0]=x
         # vp.camera_pos[2]=z
         
-        vp.render_image(size=(600,600), filename=figureName)
+        vp.render_image(size=(600,600), filename=figureName,renderer=TachyonRenderer(ambient_occlusion=False, shadows=False))
     except Exception as e:
         print(e)
         
@@ -496,6 +496,7 @@ def recenter_sim(L,r):
         run 0''')
 
 def prep_neb_swap(file,dumpstep,atomI,outfolder,atomF):
+    me = MPI.COMM_WORLD.Get_rank()
 
     
     plt.rcParams["figure.autolayout"] = True
@@ -679,8 +680,8 @@ if __name__ == "__main__":
     outfolder=sys.argv[1] 
     atomID=sys.argv[2]
     atomRemove=sys.argv[6]
-    #file=sys.argv[7]
-    file='SiOxNEB-NOH.data'
+    file=sys.argv[7]
+    #file='SiOxNEB-NOH.data'
     filepath=os.path.join(folderpath,file)
     dumpstep=0
     nebFiles =prep_neb_swap(filepath,dumpstep,atomID,outfolder,atomRemove)#prep_neb_forcemove(filepath,dumpstep,atomID,outfolder,finalPos)

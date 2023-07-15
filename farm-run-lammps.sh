@@ -91,7 +91,7 @@ export OMP_NUM_THREADS=1
 SF=/home/agoga/sandbox/topcon/slurm-output/j-\$j.txt
 
 #                       Creates a variable in lammps \${output_folder}
-if srun /home/agoga/sandbox/lammps/lmp_mpi -nocite -log \$LOG_FILE -in \$OUT_FOLDER\$FILENAME -var output_folder \$OUT_FOLDER ; 
+if srun /home/agoga/lammps-23Jun2022/build/lmp_mpi -nocite -log \$LOG_FILE -in \$OUT_FOLDER\$FILENAME -var output_folder \$OUT_FOLDER ; 
 
 #after srun exits
 then #rename the output directory to show it's finished

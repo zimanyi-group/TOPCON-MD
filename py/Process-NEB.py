@@ -273,7 +273,7 @@ def check_convergence(filename,maxneb,maxclimbing,numpart=13):
                 climbing=int(line.split()[3])
             
             last.append(line)
-            
+        print('got her')
         if climbing is None or nebiter is None or climbing_iter_f is None or climbing_iter_i is None:#cry
             print('Big boy oppsie in "Process-NEB.py"')    
             return False
@@ -292,9 +292,12 @@ def check_convergence(filename,maxneb,maxclimbing,numpart=13):
 
 if __name__=='__main__':
     
-    
+    dirname=sys.argv[1]
     atomID=sys.argv[2]
     removeID=sys.argv[5]
+    nebfolder=sys.argv[6] #second+"/NEB/"
+    datafile=sys.argv[7]
+    
     
     fileID=atomID
     
@@ -304,25 +307,28 @@ if __name__=='__main__':
     #dirname="/home/agoga/documents/code/topcon-md/data/HNEB1/"#os.path.dirname(os.path.realpath(pth))
     
     
-    dirname=sys.argv[1]
+    
     file=f"{dirname}logs/{fileID}neb.log"
-    print(file)
+
     splt=dirname[:-1].split("/")
-    tname=splt[-1]#name of the output folder 'NEB125_1-0.01_11'
+    tname=splt[-1]#name of the output folder 'NEB125-126_1-0.01_11'
     second="/".join(splt[:-1])
     
-    nebfolder=sys.argv[6] #second+"/NEB/"
+    datend=".data"
+    if datafile.endswith(datend):
+        datafile=datafile[:-len(datend)]
     
-    csvfile=nebfolder+"pairs.csv"
     
-    if True: #check_convergence(file,3000,1000):
+    #print(f"splt: {splt}, tname: {tname}, second: {second}, nebfolder: {nebfolder}")
+    csvfile=nebfolder+datafile+".csv"
+    
+    if check_convergence(file,3000,1000):
         
     
         ret=plot_mep(dirname,file,fileID)#,hnum)
         
         
         import numpy as np
-        import PIL
         from PIL import Image
 
         list_im = [dirname+f"{fileID}-NEB.png",dirname+f"PES({fileID}).png",dirname+f"{fileID}-Ovito.png"]
@@ -340,7 +346,7 @@ if __name__=='__main__':
 
         # save that beautiful picture
         imgs_comb = Image.fromarray(imgs_comb)
-        imgs_comb.save(dirname+f"NEB-PES-{fileID}.png")    
+        imgs_comb.save(dirname+f"Full.png")    
         imgs_comb.save(nebfolder+tname[3:] +".png")
         
         
@@ -356,10 +362,11 @@ if __name__=='__main__':
         savecsv(dat,csvfile,col_names)
     else:
 
-        dat=[csvID,etol,timestep]
+        # dat=[csvID,etol,timestep]
     
             
-        savecsv(dat,csvfile,col_names)
+        # savecsv(dat,csvfile,col_names)
+        print('No convergence, no cry')
     # for p in list_im:
     #     try:
     #         os.remove(p)

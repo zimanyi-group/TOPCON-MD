@@ -3,7 +3,6 @@ import ase.neighborlist
 import numpy as np
 from scipy import sparse
 import matplotlib.pyplot as plt
-
 from skspatial.objects import Line, Sphere
 
 debugatom=4
@@ -16,7 +15,7 @@ def dist(pos1,pos2):
     return ((pos2[0]-pos1[0])**2+(pos2[1]-pos1[1])**2+(pos2[2]-pos1[2])**2)**0.5
 
 def check_for_h(atoms,id,hlist):
-    hDist=1.1#ang
+    hDist=1.4#ang
     cur=atoms[id]
     
     for n in hlist:
@@ -24,15 +23,16 @@ def check_for_h(atoms,id,hlist):
         neitype=nei.symbol
         if neitype == 'H':
             d=dist(cur.position,nei.position)
-            if d <hDist:
-                return 1  
-    return 0
+            if d < hDist:
+                return True
+    return False
 
 
-dfile="/home/agoga/documents/code/topcon-md/data/pinhole-dump-files/Hcon-1500-440.data"
+dfile="/home/agoga/documents/code/topcon-md/data/NEB/SiOxNEB-NOH.data"
+dfile="/home/agoga/documents/code/topcon-md/data/NEB/SiOxNEB-H.data"
 
-dfile="/home/agoga/documents/code/topcon-md/data/SiOxNEB-H.data"
-dfile="/home/agoga/documents/code/topcon-md/data/SiOxNEB-NOH.data"
+dfile="/home/agoga/documents/code/topcon-md/data/NEB/Hcon-1500-990.data"
+
 with open(dfile) as lammps_dump_fl_obj:
     atoms = ase.io.read(lammps_dump_fl_obj,format="lammps-data",style='charge',units='real',sort_by_id=True)#, format="lammps-data", index=0)
     
@@ -45,12 +45,15 @@ print('loaded')
 
 #Set the atom types correct so they show up as Si and O
 anums=np.zeros(numAtoms)
+
+#here wea re setting atomic numbers of the different types
 anums[atoms.get_atomic_numbers()==1]=14
 anums[atoms.get_atomic_numbers()==2]=8
 anums[atoms.get_atomic_numbers()==3]=1
 atoms.set_atomic_numbers(anums)
 
-        
+#here we set the cut off radius for each atom type in angstroms
+#If two atom's circles overlap then they are neighbors
 cut=np.zeros(numAtoms)
 cut[atoms.get_atomic_numbers()==8]=1.5
 cut[atoms.get_atomic_numbers()==14]=1.05
@@ -65,6 +68,31 @@ zmax=28
 
 pairs=[]
 counts=np.zeros(numAtoms)
+hClose=[]
+
+
+
+#first run through and make a list of all O atoms that have H that are too close
+for i in range(numAtoms):
+    cur=atoms[i]
+    curtype=cur.symbol
+    
+    if curtype == 'O':
+        indices, offsets = nl.get_neighbors(i)
+        hn=[]
+        #check all the H neighbors for an atom that's too close 
+        for n in indices:
+            nei=atoms[n]
+            neitype=nei.symbol
+            if neitype =='H':
+                hn.append(n)
+                
+        if check_for_h(atoms,i,hn) == 1:
+            #print(f"atom {i+1} has H too close")
+            hClose.append(i+1)
+            continue
+        
+    
 
 
 for i in range(numAtoms):
@@ -74,6 +102,10 @@ for i in range(numAtoms):
     
     
     dprint(i,f'Debug - zpos:{cpos[2]}')
+    
+    #if there is a Hydrogen that is too close then skip
+    if i in hClose:
+        continue
     
     #don't look too close to the interface
     if cpos[2]<zmin or cpos[2]>zmax:
@@ -97,12 +129,6 @@ for i in range(numAtoms):
             elif neitype =='H':
                 hn.append(n)
         
-        
-        #@TODO not a good way to do this function because we can't check the neighbor as well
-        # as we didn't make a h list in the next loop
-        if check_for_h(atoms,i,hn) == 1:
-            print(f"atom {i+1} has H too close")
-            continue
         
         dprint(i,f"debug - {on}")
         #run through the oxygen neighbors
@@ -152,10 +178,11 @@ for i in range(numAtoms):
                     continue
                     #print(f"Thats a good one {str(p1)}")
         
-#print(pairs)
-print(len(pairs))
 
 
+
+
+print(f"H too close {str(hClose)}")
 ids = [j+1 for j in range(numAtoms) if counts[j]>6]
 print(f"Ids with greater than 6 pairs: {str(ids)}")
 ids = [j+1 for j in range(numAtoms) if counts[j]==6]
@@ -167,6 +194,7 @@ pairfile=dfile[:-5]+"-pairlist.txt"
 with open(pairfile,"w") as tf:
     for p in pairs:
         tf.write(f"{p[0]} {p[1]}\n")
-    
+
+print(f"{len(pairs)} total pairs added to the file.")
 
 

@@ -20,13 +20,10 @@ variable printevery equal 1000
 variable restartevery equal 0#500000
 variable datapath string "${output_folder}data/"
 
-variable maxneb equal 3000
-variable maxclimb equal 1000
-variable conv equal $(v_maxneb+v_maxclimb)
+# variable maxneb equal 3000
+# variable maxclimb equal 1000
 
 variable i equal part
-
-shell mkdir ${datapath}
 
 read_data ${output_folder}${fileID}-NEBI.data
 
@@ -66,6 +63,6 @@ fix n1 gNEB neb 1 parallel ideal perp 1
 
 neb ${etol} ${etol} ${maxneb} ${maxclimb} 100 final ${output_folder}${fileID}-NEBF.data
 
-#if "${steps} == ${conv}"
+
 write_dump all atom ${output_folder}o-neb.dump.$i
 run 0

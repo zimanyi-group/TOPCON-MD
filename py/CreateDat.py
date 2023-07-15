@@ -23,7 +23,7 @@ rank = comm.Get_rank()
 
 a=5.43
 dt=0.5
-etol=1e-10
+etol=1e-11
 #conversion from kcal/mol to eV
 conv=0.043361254529175
 
@@ -33,13 +33,94 @@ buff=1
 
 
 
-def NEB_min(L):
-    L.commands_string(f'''minimize {etol} {etol} 100000 100000''')
+def NEB_min(L=None):
+    lstr=f'''minimize {etol} {etol} 100000 100000'''
+    if L is not None:
+        L.commands_string(lstr)
+    else:
+        return lstr
+    
 
-def init_dump(L,file,out,dumpstep):
+
+def create_lmp_file(L,file,out,dumpstep):
+    lammps_str=f'''
+        clear
+        units         real
+        dimension     3
+        boundary    p p p
+        atom_style  charge
+        atom_modify map yes
+
+        variable seed equal 12345
+        variable NA equal 6.02e23
+ 
+
+        variable printevery equal 100
+        variable restartevery equal 0#500000
+        variable datapath string "data/"
+        timestep {dt}
+
+        variable massSi equal 28.0855 #Si
+        variable massO equal 15.9991 #O
+        variable massH equal  1.00784 #H
+        
+        region sim block 0 1 0 1 0 1
+
+        lattice diamond {a}
+
+        create_box 3 sim
+
+        read_dump {file} {dumpstep} x y z box yes add keep
+        
+        mass         3 $(v_massH)
+        mass         2 $(v_massO)
+        mass         1 $(v_massSi)
+
+        lattice none 1.0
+        min_style quickmin
+        
+        pair_style	    reaxff potential/topcon.control 
+        pair_coeff	    * * potential/ffield_Nayir_SiO_2019.reax Si O H
+        
+        
+
+        neighbor        2 bin
+        neigh_modify    every 10 delay 0 check no
+        
+        thermo $(v_printevery)
+        thermo_style custom step temp density press vol pe ke etotal #flush yes
+        thermo_modify lost ignore
+
+        log none
+        
+        fix r1 all qeq/reax 1 0.0 10.0 1e-6 reaxff
+        #compute c1 all property/atom x y z
+        
+        reset_atom_ids
+        '''
+    lammps_str += NEB_min()
+        
+    lammps_str+=f'''
+        group gSi type 2
+        group gO type 1 
+        group gH type 3
+        
+        variable tot equal $(count(gSi)+count(gO)+count(gH))
+        variable Htot equal count(gH)
+        variable perctH equal round($(100*v_Htot/v_tot))
+        
+        print '~$(v_perctH)% Hydrogen'
+        
+        write_data {out}
+        '''
+    print(lammps_str)
+    return lammps_str
+        
+        
+def create_dat(L,file,out,dumpstep):
     #Initialize and load the dump file
+    
     L.commands_string(f'''
-        shell cd topcon/
         clear
         units         real
         dimension     3
@@ -128,7 +209,8 @@ def prep_data(file,dumpstep,outfolder):
 
 
     if file.endswith(".dump"):
-        init_dump(L,file,out,dumpstep)
+        #create_lmp_file(L,file,out,dumpstep)
+        create_dat(L,file,out,dumpstep)
 
     else:
         print("File is not a .dump")
@@ -146,16 +228,16 @@ if __name__ == "__main__":
 
     
 
-    file="pinhole-dump-files/Hcon-1500-440.dump"
-    dumpstep=9
+    file="pinhole-dump-files/Hcon-1500-695.dump"
+    dumpstep=19
 
-    file="SiOxNEB-NOH.dump"
-    dumpstep=1
+    # file="SiOxNEB-NOH.dump"
+    # dumpstep=1
     
-    file="aQ-SiO2.dump"
-    dumpstep=21
+    # file="aQ-SiO2.dump"
+    # dumpstep=21
 
-    outfolder="/home/agoga/documents/code/topcon-md/data/"
+    outfolder="/home/agoga/documents/code/topcon-md/data/NEB/"
 
     filepath=os.path.join(folderpath,file)
     nebFiles =prep_data(filepath,dumpstep,outfolder)
