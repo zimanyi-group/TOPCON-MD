@@ -654,11 +654,11 @@ def prep_neb_swap(file,dumpstep,atomI,outfolder,atomF):
     
 if __name__ == "__main__":
     
-    cwd=os.getcwd()
+    # cwd=os.getcwd()
 
-    folder='/data/'
-    f=cwd+folder
-    folderpath=os.path.join(cwd,f)
+    # folder='/data/'
+    # f=cwd+folder
+    #folderpath=os.path.join(cwd,f)
     #nprocs = MPI.COMM_WORLD.Get_size()
 
     
@@ -680,9 +680,9 @@ if __name__ == "__main__":
     outfolder=sys.argv[1] 
     atomID=sys.argv[2]
     atomRemove=sys.argv[6]
-    file=sys.argv[7]
+    filepath=sys.argv[7]
     #file='SiOxNEB-NOH.data'
-    filepath=os.path.join(folderpath,file)
+    #filepath=os.path.join(folderpath,file)
     dumpstep=0
     nebFiles =prep_neb_swap(filepath,dumpstep,atomID,outfolder,atomRemove)#prep_neb_forcemove(filepath,dumpstep,atomID,outfolder,finalPos)
     #print("Got here - Proc %d out of %d procs" % (comm.Get_rank(),comm.Get_size()))

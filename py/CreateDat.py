@@ -101,8 +101,8 @@ def create_lmp_file(L,file,out,dumpstep):
     lammps_str += NEB_min()
         
     lammps_str+=f'''
-        group gSi type 2
-        group gO type 1 
+        group gSi type 1
+        group gO type 2
         group gH type 3
         
         variable tot equal $(count(gSi)+count(gO)+count(gH))
@@ -111,8 +111,7 @@ def create_lmp_file(L,file,out,dumpstep):
         
         print '~$(v_perctH)% Hydrogen'
         
-        write_data {out}
-        '''
+        write_data {out} '''
     print(lammps_str)
     return lammps_str
         
@@ -176,11 +175,11 @@ def create_dat(L,file,out,dumpstep):
         reset_atom_ids
         ''')
     
-    NEB_min(L)
+    #NEB_min(L)
         
     L.commands_string(f'''
-        group gSi type 2
-        group gO type 1 
+        group gSi type 1
+        group gO type 2 
         group gH type 3
         
         variable tot equal $(count(gSi)+count(gO)+count(gH))
@@ -189,8 +188,7 @@ def create_dat(L,file,out,dumpstep):
         
         print '~$(v_perctH)% Hydrogen'
         
-        write_data {out}
-        ''')
+        #write_data {out} ''')
     
 
 
@@ -222,14 +220,14 @@ if __name__ == "__main__":
     
     cwd=os.getcwd()
 
-    folder='/data/'
+    folder='/data' #/pinhole-dump-files/'
     f=cwd+folder
     folderpath=os.path.join(cwd,f)
 
-    
-
-    file="pinhole-dump-files/Hcon-1500-695.dump"
-    dumpstep=19
+    flist=["Hcon-1500-110.dump","Hcon-1500-220.dump","Hcon-1500-330.dump","Hcon-1500-440.dump","Hcon-1500-550.dump","Hcon-1500-695.dump","Hcon-1500-880.dump","Hcon-1500-990.dump"]
+    flist=["SiOxNEB-H.dump"]
+    file="Hcon-1500-880.dump"
+    dumpstep=0
 
     # file="SiOxNEB-NOH.dump"
     # dumpstep=1
@@ -239,7 +237,8 @@ if __name__ == "__main__":
 
     outfolder="/home/agoga/documents/code/topcon-md/data/NEB/"
 
-    filepath=os.path.join(folderpath,file)
-    nebFiles =prep_data(filepath,dumpstep,outfolder)
+    for f in flist:
+        filepath=os.path.join(folderpath,f)
+        nebFiles =prep_data(filepath,dumpstep,outfolder)
     MPI.Finalize()
     exit()

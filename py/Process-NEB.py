@@ -1,6 +1,7 @@
 import numpy as np
 import linecache as lc
 from mpi4py import MPI
+import matplotlib
 import matplotlib.pyplot as plt
 import os
 from datetime import datetime
@@ -10,6 +11,7 @@ import csv
 # import itertools
 import collections
 
+#matplotlib.use('tkagg')
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 me = MPI.COMM_WORLD.Get_rank()
@@ -18,7 +20,6 @@ if me !=0:
     quit()
     
     
-plt.style.use('seaborn-deep')
 plt.rcParams['axes.prop_cycle'] = plt.cycler(color=['mediumblue', 'crimson','darkgreen', 'darkorange','crimson', 'darkorchid'])
 #plt.rcParams['figure.figsize'] = [12,8]
 plt.rcParams['axes.linewidth'] = 1.7
@@ -315,7 +316,10 @@ if __name__=='__main__':
     second="/".join(splt[:-1])
     
     datend=".data"
+    
     if datafile.endswith(datend):
+        if '/' in datafile:
+            datafile = datafile.split('/')[-1]
         datafile=datafile[:-len(datend)]
     
     

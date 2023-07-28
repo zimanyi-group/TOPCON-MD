@@ -22,20 +22,31 @@ MAXNEB=3000
 MAXCLIMB=1000
 
 
-PAIR_FOLDER="/home/agoga/documents/code/topcon-md/data/" #/pinhole-dump-files/"
-DATAFILE="Hcon-1500-880.data"
+DATA_FOLDER="/home/agoga/documents/code/topcon-md/data/NEB/" #/pinhole-dump-files/"
+
+DATAFILE=$DATA_FOLDER"Hcon-1500-880.data"
 # DATAFILE="SiOxNEB-NOH.data"
 PAIRSFILE=${DATAFILE%.*}"-pairlist.txt"
 
 NEBFOLDER="/home/agoga/documents/code/topcon-md/output/NEB/"
+ 
 
-mapfile -t pairs < $PAIR_FOLDER$PAIRSFILE
+lastdone="385 1189"
+alreadydone=0 #set to 1 to run everything
+
+mapfile -t pairs < $PAIRSFILE
 
 # mapfile -t pairs < data/Hpairs-v1.txt
 # ATOMNUM=1642 #2041 #3898 #3339 #H #4090 #1649 #2776 #1659 
 # ATOMREMOVE=1638
 for pair in "${pairs[@]}" # #"5976 5979" #
 do
+
+    if [[ $alreadydone  == 0  && $pair != $lastdone ]] ; then
+        continue
+    else
+        alreadydone=1
+    fi
 
     ATOMNUM=${pair% *}
     ATOMREMOVE=${pair#* }
@@ -73,13 +84,13 @@ do
         
 
 
-            echo "----------------Prepping NEB----------------"
+            echo "----------------Prepping NEB for "$pair" ----------------"
             mpirun -np 4 python3 /home/agoga/documents/code/topcon-md/py/FindMinimumE.py $OUT_FOLDER $ATOMNUM $ETOL $TIMESTEP $SKIPPES $ATOMREMOVE $DATAFILE
             
-            echo "----------------Running NEB----------------"
+            echo "----------------Running NEB for "$pair" ----------------"
             mpirun -np 13 --oversubscribe lmp_mpi -partition 13x1 -nocite -log $LOG_FILE -in $OUT_FOLDER$FILENAME -var maxneb $MAXNEB -var maxclimb $MAXCLIMB -var atom_id $ATOMNUM -var output_folder $OUT_FOLDER -var fileID $ATOMNUM -var etol $ETOL -var ts $TIMESTEP -pscreen $OUT_FOLDER/screen
             
-            echo "----------------Post NEB----------------"
+            echo "----------------Post NEB for "$pair" ----------------"
             python3 /home/agoga/documents/code/topcon-md/py/Process-NEB.py $OUT_FOLDER $ATOMNUM $ETOL $TIMESTEP $ATOMREMOVE $NEBFOLDER $DATAFILE
         
         done

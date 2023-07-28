@@ -1,18 +1,18 @@
-#!/bin/sh
-#SBATCH --job-name=nebtst
-#SBATCH --partition=med2
+#!/bin/bash
+#SBATCH --job-name=paircalc
+#SBATCH --partition=high2
 #SBATCH --output=/home/agoga/sandbox/topcon/slurm-output/j-%j.txt
 #SBATCH --mail-user="adgoga@ucdavis.edu"
 #SBATCH --mail-type=FAIL,END
 
-#SBATCH --ntasks=507
-#SBATCH --ntasks-per-node=256
+#SBATCH --ntasks=13
+#SBATCH --ntasks-per-node=13
 #SBATCH --cpus-per-task=1 
-#SBATCH --mem=0
+#SBATCH --mem=256G
 #SBATCH -t 4-0
 
 
-
+#CWD=$(pwd) #current working directory
 lmppre='lmp/'
 j=$SLURM_JOB_ID
 
@@ -27,22 +27,30 @@ start=`date +%s`
 MAXNEB=3000
 MAXCLIMB=1000
 
-DATAFILE="SiOxNEB-NOH.data"
+#DATAFILE="/home/agoga/sandbox/topcon/data/NEB/Hcon-1500-110.data" #"$CWD"/"$1
+DATA_FOLDER="/home/agoga/sandbox/topcon/" 
+DATAFILE=$DATA_FOLDER$1
 PAIRSFILE=${DATAFILE%.*}"-pairlist.txt"
-PAIR_FOLDER="/home/agoga/sandbox/topcon/data/" #/pinhole-dump-files/"
+
+I="${1##*/}"
+ID="${I%.*}"
+
+echo $PAIRSFILE
+
+mapfile -t pairs < $PAIRSFILE
 
 
-NEBFOLDER="/home/agoga/sandbox/topcon/NEB/"$j"/"
+NEBFOLDER="/home/agoga/sandbox/topcon/NEB/"$j"-"$ID"/"
 mkdir -p $NEBFOLDER
 
-mapfile -t pairs < $PAIR_FOLDER$PAIRSFILE
+
 
 
 for pair in "${pairs[@]}" #"3014 3012" #
 do
     ATOMNUM=${pair% *}
     ATOMREMOVE=${pair#* }
-    for ETOL in 7e-5 # 5e-5 3e-5 1e-5 7e-6 5e-6 3e-6 1e-6 7e-7 5e-7 3e-7 1e-7 
+    for ETOL in 7e-6 # 5e-5 3e-5 1e-5 7e-6 5e-6 3e-6 1e-6 7e-7 5e-7 3e-7 1e-7 
     do 
         for TIMESTEP in 0.5 #$(seq 0.5 0.05 2) 
         do
@@ -75,13 +83,13 @@ do
             s=$OUT_FOLDER$NAME"_SLURM.txt"
 
 #19 247 - 39 507
-            echo "----------------Prepping NEB----------------"
+            echo "----------------Prepping NEB for "$pair" ----------------"
             srun /home/agoga/.conda/envs/lmp/bin/python /home/agoga/sandbox/topcon/py/FindMinimumE.py $OUT_FOLDER $ATOMNUM $ETOL $TIMESTEP $SKIPPES $ATOMREMOVE $DATAFILE
             
-            echo "----------------Running NEB----------------"
-            srun /home/agoga/lammps-23Jun2022/build/lmp_mpi -partition 13x39 -nocite -log $LOG_FILE -in $NEB_FILE -var maxneb ${MAXNEB} -var maxclimb ${MAXCLIMB} -var atom_id ${ATOMNUM} -var output_folder $OUT_FOLDER -var fileID $ATOMNUM -var etol $ETOL -var ts $TIMESTEP -pscreen $OUT_FOLDER/screen
+            echo "----------------Running NEB for "$pair" ----------------"
+            srun /home/agoga/.local/bin/lmp_mpi -partition 13x1 -nocite -log $LOG_FILE -in $NEB_FILE -var maxneb ${MAXNEB} -var maxclimb ${MAXCLIMB} -var atom_id ${ATOMNUM} -var output_folder $OUT_FOLDER -var fileID $ATOMNUM -var etol $ETOL -var ts $TIMESTEP -pscreen $OUT_FOLDER/screen
             
-            echo "----------------Post NEB----------------"
+            echo "----------------Post NEB for "$pair" ----------------"
             srun /home/agoga/.conda/envs/lmp/bin/python /home/agoga/sandbox/topcon/py/Process-NEB.py $OUT_FOLDER $ATOMNUM $ETOL $TIMESTEP $ATOMREMOVE $NEBFOLDER $DATAFILE
         
         done
