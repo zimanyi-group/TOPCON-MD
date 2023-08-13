@@ -60,7 +60,7 @@ def MEP(file):
     RD=last[8]                  #total reaction cood space
     return R, ms , efb, erb, RD
 
-def plot_mep(path,file,fileID,hnum=0, xo= 0.01):
+def plot_mep(path,file,fileID,plot,hnum=0, xo= 0.01):
     r,pe,EF,ER, RD = MEP(file)
     my_barriers=[]
     points=[]
@@ -79,25 +79,25 @@ def plot_mep(path,file,fileID,hnum=0, xo= 0.01):
             points.append([r[a], r[b], r[c]])
             
     name=fileID
+    if plot:
+        fig = plt.figure(figsize=[6,6])
+        plt.scatter(r,pe, marker = '^', color = 'darkgreen', s=180)
+        #plt.plot(r,pe, linestyle = '--', linewidth = 3.0, color = 'darkgreen')
+        #plt.scatter(points,vals, color='r', s=20)
+        txt=(r"Forward E$_A $ = {0:.2f} eV"+"\n"
+            + r"Reverse E$_A $ = {1:.2f} eV"+"\n").format(EF, ER)
+        txt2 = "Replica distance={0:.2f}".format(RD) + r"$\AA $"
+        plt.text(xo, np.max(pe)*0.8, txt, fontsize = 14)
+        
+        plt.text(xo, np.max(pe)*0.68, txt2,fontsize=14)
+        plt.title(f"MEP with E-tol': {etol} & timestep: {timestep}")
+        plt.ylabel("PE (eV)")
+        plt.xlabel(r'$x_{replica} $')
+        #plt.axes().yaxis.set_major_locator(MaxNLocator(integer=True))
+        plt.grid('on',axis='y',linewidth=1)
+        plt.savefig(path+name +"-NEB.png")
     
-    fig = plt.figure(figsize=[6,6])
-    plt.scatter(r,pe, marker = '^', color = 'darkgreen', s=180)
-    #plt.plot(r,pe, linestyle = '--', linewidth = 3.0, color = 'darkgreen')
-    #plt.scatter(points,vals, color='r', s=20)
-    txt=(r"Forward E$_A $ = {0:.2f} eV"+"\n"
-        + r"Reverse E$_A $ = {1:.2f} eV"+"\n").format(EF, ER)
-    txt2 = "Replica distance={0:.2f}".format(RD) + r"$\AA $"
-    plt.text(xo, np.max(pe)*0.8, txt, fontsize = 14)
-    
-    plt.text(xo, np.max(pe)*0.68, txt2,fontsize=14)
-    plt.title(f"MEP with E-tol': {etol} & timestep: {timestep}")
-    plt.ylabel("PE (eV)")
-    plt.xlabel(r'$x_{replica} $')
-    #plt.axes().yaxis.set_major_locator(MaxNLocator(integer=True))
-    plt.grid('on',axis='y',linewidth=1)
-    plt.savefig(path+name +"-NEB.png")
-    
-    return (EF,ER,my_barriers,RD)
+    return (EF,ER,my_barriers,RD,r,pe)
 
 
 def calc_barrier(file):
@@ -274,7 +274,6 @@ def check_convergence(filename,maxneb,maxclimbing,numpart=13):
                 climbing=int(line.split()[3])
             
             last.append(line)
-        print('got her')
         if climbing is None or nebiter is None or climbing_iter_f is None or climbing_iter_i is None:#cry
             print('Big boy oppsie in "Process-NEB.py"')    
             return False
@@ -290,7 +289,33 @@ def check_convergence(filename,maxneb,maxclimbing,numpart=13):
         else:
             return True
     
+def check_bad_NEB(feb,pe):
+    cutoff=feb/2
+    for i in range(pe.size-1):
+        diff=abs(pe[i+1]-pe[i])
+        if abs(diff)>cutoff:
+            return True
+    return False
 
+def find_NEB_info(filename):
+    #The log file outputs lines like
+    #print pcsv_Zi 25
+    
+    #Search for these lines and input 25 into the Zi column of the CSV
+    zi=None
+    zf=None
+    fields=[]
+    
+    with open(filename,'r') as logF:
+        for line in logF:
+            if "pcsv_" in line and "print" not in line:
+                spt=line.split()
+                name=spt[0].split('_')[1]
+                data=spt[1]
+                fields.append([name,data])
+                
+    return fields   
+                
 if __name__=='__main__':
     
     dirname=sys.argv[1]
@@ -298,26 +323,27 @@ if __name__=='__main__':
     removeID=sys.argv[5]
     nebfolder=sys.argv[6] #second+"/NEB/"
     datafile=sys.argv[7]
-    
-    
+    springconst=sys.argv[8]  
+    plot= True if sys.argv[9] == 1 else False
     fileID=atomID
     
     csvID=str(atomID)+'-'+str(removeID)
-    col_names=["pair","etol","ts","dist","FEB","REB","A","B","C","D","E","F","G","H"]
+    col_names=["pair","etol","ts","fail","dist","FEB","REB","K"]
+    col_names_tail=["A","B","C","D","E","F","G","H"]
     
     #dirname="/home/agoga/documents/code/topcon-md/data/HNEB1/"#os.path.dirname(os.path.realpath(pth))
     
     
     
     file=f"{dirname}logs/{fileID}neb.log"
-
+    infolog=f"{dirname}logs/PrepNEB-If.log"
     splt=dirname[:-1].split("/")
     tname=splt[-1]#name of the output folder 'NEB125-126_1-0.01_11'
     second="/".join(splt[:-1])
     
-    datend=".data"
-    
-    if datafile.endswith(datend):
+    datend=".dat"
+    dataend=".data"
+    if datafile.endswith(datend) or datafile.endswith(dataend):
         if '/' in datafile:
             datafile = datafile.split('/')[-1]
         datafile=datafile[:-len(datend)]
@@ -325,13 +351,51 @@ if __name__=='__main__':
     
     #print(f"splt: {splt}, tname: {tname}, second: {second}, nebfolder: {nebfolder}")
     csvfile=nebfolder+datafile+".csv"
+    # try:
     
-    if check_convergence(file,3000,1000):
+    
+    
+    
         
     
-        ret=plot_mep(dirname,file,fileID)#,hnum)
+    ret=plot_mep(dirname,file,fileID,plot)#,hnum)
+
+    badneb=check_bad_NEB(ret[0],ret[5])
+    convergence=check_convergence(file,3000,1000)
+    
+
+    print('-----NEB did not converge, not saved-----') if not convergence else None
+    print('-----NEB produced bad MEB, not saved-----') if badneb else None
         
+    # if z[0] is None or z[1] is None:
+    #     print("-----Could not find Zi or Zf in log file-----")
+    bad= "False" if (not badneb and convergence) else "True"
+    
+    dat=[csvID,etol,timestep,bad,ret[3],ret[0],ret[1],springconst]
+    log_entries=find_NEB_info(infolog)
+    
+    #print(log_entries)
+    for e in log_entries:
+        col_names.append(e[0])
+        dat.append(e[1])
+    
+    
+    
+    #other barriers given by NEB
+    obarriers=ret[2]
+    for c in col_names_tail:#name these whatever
+        col_names.append(c)
+    for l in obarriers:
+        dat.append(l[0])
+        dat.append(l[1])
         
+    savecsv(dat,csvfile,col_names)
+        
+    # except:
+    #     print('Failed to analyze NEB')
+    
+    #now do the image stuff
+    if plot:
         import numpy as np
         from PIL import Image
 
@@ -352,30 +416,6 @@ if __name__=='__main__':
         imgs_comb = Image.fromarray(imgs_comb)
         imgs_comb.save(dirname+f"Full.png")    
         imgs_comb.save(nebfolder+tname[3:] +".png")
-        
-        
-        
-
-        
-        dat=[csvID,etol,timestep,ret[3],ret[0],ret[1]]
-        
-        for l in ret[2]:
-            dat.append(l[0])
-            dat.append(l[1])
-            
-        savecsv(dat,csvfile,col_names)
-    else:
-
-        # dat=[csvID,etol,timestep]
-    
-            
-        # savecsv(dat,csvfile,col_names)
-        print('No convergence, no cry')
-    # for p in list_im:
-    #     try:
-    #         os.remove(p)
-    #     except:
-    #         i=0
 
 
 

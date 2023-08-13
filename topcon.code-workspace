@@ -1,8 +1,11 @@
 {
 	"folders": [
 		{
-			"name": "topcon",
-			"path": ".."
+			"path": "."
+		},
+		{
+			"name": "TOPCon-LAMMPS",
+			"path": "TOPCon-LAMMPS"
 		}
 	],
 	"settings": {}

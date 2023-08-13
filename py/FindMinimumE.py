@@ -18,8 +18,7 @@ import matplotlib.gridspec as gridspec
 import matplotlib as mpl
  
 
-comm = MPI.COMM_WORLD
-rank = comm.Get_rank()
+me = MPI.COMM_WORLD.Get_rank()
 #dt=1
 etol=sys.argv[3]
 dt=sys.argv[4]
@@ -69,7 +68,7 @@ def find_atom_position(L,atomID):
 def NEB_min(L):
     L.commands_string(f'''minimize {etol} {etol} 10000 10000''')
 
-def init_dump(L,file,out,dumpstep):
+def init_dump(L,file,dumpstep):
     #Initialize and load the dump file
     L.commands_string(f'''
         clear
@@ -119,13 +118,6 @@ def init_dump(L,file,out,dumpstep):
         
         fix r1 all qeq/reax 1 0.0 10.0 1e-6 reaxff
         compute c1 all property/atom x y z''')
-    
-    # NEB_min(L)
-
-        
-    L.commands_string(f'''
-        write_data {out}
-        ''')
     
 def init_dat(L,file):
 
@@ -377,108 +369,6 @@ def plot_PES(PESimage,markerPts,xlist,zlist,elist,title):
     # ax1.set_title(f"Potential energy landscape around atom {atom}")
     # plt.savefig(PESimage)
 
-
-def prep_neb_forcemove(file,dumpstep,atom,outfolder,finalLoc=None):
-    me = MPI.COMM_WORLD.Get_rank()
-    nprocs = MPI.COMM_WORLD.Get_size()
-    
-    L = lammps('mpi')
-    L2 = lammps('mpi')
-    
-    
-    searchRangeMin=0
-    searchRangeMax=.5
-    
-    fileIdent=f'{atom}'
-    out=outfolder+f'{fileIdent}-NEBI.data'
-    neb=outfolder+f'{fileIdent}-NEBF.data'
-    PESimage=outfolder+f"PES({fileIdent}).png"
-    full= outfolder+ f'{fileIdent}-Full.data'
-    
-    #do this first initialize to get around reaxff issues with deleting atoms and writing data
-    init_dump(L2,file,full,dumpstep)
-    
-    init_dat(L,full,out)
-    
-    xi, yi, zi = find_atom_position(L,atom)
-    ri=(xi,yi,zi)
-    
-    reduce_sim_box(L,ri)
-    
-    ret = create_PES(L,atom,fileIdent,outfolder,out)
-    L=ret[0]
-    elist=ret[1]
-    ri=ret[2]
-    
-    
-    xi, yi, zi = ri[0], ri[1], ri[2] #find_atom_position(L,atom)
-    
-    print('Finding minimum energy positon')
-    eMin=10000
-    rMin=finalLoc
-    for j in range(zlen):
-        for k in range(xlen):
-            
-            dE=elist[j,k]
-
-            x=xlist[k]
-            y=0
-            z=zlist[j]
-            
-            if finalLoc is not None:
-                dx=finalLoc[0]-x
-                dz=finalLoc[1]-z
-            else:
-                dx=x
-                dz=z
-                
-            dist = (dx*dx+dz*dz)**(1/2)
-            
-            #picking lowest energy within specific search range
-            if dE < eMin and dist <= searchRangeMax:
-                rMin=(x,z)
-                eMin=dE
-    
-    
-    xyz=outfolder+f'{fileIdent}-NEBFXYZ.data'
-     #now create the lowest energy position data file for NEB.
-    L.commands_string(f'''
-                set atom {atom} x {xi+rMin[0]} y {yi} z {zi+rMin[1]}
-                
-                run 0
-                write_data {xyz}
-    ''')
-    
-    NEB_min(L)
-    
-    L.commands_string(f'''
-                write_dump all custom {neb} id x y z
-                ''')
-    
-    cx, cy, cz = find_atom_position(L,atom)
-    rMin=(cx-xi,cz-zi)
-    
-    plottitle=f"Potential energy landscape around atom {atom}"
-    redXPts=np.transpose([[0,0],[rMin[0],rMin[1]]])
-    allPts=[['x',redXPts],['o',finalLoc]]
-    plot_PES(PESimage,allPts,xlist,zlist,elist,plottitle)
-    
-    
-    ####Now clean up the dump file to be the correct format for NEB runs
-    if me == 0:## ONLY RUN ON ONE PROCESS
-        with open(neb, "r+") as f:
-            d = f.readlines()
-            f.seek(0)
-            i=0
-            for l in d:
-            #kill the specific lines of the xyz file that are not kosher
-                if i not in {0,1,2,4,5,6,7,8}:
-                    f.write(l)
-                i+=1
-            f.truncate()
-            
-    return
-
 def recenter_sim(L,r):
     
     bbox= L.extract_box()
@@ -494,24 +384,21 @@ def recenter_sim(L,r):
         #displace_atoms all move {xhlen-r[0]} {yhlen-r[1]} {zhlen-r[2]}
         displace_atoms all move {xhlen-r[0]} {yhlen-r[1]} 0
         run 0''')
-
-def prep_neb_swap(file,dumpstep,atomI,outfolder,atomF):
-    me = MPI.COMM_WORLD.Get_rank()
-
     
+    return np.array([[bbox[0][0],bbox[1][0]],[bbox[0][1],bbox[1][1]],[bbox[0][2],bbox[1][2]]])
+
+def prep_neb_swap(file,dumpstep,atomI,outfolder,atomF,plot):
     plt.rcParams["figure.autolayout"] = True
     
     #Need two lammps instances so that when removing an atom and minimizing we don't increase time for final NEB image minimization
-    L2= lammps('mpi',["-log",f'{outfolder}/logs/PrepNEB-F.log'])
-    LT = lammps('mpi',["-log",f'{outfolder}/logs/PrepNEB-LT.log'])
-    L = lammps('mpi',["-log",f'{outfolder}/logs/PrepNEB-I.log'])
-    
-    # L2= lammps('mpi',["-log","/home/agoga/sandbox/topcon/log2.log"])
-    # LT = lammps('mpi',["-log","/home/agoga/sandbox/topcon/logT.log"])
-    # L = lammps('mpi',["-log","/home/agoga/sandbox/topcon/log1.log"])
+    L1 = lammps('mpi',["-log",f'{outfolder}/logs/PrepNEB-I.log'])
+    L2 = lammps('mpi',["-log",f'{outfolder}/logs/PrepNEB-F.log'])
+
     
     fileIdent=f'{atomI}'
 
+    reset1=outfolder+f'{fileIdent}-NEBI.dump'
+    reset2=outfolder+f'{fileIdent}-NEBF.dump'
     nebI=outfolder+f'{fileIdent}-NEBI.data'
     nebF=outfolder+f'{fileIdent}-NEBF.data'
     full= outfolder+ f'{fileIdent}-Full.data'
@@ -524,63 +411,87 @@ def prep_neb_swap(file,dumpstep,atomI,outfolder,atomF):
     
     #initilize the data files 
     if file.endswith(".dump"):
+        LT = lammps('mpi',["-log",f'{outfolder}/logs/PrepNEB-LT.log'])
         #do this first initialize to get around reaxff issues(charge stuff I think)
-        init_dump(LT,file,full,dumpstep)
-        
-        init_dat(L,full)
+        init_dump(LT,file,dumpstep)
+        LT.commands_string(f'''
+            write_data {full}
+            ''')
+        #
+        init_dat(L1,full)
         init_dat(L2,full)
         
-    elif file.endswith(".data"):
-        init_dat(L,file)
+    elif file.endswith(".data") or file.endswith(".dat"):
+        init_dat(L1,file)
         init_dat(L2,file)
     else:
         print("File is not a .data or .dump")
+        return
     
     
     ##### L1 - create the initial NEB data file
-    ri = find_atom_position(L,atomI)
-    recenter_sim(L,ri)
+    ri = find_atom_position(L1,atomI)
+    rf = find_atom_position(L1,atomF)
+    icoord=ri#have to use the coordinates before recentering
+    fcoord=rf
     
-    ri = find_atom_position(L,atomI)
-    NEB_min(L)
-    L.commands_string(f'''
+    bbox=recenter_sim(L1,ri)
+
+
+    ri = find_atom_position(L1,atomI)
+    NEB_min(L1)
+    L1.commands_string(f'''
     write_data {nebI}
     ''')
     
-    ri = find_atom_position(L,atomI)
+    ri = find_atom_position(L1,atomI)
     
      
-    if me == 0:
+    if me == 0 and plot:
         #Now create ovito plot of atoms for future use
         create_ovito_plot(nebI,ovitoFig,ri,atomI,selection)
     
-        
-    ret = create_PES(L,atomI)
+    ret = create_PES(L1,atomI)
     elist=ret[1]
     
-    rf = find_atom_position(L,atomF)
-    ri = find_atom_position(L,atomI)
-    
+    rf = find_atom_position(L1,atomF)
+    ri = find_atom_position(L1,atomI)
+
     #delete the output file so that we can rewrite it without the atom
     try:
         if me == 0:
             os.remove(nebI)
-        
     except:
         print("bad os fail - Proc %d out of %d procs" % (comm.Get_rank(),comm.Get_size()))
         return
+    ###
+    # Now we start deleting atoms
+    # After deleting atoms we will save then load the data so that lammps resets all the charges do not have a net charge
+    ###
     
     #delete the atom at the final location
-    L.commands_string(f'''
+    L1.commands_string(f'''
         group gFAtom id {atomF}
         delete_atoms group gFAtom compress no
+        reset_timestep 0
+        write_dump all atom {reset1}
     ''')
-    
-    NEB_min(L)
-    
-    L.commands_string(f'''
+    L1f = lammps('mpi',["-log",f'{outfolder}/logs/PrepNEB-If.log'])
+    init_dump(L1f,reset1,0)
+    NEB_min(L1f)
+    ri = find_atom_position(L1f,atomI)
+    L1f.commands_string(f'''
         write_data {nebI}
         ''')
+    
+    #now print info for the final data file
+    L1f.commands_string(f'''
+        print "pcsv_iPos [{icoord[0]},{icoord[1]},{icoord[2]}]"
+        print "pcsv_fPos [{fcoord[0]},{fcoord[1]},{fcoord[2]}]"
+        print "pcsv_box [[{bbox[0][0]},{bbox[0][1]}],[{bbox[1][0]},{bbox[1][1]}],[{bbox[2][0]},{bbox[2][1]}]]"
+        ''')
+    
+    
     
     
     
@@ -596,30 +507,29 @@ def prep_neb_swap(file,dumpstep,atomI,outfolder,atomF):
     rf2 = find_atom_position(L2,atomF)
     
     
-    #delete the atom at the final location
+    #delete the atom at the final location and reload using a dump file so that lammps resets charges
     L2.commands_string(f'''
         group gFAtom id {atomF}
         delete_atoms group gFAtom compress no
+        reset_timestep 0
+        write_dump all atom {reset2}
     ''')
+    L2f = lammps('mpi',["-log",f'{outfolder}/logs/PrepNEB-Ff.log'])
+    init_dump(L2f,reset2,0)
     
     
     xyz=outfolder+f'{fileIdent}-NEBFXYZ.data'
     #now create the lowest energy position data file for NEB.
-    L2.commands_string(f'''
+    L2f.commands_string(f'''
                 set atom {atomID} x {rf2[0]} y {rf2[1]} z {rf2[2]}
                 
                 run 0
                 write_data {xyz}
     ''')
     
-    NEB_min(L2)
+    NEB_min(L2f)
     
-    rf2 = find_atom_position(L2,atomID)
-    
-    # #@TODO remove all the other atoms that are not the specific atom moving
-    # L2.commands_string(f'''
-    #             write_dump all custom {nebF} id x y z
-    #             ''')
+    rf2 = find_atom_position(L2f,atomID)
     
 
     plottitle=f"Potential energy landscape around atom {atomID}"
@@ -635,56 +545,150 @@ def prep_neb_swap(file,dumpstep,atomI,outfolder,atomF):
         
         with open(nebF,'w+') as f:
             f.write(f"1 \n{atomID} {rf2[0]} {rf2[1]} {rf2[2]}")
-        # with open(nebF, "r+") as f:
-        #     d = f.readlines()
-        #     f.seek(0)
-        #     i=0
-        #     for l in d:
-                
-        #         #kill the specific lines of the xyz file that are not kosher
-        #         if i not in {0,1,2,4,5,6,7,8}:
-        #             if l.startswith(str(atomID)):
-        #                 f.write(l)
-        #         i+=1
-                
-            # f.truncate()
     return
     
+
+def prep_neb_into_iface(file,dumpstep,atomI,outfolder,plot):
+    plt.rcParams["figure.autolayout"] = True
     
+    #Need two lammps instances so that when removing an atom and minimizing we don't increase time for final NEB image minimization
+    L1 = lammps('mpi',["-log",f'{outfolder}/logs/PrepNEB-iface-I.log'])
+
+
+    
+    fileIdent=f'{atomI}'
+
+    nebI=outfolder+f'{fileIdent}-NEBI.data'
+    nebF=outfolder+f'{fileIdent}-NEBF.data'
+    full= outfolder+ f'{fileIdent}-Full.data'
+    
+    PESimage=outfolder+f"PES({fileIdent}).png"
+    ovitoFig=outfolder+f"{fileIdent}-Ovito.png"
+    
+    
+    
+    #initilize the data files 
+    if file.endswith(".dump"):
+        LT = lammps('mpi',["-log",f'{outfolder}/logs/PrepNEB-LT.log'])
+        #do this first initialize to get around reaxff issues(charge stuff I think)
+        init_dump(LT,file,dumpstep)
+        LT.commands_string(f'''
+            write_data {full}
+            ''')
+        #
+        init_dat(L1,full)
+
+        
+    elif file.endswith(".data") or file.endswith(".dat"):
+        init_dat(L1,file)
+
+    else:
+        print("File is not a .data or .dump")
+        return
+    
+    
+    ##### L1 - create the initial NEB data file
+    ri = find_atom_position(L1,atomI)
+
+    icoord=ri#have to use the coordinates before recentering
+    fcoord=rf
+    
+    bbox=recenter_sim(L1,ri)
+
+
+    ri = find_atom_position(L1,atomI)
+    NEB_min(L1)
+    L1.commands_string(f'''
+    write_data {nebI}
+    ''')
+    
+    ri = find_atom_position(L1,atomI)
+    
+     
+    if me == 0 and plot:
+        #Now create ovito plot of atoms for future use
+        create_ovito_plot(nebI,ovitoFig,ri,atomI,selection)
+    
+    ret = create_PES(L1,atomI)
+    elist=ret[1]
+    
+    ri = find_atom_position(L1,atomI)
+
+    #delete the output file so that we can rewrite it without the atom
+    try:
+        if me == 0:
+            os.remove(nebI)
+    except:
+        print("bad os fail - Proc %d out of %d procs" % (comm.Get_rank(),comm.Get_size()))
+        return
+    ###
+    # Now we start deleting atoms
+    # After deleting atoms we will save then load the data so that lammps resets all the charges do not have a net charge
+    ###
+    
+
+    NEB_min(L1)
+    ri = find_atom_position(L1,atomI)
+    L1.commands_string(f'''
+        write_data {nebI}
+        ''')
+    
+    #now print info for the final data file
+    L1.commands_string(f'''
+        print "pcsv_iPos [{icoord[0]},{icoord[1]},{icoord[2]}]"
+        print "pcsv_fPos [{fcoord[0]},{fcoord[1]},{fcoord[2]}]"
+        print "pcsv_box [[{bbox[0][0]},{bbox[0][1]}],[{bbox[1][0]},{bbox[1][1]}],[{bbox[2][0]},{bbox[2][1]}]]"
+        ''')
+    
+    
+    recenter_sim(L2,ri)
+    
+    ri = find_atom_position(L1,atomI)
+    NEB_min(L1)
+
+    
+    rf = find_atom_position(L1,atomF)
+    
+    
+    
+    xyz=outfolder+f'{fileIdent}-NEBFXYZ.data'
+    #now create the lowest energy position data file for NEB.
+    L1.commands_string(f'''
+                set atom {atomID} x {rf2[0]} y {rf2[1]} z {rf2[2]}
+                
+                run 0
+                write_data {xyz}
+    ''')
+    
+    NEB_min(L1)
+    
+    rf2 = find_atom_position(L1,atomID)
+    
+
+    plottitle=f"Potential energy landscape around atom {atomID}"
+    redXPts=np.transpose([[0,0]])
+    allPts=[['x',redXPts]]
+    
+    if skipPES != 1 and me==0:
+        plot_PES(PESimage,allPts,xlist,zlist,elist,plottitle)
+    
+    
+    ####Now clean up the dump file to be the correct format for NEB runs
+    if me == 0:## ONLY RUN ON ONE PROCESS
+        
+        with open(nebF,'w+') as f:
+            f.write(f"1 \n{atomID} {rf2[0]} {rf2[1]} {rf2[2]}")
+    return
     
 if __name__ == "__main__":
     
-    # cwd=os.getcwd()
-
-    # folder='/data/'
-    # f=cwd+folder
-    #folderpath=os.path.join(cwd,f)
-    #nprocs = MPI.COMM_WORLD.Get_size()
-
-    
-    withH=False
-    finalPos=None
-    
-    # if withH:
-    #     file="SiOxNEB-H.dump"
-    #     dumpstep=9
-    #     file="/home/agoga/documents/code/topcon-md/data/pinhole-dump-files/Hcon-1500-440.dump"
-
-    # else:
-    #     file="SiOxNEB-NOH.dump"
-    #     dumpstep=1#400010
-
-
-        
-        
     outfolder=sys.argv[1] 
     atomID=sys.argv[2]
-    atomRemove=sys.argv[6]
+    atom=sys.argv[6]
     filepath=sys.argv[7]
-    #file='SiOxNEB-NOH.data'
-    #filepath=os.path.join(folderpath,file)
+    plot= True if sys.argv[8] == 1 else False
     dumpstep=0
-    nebFiles =prep_neb_swap(filepath,dumpstep,atomID,outfolder,atomRemove)#prep_neb_forcemove(filepath,dumpstep,atomID,outfolder,finalPos)
-    #print("Got here - Proc %d out of %d procs" % (comm.Get_rank(),comm.Get_size()))
+    nebFiles =prep_neb_into_iface(filepath,dumpstep,atomID,outfolder,fpos,plot)
+
     MPI.Finalize()
     exit()
