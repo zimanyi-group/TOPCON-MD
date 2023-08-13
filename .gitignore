@@ -15,3 +15,8 @@ andrew-methods/*
 andrew-1900-4-6.txt
 *.zip
 data/zeke/*
+*.csv
+*.svg
+*.dat
+*.bonds
+*.txt

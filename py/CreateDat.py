@@ -42,7 +42,7 @@ def NEB_min(L=None):
     
 
 
-def create_lmp_file(L,file,out,dumpstep):
+def create_lmp_file(file,out,dumpstep=0):
     lammps_str=f'''
         clear
         units         real
@@ -62,15 +62,27 @@ def create_lmp_file(L,file,out,dumpstep):
 
         variable massSi equal 28.0855 #Si
         variable massO equal 15.9991 #O
-        variable massH equal  1.00784 #H
-        
+        variable massH equal  1.00784 #H 
+        print $(v_infile)
+        print $(v_outfile)
+        '''
+    print(f"Loading file with path: {file}")
+    if  file.endswith(".dump"):
+        lammps_str+=f'''
         region sim block 0 1 0 1 0 1
-
+        
         lattice diamond {a}
 
         create_box 3 sim
 
         read_dump {file} {dumpstep} x y z box yes add keep
+        '''
+    elif file.endswith(".data") or file.endswith(".dat"):
+        lammps_str+=f'''
+        read_data {file}
+                        '''
+
+    lammps_str+=f'''
         
         mass         3 $(v_massH)
         mass         2 $(v_massO)
@@ -94,11 +106,10 @@ def create_lmp_file(L,file,out,dumpstep):
         log none
         
         fix r1 all qeq/reax 1 0.0 10.0 1e-6 reaxff
-        #compute c1 all property/atom x y z
-        
+
         reset_atom_ids
         '''
-    lammps_str += NEB_min()
+    #lammps_str += NEB_min()
         
     lammps_str+=f'''
         group gSi type 1
@@ -111,110 +122,33 @@ def create_lmp_file(L,file,out,dumpstep):
         
         print '~$(v_perctH)% Hydrogen'
         
-        write_data {out} '''
-    print(lammps_str)
+        #write_data $(v_outfile) '''
+    print(f"Saving file with path: {out}")
     return lammps_str
         
         
-def create_dat(L,file,out,dumpstep):
+def create_dat(file,out,dumpstep=0):
     #Initialize and load the dump file
     
-    L.commands_string(f'''
-        clear
-        units         real
-        dimension     3
-        boundary    p p p
-        atom_style  charge
-        atom_modify map yes
+    lstr=create_lmp_file(file,out,dumpstep)
 
-        variable seed equal 12345
-        variable NA equal 6.02e23
- 
-
-        variable printevery equal 100
-        variable restartevery equal 0#500000
-        variable datapath string "data/"
-        timestep {dt}
-
-        variable massSi equal 28.0855 #Si
-        variable massO equal 15.9991 #O
-        variable massH equal  1.00784 #H
-        
-        region sim block 0 1 0 1 0 1
-
-        lattice diamond {a}
-
-        create_box 3 sim
-
-        read_dump {file} {dumpstep} x y z box yes add keep
-        
-        mass         3 $(v_massH)
-        mass         2 $(v_massO)
-        mass         1 $(v_massSi)
-
-        lattice none 1.0
-        min_style quickmin
-        
-        pair_style	    reaxff potential/topcon.control 
-        pair_coeff	    * * potential/ffield_Nayir_SiO_2019.reax Si O H
-        
-        
-
-        neighbor        2 bin
-        neigh_modify    every 10 delay 0 check no
-        
-        thermo $(v_printevery)
-        thermo_style custom step temp density press vol pe ke etotal #flush yes
-        thermo_modify lost ignore
-
-        log none
-        
-        fix r1 all qeq/reax 1 0.0 10.0 1e-6 reaxff
-        #compute c1 all property/atom x y z
-        
-        reset_atom_ids
-        ''')
+    L = lammps('mpi',cmdargs=["-var","infile",file,'-var',"outfile",out])
+    L.commands_string(lstr)
     
-    #NEB_min(L)
-        
-    L.commands_string(f'''
-        group gSi type 1
-        group gO type 2 
-        group gH type 3
-        
-        variable tot equal $(count(gSi)+count(gO)+count(gH))
-        variable Htot equal count(gH)
-        variable perctH equal round($(100*v_Htot/v_tot))
-        
-        print '~$(v_perctH)% Hydrogen'
-        
-        #write_data {out} ''')
-    
-
-
 
 def prep_data(file,dumpstep,outfolder):
     me = MPI.COMM_WORLD.Get_rank()
     nprocs = MPI.COMM_WORLD.Get_size()
     
-    
-    L = lammps('mpi')
+    outfile=file.removesuffix('.dat').removesuffix('.data').removesuffix('.dump')+".data"
+    print(outfile)
+    #L = lammps('mpi',["-var",f"infile {file}",'-var',f"outfile {outfile}"])
+    create_dat(file,outfile,dumpstep)
 
-    
-
-    out=file[:-5]+".data"
-
-
-
-    if file.endswith(".dump"):
-        #create_lmp_file(L,file,out,dumpstep)
-        create_dat(L,file,out,dumpstep)
-
-    else:
-        print("File is not a .dump")
-    
-                
+         
     return
+
+
     
 if __name__ == "__main__":
     
@@ -225,9 +159,10 @@ if __name__ == "__main__":
     folderpath=os.path.join(cwd,f)
 
     flist=["Hcon-1500-110.dump","Hcon-1500-220.dump","Hcon-1500-330.dump","Hcon-1500-440.dump","Hcon-1500-550.dump","Hcon-1500-695.dump","Hcon-1500-880.dump","Hcon-1500-990.dump"]
-    flist=["SiOxNEB-H.dump"]
-    file="Hcon-1500-880.dump"
-    dumpstep=0
+    flist=["1.6-381.dat","1.7-276.dat","1.8-280.dat"]
+    folderpath="/home/agoga/documents/code/topcon-md/data/pinhole-dump-files/"
+    flist=["Hcon-1500-1.dump"]
+    dumpstep=1510000
 
     # file="SiOxNEB-NOH.dump"
     # dumpstep=1
@@ -236,9 +171,11 @@ if __name__ == "__main__":
     # dumpstep=21
 
     outfolder="/home/agoga/documents/code/topcon-md/data/NEB/"
-
+    #filepath=os.path.join(folderpath,file)
+    #prep_data(filepath,dumpstep,outfolder)
     for f in flist:
         filepath=os.path.join(folderpath,f)
         nebFiles =prep_data(filepath,dumpstep,outfolder)
+        
     MPI.Finalize()
     exit()

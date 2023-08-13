@@ -58,7 +58,7 @@ fix r1 all qeq/reax 1 0.0 10.0 1e-6 reaxff
 
 group gNEB id ${atom_id}
 
-fix n1 gNEB neb 1 parallel ideal perp 1
+fix n1 gNEB neb ${springconst} parallel ideal perp ${springconst}
 
 
 neb ${etol} ${etol} ${maxneb} ${maxclimb} 100 final ${output_folder}${fileID}-NEBF.data

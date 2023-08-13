@@ -1,4 +1,3 @@
-#original file written by Andrew Diggs
 from ovito.io import import_file, export_file
 import ovito.modifiers as m#import BondAnalysisModifier, CreateBondsModifier,CoordinationAnalysisModifier,TimeSeriesModifier
 import glob, os
@@ -40,10 +39,6 @@ def modify(frame: int, data: DataCollection, typeA = 2, typeB = 1, cutoff_radius
     data.apply(SelectTypeModifier(types = {typeB}))
     print(f"Fraction of Type{typeB} atoms: {data.attributes['SelectType.num_selected.2']/data.particles.count:.2f}")
     
-
-# def sillyBilly(t,v,A,C):
-#     return A*(t**(1/3))+C
-
 def coordinationTimeseries(folderList,coordList):
     pipelineList=[]
     numCoordNumbers=len(coordList)
@@ -259,9 +254,7 @@ def rdfTimeseries(file,range,out):
     
     # def animate(i):
     #     return i
-        
-    
-        
+              
 def bondAnalysis(folder,plot):
     try: 
         datafile=''
