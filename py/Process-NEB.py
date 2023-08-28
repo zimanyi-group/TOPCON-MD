@@ -106,6 +106,7 @@ def plot_mep(file,figPath,plot,hnum=0, xo= 0.01):
         plt.savefig(figPath)
     
     return (EF,ER,my_barriers,RD,r,pe)
+    return (EF,ER,my_barriers,RD,r,pe)
 
 
 def calc_barrier(file):
@@ -416,6 +417,8 @@ if __name__=='__main__':
     fileID=atomID
     
     csvID=str(atomID)+'-'+str(removeID)
+    col_names=["pair","etol","ts","fail","dist","FEB","REB","K"]
+    col_names_tail=["A","B","C","D","E","F","G","H"]
     col_names=["pair","etol","ts","fail","dist","FEB","REB","K"]
     col_names_tail=["A","B","C","D","E","F","G","H"]
     

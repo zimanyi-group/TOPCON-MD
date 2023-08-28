@@ -147,7 +147,7 @@ do
     done
 done
 
-end=`date +%s`
+    end=`date +%s`
 
 runtime=$( echo "$end-$start" | bc -l)
 runtimeMin=$( echo "$runtime/60" | bc -l)

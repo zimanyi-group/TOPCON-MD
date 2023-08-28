@@ -43,6 +43,7 @@ def NEB_min(L=None):
 
 
 def create_lmp_file(file,out,dumpstep=0):
+def create_lmp_file(file,out,dumpstep=0):
     lammps_str=f'''
         clear
         units         real
@@ -69,13 +70,28 @@ def create_lmp_file(file,out,dumpstep=0):
     print(f"Loading file with path: {file}")
     if  file.endswith(".dump"):
         lammps_str+=f'''
+        variable massH equal  1.00784 #H 
+        print $(v_infile)
+        print $(v_outfile)
+        '''
+    print(f"Loading file with path: {file}")
+    if  file.endswith(".dump"):
+        lammps_str+=f'''
         region sim block 0 1 0 1 0 1
+        
         
         lattice diamond {a}
 
         create_box 3 sim
 
         read_dump {file} {dumpstep} x y z box yes add keep
+        '''
+    elif file.endswith(".data") or file.endswith(".dat"):
+        lammps_str+=f'''
+        read_data {file}
+                        '''
+
+    lammps_str+=f'''
         '''
     elif file.endswith(".data") or file.endswith(".dat"):
         lammps_str+=f'''
@@ -107,9 +123,10 @@ def create_lmp_file(file,out,dumpstep=0):
         
         fix r1 all qeq/reax 1 0.0 10.0 1e-6 reaxff
 
+
         reset_atom_ids
         '''
-    lammps_str += NEB_min()
+    #lammps_str += NEB_min()
         
     lammps_str+=f'''
         group gSi type 1
@@ -128,7 +145,13 @@ def create_lmp_file(file,out,dumpstep=0):
         
         
 def create_dat(file,out,dumpstep=0):
+def create_dat(file,out,dumpstep=0):
     #Initialize and load the dump file
+    
+    lstr=create_lmp_file(file,out,dumpstep)
+
+    L = lammps('mpi',cmdargs=["-var","infile",file,'-var',"outfile",out])
+    L.commands_string(lstr)
     
     lstr=create_lmp_file(file,out,dumpstep)
 
@@ -146,7 +169,16 @@ def prep_data(file,dumpstep,outfolder):
     create_dat(file,outfile,dumpstep)
 
          
+    outfile=file.removesuffix('.dat').removesuffix('.data').removesuffix('.dump')+".data"
+    print(outfile)
+    #L = lammps('mpi',["-var",f"infile {file}",'-var',f"outfile {outfile}"])
+    create_dat(file,outfile,dumpstep)
+
+         
     return
+
+
+    
 
 
     

@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from skspatial.objects import Line, Sphere
 import sys
 
+
 import os
 import shutil
 import pandas as pd
@@ -19,6 +20,8 @@ numproc=MPI.COMM_WORLD.Get_size()
 
 lowerletters=list(string.ascii_lowercase)
 
+lowerletters=list(string.ascii_lowercase)
+
 def dprint(id,str):
         if id == debugatom:
             print(str)
@@ -26,7 +29,9 @@ def dprint(id,str):
 def perp_interface(cur, neigh):
     planeDir=[0,0,1]
     vecBuffer=20
+    vecBuffer=20
     
+    ang = nt.angle_between((cur-neigh),planeDir)
     ang = nt.angle_between((cur-neigh),planeDir)
     if abs(ang) > vecBuffer:
         return False
@@ -36,8 +41,10 @@ def perp_interface(cur, neigh):
 def parallel_interface(cur, neigh):
     planeDir=[0,0,1]
     vecBuffer=2
+    vecBuffer=2
     #checking angle between pair sep vector and interface plane vector
     #so to be parallel the angle between needs to be roughly 90
+    ang = 90 - nt.angle_between((cur-neigh),planeDir)
     ang = 90 - nt.angle_between((cur-neigh),planeDir)
     if abs(ang) > vecBuffer:
         return False
@@ -68,16 +75,49 @@ def closer_pair(apos,bpos):
         
 
 def create_pair_list(datapath, dfile, distDir,writefile=False,split=1):
+def closer_pair(apos,bpos):
+    i1=16
+    i2=32
+    az=apos[2]
+    bz=bpos[2]
+    if az < 8:
+        az+=32
+    if bz < 8:
+        bz+=32
+    alow=abs(az-i1)
+    blow=abs(bz-i1)
+    
+    ahigh=abs(i2-az)
+    bhigh=abs(i2-bz)
+    
+    amin = min(alow,ahigh)
+    bmin = min(blow,bhigh)
+    if amin < bmin:#a is closer to the lower interface
+        return True
+    else:
+        return False
+        
+
+def create_pair_list(datapath, dfile, distDir,writefile=False,split=1):
     
     SiRad=10
     
     zlowrange=[18,20]
     zhighrange=[28,30]
+    zlowrange=[18,20]
+    zhighrange=[28,30]
     
+    SiOBondOrder=nt.SiOBondOrder
     SiOBondOrder=nt.SiOBondOrder
 
     zmin=19
+    zmin=19
     zmax=28
+    filename=dfile.removesuffix('.dat').removesuffix('.data').removesuffix('.dump')
+
+    
+    # with open(datapath+dfile) as lammps_dump_fl_obj:
+    #     apos = ase.io.read(lammps_dump_fl_obj,format="lammps-data",style='charge',units='real',sort_by_id=True)#, format="lammps-data", index=0)
     filename=dfile.removesuffix('.dat').removesuffix('.data').removesuffix('.dump')
 
     
@@ -89,10 +129,16 @@ def create_pair_list(datapath, dfile, distDir,writefile=False,split=1):
     (atoms, simbox) = nt.read_file_data_bonds(datapath,dfile)
     numAtoms=len(atoms.index)
 
+    #create_bond_file(datapath,dfile,bondfile)
+    #atoms=read_bonds(datapath+'/scratchfolder/'+bondfile)
+    (atoms, simbox) = nt.read_file_data_bonds(datapath,dfile)
+    numAtoms=len(atoms.index)
+
 
     print(f'--------Running file: {dfile} with {numAtoms} atoms--------')
 
     pairs=[]
+    counts=np.zeros(numAtoms+1)
     counts=np.zeros(numAtoms+1)
     hClose=[]
     badO=[]
@@ -383,6 +429,12 @@ def create_oh_pair_list(datapath, dfile, distDir,writefile=False,split=1):
                 
                 if neibo < SiOBondOrder:
                     continue
+            for neib in neibonds:
+                nei=neib[0]
+                neibo=neib[1]
+                
+                if neibo < SiOBondOrder:
+                    continue
             
                 #skip if the oxygen is bad or if this is the current oxygen already looking at
                 # if nei in badO or nei == i:
@@ -398,6 +450,8 @@ def create_oh_pair_list(datapath, dfile, distDir,writefile=False,split=1):
         
                 dprint(i,f"debug testing {n}")
                     
+                    
+                neipos= atoms.at[nei,'pos']
                     
                 neipos= atoms.at[nei,'pos']
                 
@@ -880,6 +934,7 @@ if __name__=='__main__':
     debugatom=-1
     
     datapath="/home/agoga/documents/code/topcon-md/data/neb/"
+    datapath="/home/agoga/documents/code/topcon-md/data/neb/"
 
     
     distDirectory='pinholeCenter/'
@@ -889,7 +944,10 @@ if __name__=='__main__':
         
     # f="1.6-381.dat"
     # create_pair_list(datapath,f,distDirectory,True)
+    # f="1.6-381.dat"
+    # create_pair_list(datapath,f,distDirectory,True)
     
+    #dlist = ["Hcon-1500-0.data","Hcon-1500-110.data","Hcon-1500-220.data","Hcon-1500-330.data","Hcon-1500-440.data","Hcon-1500-550.data","Hcon-1500-695.data","Hcon-1500-880.data","Hcon-1500-990.data"]
     #dlist = ["Hcon-1500-0.data","Hcon-1500-110.data","Hcon-1500-220.data","Hcon-1500-330.data","Hcon-1500-440.data","Hcon-1500-550.data","Hcon-1500-695.data","Hcon-1500-880.data","Hcon-1500-990.data"]
     
     i=1
