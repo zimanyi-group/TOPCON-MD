@@ -24,9 +24,9 @@ SKIPPES=1
 numruns=0
 start=`date +%s`
 
-MAXNEB=3000
-MAXCLIMB=1000
-SPRINGCONST=1
+maxneb=3000
+maxclimb=1000
+springconst=1
 
 
 #datafile="/home/agoga/sandbox/topcon/data/neb/Hcon-1500-110.data" #"$CWD"/"$1
@@ -99,10 +99,10 @@ do
             srun /home/agoga/.conda/envs/lmp/bin/python $OUT_FOLDER"FindMinimumE.py" $OUT_FOLDER $atomnum $ETOL $TIMESTEP $SKIPPES $atomremove $datafile $plot
             
             echo "----------------Running NEB for "$pair" ----------------"
-            srun /home/agoga/.local/bin/lmp_mpi -partition 13x1 -nocite -log $LOG_FILE -in $NEB_FILE -var maxneb ${MAXNEB} -var maxclimb ${MAXCLIMB} -var atom_id ${atomnum} -var output_folder $OUT_FOLDER -var fileID $atomnum -var etol $ETOL -var ts $TIMESTEP -var springconst $SPRINGCONST -pscreen $OUT_FOLDER/screen
+            srun /home/agoga/.local/bin/lmp_mpi -partition 13x1 -nocite -log $LOG_FILE -in $NEB_FILE -var maxneb ${maxneb} -var maxclimb ${maxclimb} -var atom_id ${atomnum} -var output_folder $OUT_FOLDER -var fileID $atomnum -var etol $ETOL -var ts $TIMESTEP -var springconst $springconst -pscreen $OUT_FOLDER/screen
             
             echo "----------------Post NEB for "$pair" ----------------"
-            srun /home/agoga/.conda/envs/lmp/bin/python $OUT_FOLDER"Process-NEB.py" $OUT_FOLDER $atomnum $ETOL $TIMESTEP $atomremove $nebfolder $datafile $SPRINGCONST $plot
+            srun /home/agoga/.conda/envs/lmp/bin/python $OUT_FOLDER"Process-NEB.py" $OUT_FOLDER $atomnum $ETOL $TIMESTEP $atomremove $nebfolder $datafile $springconst $plot
 
             rm -r $OUT_FOLDER
         done

@@ -109,7 +109,7 @@ def create_lmp_file(file,out,dumpstep=0):
 
         reset_atom_ids
         '''
-    #lammps_str += NEB_min()
+    lammps_str += NEB_min()
         
     lammps_str+=f'''
         group gSi type 1
@@ -122,7 +122,7 @@ def create_lmp_file(file,out,dumpstep=0):
         
         print '~$(v_perctH)% Hydrogen'
         
-        #write_data $(v_outfile) '''
+        write_data {out} '''
     print(f"Saving file with path: {out}")
     return lammps_str
         
@@ -158,24 +158,21 @@ if __name__ == "__main__":
     f=cwd+folder
     folderpath=os.path.join(cwd,f)
 
-    flist=["Hcon-1500-110.dump","Hcon-1500-220.dump","Hcon-1500-330.dump","Hcon-1500-440.dump","Hcon-1500-550.dump","Hcon-1500-695.dump","Hcon-1500-880.dump","Hcon-1500-990.dump"]
-    flist=["1.6-381.dat","1.7-276.dat","1.8-280.dat"]
+    # flist=["Hcon-1500-110.dump","Hcon-1500-220.dump","Hcon-1500-330.dump","Hcon-1500-440.dump","Hcon-1500-550.dump","Hcon-1500-695.dump","Hcon-1500-880.dump","Hcon-1500-990.dump"]
+    # flist=["1.6-381.dat","1.7-276.dat","1.8-280.dat"]
     folderpath="/home/agoga/documents/code/topcon-md/data/pinhole-dump-files/"
-    flist=["Hcon-1500-1.dump"]
-    dumpstep=1510000
-
-    # file="SiOxNEB-NOH.dump"
-    # dumpstep=1
-    
-    # file="aQ-SiO2.dump"
-    # dumpstep=21
-
     outfolder="/home/agoga/documents/code/topcon-md/data/NEB/"
-    #filepath=os.path.join(folderpath,file)
-    #prep_data(filepath,dumpstep,outfolder)
-    for f in flist:
-        filepath=os.path.join(folderpath,f)
-        nebFiles =prep_data(filepath,dumpstep,outfolder)
+    f="Hcon-1500-695.dump"
+    dumpstep=1510053
+    filepath=os.path.join(folderpath,f)
+    nebFiles =prep_data(filepath,dumpstep,outfolder)
+
+    # outfolder="/home/agoga/documents/code/topcon-md/data/NEB/"
+    # #filepath=os.path.join(folderpath,file)
+    # #prep_data(filepath,dumpstep,outfolder)
+    # for f in flist:
+    #     filepath=os.path.join(folderpath,f)
+    #     nebFiles =prep_data(filepath,dumpstep,outfolder)
         
     MPI.Finalize()
     exit()

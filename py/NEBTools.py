@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 
@@ -23,6 +24,8 @@ import ase.cell
 
 from matplotlib.ticker import MaxNLocator
 from pandas.api.types import is_numeric_dtype
+from numpy.linalg import norm
+
 jp=0
 
 
@@ -30,6 +33,7 @@ me = MPI.COMM_WORLD.Get_rank()
 numproc=MPI.COMM_WORLD.Get_size()
 
 
+conv=0.043361254529175
 
 SiOBondOrder=0.9
 image_folder="/home/agoga/documents/code/topcon-md/neb-out/analysis-images/"
@@ -38,6 +42,21 @@ datafolder="/home/agoga/documents/code/topcon-md/data/neb/"
 v=4.74e-20
 w=1.6e-7
 HNumToConcentration=w/v
+
+def pbc_vec_subtract(simbox, posi,posf):
+    ret=[0,0,0]
+    for i, (a, b) in enumerate(zip(posi, posf)):
+        delta = abs(b - a)
+        dimension=simbox[i,1]-simbox[i,0]
+        if delta > dimension/2:
+            if b < a:
+                b+=dimension
+            else:
+                a+=dimension
+            
+        ret[i]=b-a
+        
+    return ret
 
 def pbc_dist(simbox, pos1,pos2):
     total = 0
@@ -48,12 +67,32 @@ def pbc_dist(simbox, pos1,pos2):
             delta = dimension - delta
         total += delta ** 2
     return total ** 0.5
-           
+
+
+def pbc_dist_point_to_vec(simbox, p1,p2,distPoint):
+    vec1=pbc_vec_subtract(simbox,p1,p2)
+    vec2=pbc_vec_subtract(simbox,distPoint,p1)
+    dist = norm(np.cross(vec1,vec2))/norm(vec1)
+    #print(f"pbc_dist_point_to_vec - {distPoint} to {p2}-{p1}={dist}")
+    return dist
+
+
+def apply_point_vec_dist(df,simbox,p1,p2,atomtype=None,col='pos'):
+    pvdcol='pointvecDist'
+    if df.empty:
+        return df
+    distdf=df.copy()
     
+    if atomtype is not None:
+        distdf=distdf[distdf["type"]==atomtype]
 
+    distdf[pvdcol]=distdf.apply(lambda row: pbc_dist_point_to_vec(simbox,p1,p2,row[col]),axis=1)
 
-def apply_dist_from_pos(df,simbox,pos,atomtype=None):
-    distdf=df
+    return (distdf,pvdcol)
+           
+
+def apply_dist_from_pos(df,simbox,pos,atomtype=None,col='pos'):
+    distdf=df.copy()
     #pos=df.at[atom,'pos']
     
     if atomtype is not None:
@@ -61,7 +100,7 @@ def apply_dist_from_pos(df,simbox,pos,atomtype=None):
     #partdf=dd.from_pandas(distdf,npartitions=numproc)
     # print(distdf.iloc[0].to_string())
     #.swifter.progress_bar(False).allow_dask_on_strings(enable=True).apply
-    distdf['dist']=distdf.apply(lambda row: pbc_dist(simbox,row['pos'],pos),axis=1)
+    distdf['dist']=distdf.apply(lambda row: pbc_dist(simbox,row[col],pos),axis=1)
     # print(distdf.iloc[0].to_string())
     #distdf['dist']=partdf.map_partitions(lambda df: df.apply((lambda row: pbc_dist(simbox,row['pos'],pos)),axis=1),meta=('pos', object)).compute(scheduler='threads')
 
@@ -128,6 +167,101 @@ def angle_between_pts(p1, p2,pm,box,debug=False):
 
     print(f"--- post fixing ---\np1{p1} p2{p2}\nimiddle{imiddle} fmiddle{fmiddle}\nbox{box}\nang={ang}") if debug else None
     return (ang,[v1,v2])
+
+def find_atom_position(L,atomID):
+    L.commands_string(f'''
+        variable x{atomID} equal x[{atomID}]
+        variable y{atomID} equal y[{atomID}]
+        variable z{atomID} equal z[{atomID}]
+        ''')
+    
+    x = L.extract_variable(f'x{atomID}')
+    y = L.extract_variable(f'y{atomID}')
+    z = L.extract_variable(f'z{atomID}')
+    
+    return (x,y,z)
+
+def NEB_min(L,etol):
+    L.commands_string(f'''minimize {etol} {etol} 10000 10000''')
+
+def find_local_minima_position(file,atom,initial_guess):
+    ti=time.time()
+    #Need two lammps instances so that when removing an atom and minimizing we don't increase time for final NEB image minimization
+    L = lammps('mpi',["-log",'none',"-screen",'none'])
+    init_dat(L,file)
+
+    len=1
+    perDim=3
+    step=len/perDim
+    elist=np.zeros([perDim,perDim,perDim])
+
+    dlist=np.arange(-len/2,len/2,step)
+    
+    tot = perDim**3
+    s=1
+    
+    minx=0
+    miny=0
+    minz=0
+    
+    
+    xi, yi, zi = initial_guess[0], initial_guess[1], initial_guess[2]
+    minx, miny, minz = xi, yi, zi
+    
+    L.commands_string(f'''
+                    set atom {atom} x {xi} y {yi} z {zi}
+                    run 0
+                    ''')
+
+    Ef=0
+    Ei = L.extract_compute('thermo_pe',0,0)*conv
+    minE=Ei
+    for i in range(perDim):
+        for j in range(perDim):
+            for k in range(perDim):
+            
+                x=dlist[i]
+                y=dlist[j]
+                z=dlist[k]
+
+                
+                xf = xi + x
+                yf = yi + y
+                zf = zi + z
+                
+                
+                
+                L.commands_string(f'''
+                    set atom {atom} x {xf} y {yf} z {zf}
+                    run 0
+                    ''')
+                s+=1
+                Ef = L.extract_compute('thermo_pe',0,0)*conv
+                # elist[i,j,k]=Ef
+                
+                if me==0:
+                    print(f"Step {s}/{tot}: {Ef - minE}")
+                    
+                if Ef < minE:
+                    minx=xf
+                    miny=yf
+                    minz=zf
+                    
+                    
+                    # if me==0:
+                    #     print(f"New minima; {minE} to {Ef}")
+                        
+                    minE=Ef
+                    
+                
+    
+    lowestpos=[minx,miny,minz]
+    initialpos=[xi,yi,zi]
+    tf=time.time()
+    if me==0:
+        print(f"Atom {atom} from {initialpos} to {lowestpos}: {Ei}  {minE} in {tf-ti}")
+        
+    return lowestpos
 
 def angle_between_df(df, col, refang=[0,0,1]):
     
@@ -306,7 +440,59 @@ def read_data(file):
 
     return (df,simbox)
 
-#returns (df, simbox)
+def init_dat(L,file):
+
+    L.commands_string(f'''
+        clear
+        units         real
+        dimension     3
+        boundary    p p p
+        atom_style  charge
+        atom_modify map yes
+
+
+        #atom_modify map array
+        variable seed equal 12345
+        variable NA equal 6.02e23
+
+        timestep 0.5
+
+        variable printevery equal 100
+        variable restartevery equal 0
+        variable datapath string "data/"
+
+
+        variable massSi equal 28.0855 #Si
+        variable massO equal 15.9991 #O
+        variable massH equal  1.00784 #H
+        
+
+        read_data {file}
+        
+        mass         3 $(v_massH)
+        mass         2 $(v_massO)
+        mass         1 $(v_massSi)
+
+
+        min_style quickmin
+        
+        pair_style	    reaxff potential/topcon.control
+        pair_coeff	    * * potential/ffield_Nayir_SiO_2019.reax Si O H
+
+        neighbor        2 bin
+        neigh_modify    every 10 delay 0 check no
+        
+        thermo $(v_printevery)
+        thermo_style custom step temp density press vol pe ke etotal #flush yes
+        thermo_modify lost ignore
+        
+        region sim block EDGE EDGE EDGE EDGE EDGE EDGE
+        
+        fix r1 all qeq/reax 1 0.0 10.0 1e-6 reaxff
+        compute c1 all property/atom x y z
+        run 0
+        ''')
+
 def read_file_data_bonds(datapath,dfile):
     
     (dfdata,simbox)=read_data(datapath+dfile)
@@ -594,7 +780,9 @@ def find_nnneighbor(df,curatom,zappdatom,natom="Si",nnatom="O"):
     return None
 
 
-def angle_between_pts_df(df,col,valcol):
+def angle_between_pts_df(df,valcol,posdf=None,box=None):
+    #this function finds the angle between pts of NEB vacancy pairs
+    
     #df=basedf.copy()
     csvlist=df["csvname"].unique()
     
@@ -602,19 +790,21 @@ def angle_between_pts_df(df,col,valcol):
         dfc=df[df["csvname"]==csvfile]
         (ratio,Hnum)=stats_from_csv_name(csvfile)
         
- 
-        (posdf,box)=load_data_and_bonds_from_csv(csvfile)
-        
+        if posdf == None and box == None:
+            (posdf,box)=load_data_and_bonds_from_csv(csvfile)
+        #print(posdf.to_string())
         for index, row in dfc.iterrows():
-            curcol=row[col]
             pair=row['pair']
             ipos=row['iPos']
             fpos=row['fPos']
             box=np.array(row['box'])
             mover=int(pair.split('-')[0])
             zapped=int(pair.split('-')[1])
+            # print(csvfile)
+            # print(mover)
+            # print(zapped)
             fsn=find_movers_neighbor(posdf,mover,zapped)
-
+            # print(fsn)
             middle=posdf.at[fsn,"pos"]
             
             debug = False
@@ -633,184 +823,8 @@ def angle_between_pts_df(df,col,valcol):
     return df
 
 
-def plot_pair_angle(basedf,col="FEB"):
-    df=basedf.copy()
-    csvlist=df["csvname"].unique()
-    subfolder="OSiO-bond-angle/"
-    colranges=[0,1.8,2.8,3.8,10]
-    valcol="Pair angle"
-    
-    df=angle_between_pts_df(df,col,valcol)
-    #print(df.to_string())
-    
-    units="°" 
-    xlabel= f"Bond angle{units} of O pairs" 
-    
-    plot_multi_distribution(df,valcol, units)
-    numbins=10
-    
-    vartitle=f"angle{units} between pairs"
-    plotfilename=f"bondangle-histogram"
-    
-    print("Calculation done, now plotting")
-    t=[]
-    for j in range(len(csvlist)):
-        csvfile=csvlist[j]
-        (ratio,Hnumber)=stats_from_csv_name(csvfile)
-        t.append([float(ratio),int(Hnumber),csvfile])
-    tmp=np.array(t,dtype=object)
-    
-    sortedcsv=tmp[np.lexsort((tmp[:,1],tmp[:,0]))]
-
-    
-    
-    uniratio=np.unique(sortedcsv[:,0])
-
-    numregions=len(colranges)-1
-    fig,axes = plt.subplots(ncols=1,nrows=1,figsize=(6,6))
-    
-    #dfl=df[df[valcol]>80]
-    
-    for ratio in uniratio:
-        ax1=axes
-        ratiocsvs=sortedcsv[sortedcsv[:,0]==ratio]
-        
-        numcsv=len(ratiocsvs)
-        al=[]
-        fl=[]
-        for j in range(numcsv):
-            csvfile=ratiocsvs[j][2]
-            dfr=df[df["csvname"]==csvfile]
-
-            (r,Hnumber)=stats_from_csv_name(csvfile)
-            
-            # alist=dfr.loc[dfr[col].between(alow,ahigh),valcol].tolist()
-            # print(alist)
-            # flist=alist=dfr.loc[dfr[col].between(alow,ahigh),col].tolist()
-            alist=dfr[valcol].tolist()
-            flist=dfr[col].tolist()
-            
-            al.extend(alist)
-            fl.extend(flist)
-            
-            #rlist=dfr[]
-            numfeb=len(alist)
-            title=f"Migration pair angles v. {col} for SiOx with x={ratio} and {Hnumber}H." # - between {alow} eV and {ahigh} eV"
-        
-        
-        ax1.scatter(al,fl,s=6)#,facecolors='none',linewidths=0.4)
-        ax1.set_title(title)
-        ax1.set_xlabel(f"O-Si-O pair angle({units})")
-        ax1.set_ylabel(f"{col}(eV)")
-        # get legend handles and their corresponding labels
-    avgSiO2=109.4
-    plt.axvline(avgSiO2,linestyle="dashed")
-    plt.text(110,.8,f'Average O-Si-O bond angle in a-SiO2:{avgSiO2}{units}', size=9)
-    # handles, labels = ax1.get_legend_handles_labels()
-
-    # # zip labels as keys and handles as values into a dictionary, ...
-    # # so only unique labels would be stored 
-    # dict_of_labels = dict(zip(labels, handles))
-
-    # # use unique labels (dict_of_labels.keys()) to generate your legend
-    # ax1.legend(dict_of_labels.values(), dict_of_labels.keys())
-          
-    plt.show()
-    
-    
     
 #Plotters
-def plot_multi_distribution(setdf,col="FEB",units="eV",plot=False):
-    df=dist_from_df(setdf,col,units,plot)
-    
-    
-    #1%, 3%, 5%, 6%, 7%, 9%, 11%, 13%
-
-    fig, (ax1,ax2)=plt.subplots(2,1,sharex=True,height_ratios=[15,1])
-
-    fig.subplots_adjust(hspace=0.1) 
-    t=0
-
-    ratios=df["ratio"].unique()
-    
-    for r in ratios:
-
-
-        dfr=df[df["ratio"]==r]
-
-        dfr=dfr.sort_values(by=['Hnum'])
-
-        xvals=[]#np.array([0,1,3,5,6,7,9,11,13])
-
-        min=10
-        max=0
-        
-        xvals=dfr['Hnum'].to_numpy(dtype=float)
-        yvals=dfr['mean'].to_numpy(dtype=float)
-        xvals=xvals*HNumToConcentration
-
-        #Setting tick and label text to smaller font
-        axisfontsize=10
-        fig.suptitle(f'{col} distributions for Oxygen migration in SiOx',fontsize=axisfontsize+1)
-
- 
-        ax2.tick_params(axis='both', which='major', labelsize=axisfontsize)
-        ax2.tick_params(axis='both', which='minor', labelsize=axisfontsize)
-        ax1.tick_params(axis='both', which='major', labelsize=axisfontsize)
-        ax1.tick_params(axis='both', which='minor', labelsize=axisfontsize)
-        
-        
-
-        fig.supxlabel('Areal Hydrogen Density(H/cm$^2$)',fontsize=axisfontsize)
-        fig.supylabel(f'{col} - mean ({units})',fontsize=axisfontsize)
-
-        ax2.set_yticks((0,10))
-        ax2.set_ylim(0,0.5)
-        # ax1.set_ylim(min-.1,max+.1)
-    
-
-        ax1.spines.bottom.set_visible(False)
-        ax2.spines.top.set_visible(False)
-        ax1.xaxis.tick_top()
-        ax1.set_xscale('log')
-
-
-
-        ax1.tick_params(labeltop=False)  # don't put tick labels at the top
-        ax2.xaxis.tick_bottom()
-
-
-        d = .5  # proportion of vertical to horizontal extent of the slanted line
-        kwargs = dict(marker=[(-1, -d), (1, d)], markersize=12,
-                    linestyle="none", color='k', mec='k', mew=1, clip_on=False)
-        ax1.plot([0, 1], [0, 0], transform=ax1.transAxes, **kwargs)
-        ax2.plot([0, 1], [1, 1], transform=ax2.transAxes, **kwargs)
-
-        #make sure that 0 shows up fine on the log plot
-        if xvals[0]==0:
-            low=xvals[1]
-            low=low/2
-            xvals[0]=low
-            ax1.set_xlim(low,xvals[-1]*1.1)
-
-
-        erb=ax1.plot(xvals, yvals, label=str(r))#,yerr=yer[1])
-        ax1.legend(title="Value of x")
-        t+=1
-    
-    avgSiO2=109.4
-    ax1.axhline(avgSiO2,linestyle="dashed")
-    ax1.text(0.3,.08,f'Average O-Si-O bond angle in a-SiO2:{avgSiO2}{units}', size=9,transform=ax1.transAxes)
-    
-    name=f"{col}vH"
-    dirname=image_folder
-    os.makedirs(dirname, exist_ok=True)
-    figname=dirname+name+'.svg'
-    print(f"Saved figure with path {figname}")
-    fig.savefig(figname)
-    plt.close(fig)
-        #erb[-1][0].set_linestyle('--')
-     
 
 def plot_any_split_hist(basedf,col,var,colranges,numbins,vartitle,xlabel,units,subfolder,plotfilename):
     df=basedf.copy()
@@ -901,7 +915,7 @@ def plot_any_split_hist(basedf,col,var,colranges,numbins,vartitle,xlabel,units,s
     
     
     fig, axes = plt.subplots(ncols=numregion,nrows=1, figsize=[numregion*5,5])  
-    
+    supfigname=dirname+plotfilename+'.svg'
     minv=np.min(avglist[:,:,2])
     maxv=np.max(avglist[:,:,2])
     limbuf=(maxv-minv)*.1
@@ -927,12 +941,205 @@ def plot_any_split_hist(basedf,col,var,colranges,numbins,vartitle,xlabel,units,s
         dict_of_labels = dict(zip(labels, handles))
 
         # use unique labels (dict_of_labels.keys()) to generate your legend
-        ax.legend(dict_of_labels.values(), dict_of_labels.keys())
+        ax.legend(dict_of_labels.values(), dict_of_labels.keys(),title="SiOx Ratio")
+        
+        
+        ax.set_xscale('log')
+        
         ax.set_ylim(minv-limbuf,maxv+limbuf)
-        ax.set_title(f"Avg {vartitle} between {alow} eV and {ahigh} eV")
-        ax.set_xlabel("H Num")
+        ax.set_title(f"{vartitle} between {alow} eV and {ahigh} eV")
+        ax.set_xlabel('Areal Hydrogen Density(H/cm$^2$)')
         ax.set_ylabel(f"Avg {vartitle}")
+        
+    fig.savefig(supfigname)
+    print(f"Saved figure with path {supfigname}")
     plt.show()
+    
+    plt.close(fig)
+    
+    
+def plot_pair_angle(basedf,col="FEB"):
+    df=basedf.copy()
+    csvlist=df["csvname"].unique()
+    subfolder="angle-OSiO-bond/"
+    colranges=[0,1.8,2.8,3.8,10]
+    valcol="Pair angle"
+    print('here')
+    df=angle_between_pts_df(df,valcol)
+    #print(df.to_string())
+    
+    units="°" 
+    xlabel= f"Bond angle{units} of O pairs" 
+    
+    plot_multi_distribution(df,valcol, units)
+    numbins=10
+    
+    vartitle=f"angle{units} between pairs"
+    plotfilename=f"bondangle-histogram"
+    
+    print("Calculation done, now plotting")
+    t=[]
+    for j in range(len(csvlist)):
+        csvfile=csvlist[j]
+        (ratio,Hnumber)=stats_from_csv_name(csvfile)
+        t.append([float(ratio),int(Hnumber),csvfile])
+    tmp=np.array(t,dtype=object)
+    
+    sortedcsv=tmp[np.lexsort((tmp[:,1],tmp[:,0]))]
+
+    
+    
+    uniratio=np.unique(sortedcsv[:,0])
+
+    numregions=len(colranges)-1
+    fig,axes = plt.subplots(ncols=1,nrows=1,figsize=(6,6))
+    
+    #dfl=df[df[valcol]>80]
+    
+    for ratio in uniratio:
+        ax1=axes
+        ratiocsvs=sortedcsv[sortedcsv[:,0]==ratio]
+        
+        numcsv=len(ratiocsvs)
+        al=[]
+        fl=[]
+        for j in range(numcsv):
+            csvfile=ratiocsvs[j][2]
+            dfr=df[df["csvname"]==csvfile]
+
+            (r,Hnumber)=stats_from_csv_name(csvfile)
+            
+            # alist=dfr.loc[dfr[col].between(alow,ahigh),valcol].tolist()
+            # print(alist)
+            # flist=alist=dfr.loc[dfr[col].between(alow,ahigh),col].tolist()
+            alist=dfr[valcol].tolist()
+            flist=dfr[col].tolist()
+            
+            al.extend(alist)
+            fl.extend(flist)
+            
+            #rlist=dfr[]
+            numfeb=len(alist)
+            title=f"Migration pair angles v. {col} for SiOx with x={ratio} and {Hnumber}H." # - between {alow} eV and {ahigh} eV"
+        
+        
+        ax1.scatter(al,fl,s=6,label=ratio)#,facecolors='none',linewidths=0.4)
+        ax1.set_title(title)
+        ax1.set_xlabel(f"O-Si-O pair angle({units})")
+        ax1.set_ylabel(f"{col}(eV)")
+        # get legend handles and their corresponding labels
+        
+        
+    avgSiO2=109.4
+    plt.axvline(avgSiO2,linestyle="dashed")
+    plt.text(110,.9,f'Average O-Si-O bond angle in a-SiO2:{avgSiO2}{units}', size=9)
+    handles, labels = ax1.get_legend_handles_labels()
+
+    # zip labels as keys and handles as values into a dictionary, ...
+    # so only unique labels would be stored 
+    dict_of_labels = dict(zip(labels, handles))
+
+    # use unique labels (dict_of_labels.keys()) to generate your legend
+    ax1.legend(dict_of_labels.values(), dict_of_labels.keys())
+          
+    plt.show()
+    return df
+    
+def plot_multi_distribution(setdf,col="FEB",units="eV",plot=False):
+    df=dist_from_df(setdf,col,units,plot)
+    
+    
+    #1%, 3%, 5%, 6%, 7%, 9%, 11%, 13%
+
+    fig, (ax1,ax2)=plt.subplots(2,1,sharex=True,height_ratios=[15,1])
+
+    fig.subplots_adjust(hspace=0.1) 
+    t=0
+
+    ratios=df["ratio"].unique()
+    
+    for r in ratios:
+
+
+        dfr=df[df["ratio"]==r]
+
+        dfr=dfr.sort_values(by=['Hnum'])
+
+        xvals=[]#np.array([0,1,3,5,6,7,9,11,13])
+
+        min=10
+        max=0
+        
+        xvals=dfr['Hnum'].to_numpy(dtype=float)
+        yvals=dfr['mean'].to_numpy(dtype=float)
+        xvals=xvals*HNumToConcentration
+        ax1.set_xscale('log')
+        ax2.set_xscale('log')
+        #Setting tick and label text to smaller font
+        axisfontsize=10
+        fig.suptitle(f'Mean forward barrier for Oxygen migration in SiOx',fontsize=axisfontsize+1)
+
+ 
+        ax2.tick_params(axis='both', which='major', labelsize=axisfontsize)
+        ax2.tick_params(axis='both', which='minor', labelsize=axisfontsize)
+        ax1.tick_params(axis='both', which='major', labelsize=axisfontsize)
+        ax1.tick_params(axis='both', which='minor', labelsize=axisfontsize)
+        
+        
+
+        fig.supxlabel('Areal Hydrogen Density(H/cm$^2$)',fontsize=axisfontsize)
+        fig.supylabel(f'{col} - mean ({units})',fontsize=axisfontsize)
+
+        ax2.set_yticks((0,10))
+        ax2.set_ylim(0,0.5)
+        # ax1.set_ylim(min-.1,max+.1)
+    
+
+        ax1.spines.bottom.set_visible(False)
+        ax2.spines.top.set_visible(False)
+        ax1.xaxis.tick_top()
+        
+
+
+
+        ax1.tick_params(labeltop=False)  # don't put tick labels at the top
+        ax2.xaxis.tick_bottom()
+
+
+        d = .5  # proportion of vertical to horizontal extent of the slanted line
+        kwargs = dict(marker=[(-1, -d), (1, d)], markersize=12,
+                    linestyle="none", color='k', mec='k', mew=1, clip_on=False)
+        ax1.plot([0, 1], [0, 0], transform=ax1.transAxes, **kwargs)
+        ax2.plot([0, 1], [1, 1], transform=ax2.transAxes, **kwargs)
+
+        #make sure that 0 shows up fine on the log plot
+        if xvals[0]==0:
+            low=xvals[1]
+            low=low/2
+            xvals[0]=low
+            ax1.set_xlim(low,xvals[-1]*1.1)
+
+
+        erb=ax1.scatter(xvals, yvals, label=str(r))#,yerr=yer[1])
+        ax1.legend(title="Value of x")
+        t+=1
+    
+    
+    
+    # avgSiO2=109.4
+    # ax1.axhline(avgSiO2,linestyle="dashed")
+    # ax1.text(0.3,.08,f'Average O-Si-O bond angle in a-SiO2:{avgSiO2}{units}', size=9,transform=ax1.transAxes)
+    
+    
+    name=f"{col}vH"
+    dirname=image_folder+"/individual-dist/"
+    os.makedirs(dirname, exist_ok=True)
+    figname=dirname+name+'.svg'
+    print(f"Saved figure with path {figname}")
+    fig.savefig(figname)
+    plt.close(fig)
+        #erb[-1][0].set_linestyle('--')
+     
 
 def plot_rangehist(basedf,rlist,type=None,col='FEB',skip=False): 
     df=basedf.copy()    
@@ -950,7 +1157,7 @@ def plot_rangehist(basedf,rlist,type=None,col='FEB',skip=False):
         # if j==0:
         #     j+=1
         #     continue
-        print(csvfile)
+        print("plot_rangehist on "+ str(csvfile))
         filetimestart = time.time()
         
         dfc=df[df["csvname"]==csvfile]
@@ -1006,7 +1213,7 @@ def plot_rangehist(basedf,rlist,type=None,col='FEB',skip=False):
                     print(f"EST total time for this csv: {esttime}")
                 i+=1
         
-    units=r"$$\AA$$"
+    units=r"$\AA$"
     print("Calculation done, now plotting")
     for radius in rlist:
         valcol=f'{typename}range{radius}' 
@@ -1131,15 +1338,346 @@ def plot_vang_multi(basedf,col='FEB',refvec=[0,0,1]):
     
     numbins=10
     units="(°)"
-    vartitle="angle(°)"
+    vartitle="Angle(°) to i-face"
     plotfilename="angle-histogram"
     print("Calculation done, now plotting")
     plot_any_split_hist(dfa,col,var,colranges,numbins,vartitle,xlabel,units,subfolder,plotfilename)
  
+def plot_bondang_vdz(basedf):
+    df=basedf.copy()
+    csvlist=df["csvname"].unique()
+    subfolder="angle-OSiO-bond/"
+    colranges=[0,1.8,2.8,3.8,10]
+    valcol="Pair angle"
+    #print(df.to_string())
+    #box=np.array(df.iloc[0]['box'])
+    
+    hnum=[]
+    angnum=[]
+    meanlist=[]
+    for csvfile in csvlist:
+        dfc=df[df["csvname"]==csvfile]
+        #print(dfc.to_string())
+        (ratio,Hnum)=stats_from_csv_name(csvfile)
+        
+
+        #dfc=dfc[dfc.apply(limit_zpos_iface,axis=1,args=(bulk,))]
+        
+        (posdf,box)=load_data_from_csv(csvfile)
+        
+        dfc=angle_between_pts_df(dfc,valcol)
+        dfc=dfc.apply(vz_idz,axis=1)
+        #dfc=dfc[dfc[valcol]<maxang]
+        
+        
+            
+    zpos=dfc['zpos'].tolist()
+    anglis=dfc['Pair angle'].tolist()    
+    fig, ax = plt.subplots()
+    # pl=np.array([hnum,angnum]).T
+    ax.scatter(zpos,anglis,s=6,facecolors='none',edgecolors='b')
+    # ax.set_title(f"Number of H in range vs. Number of pairs with angle < {maxang}")
+    # ax.set_xlabel(f"Number of H within {dist}Å of pair.")
+    # ax.set_ylabel(f"Number of pair angles < 110° in range.")
+    # for hn in np.unique(pl[:,0]):
+    #     tl = pl[pl[:,0]==hn]
+    #     mtl=np.mean(tl[:,1])
+    #     ax.scatter(hn,mtl,s=20,marker='x',c='r')
+    
+def create_bond_angles(atoms,box,type1='O',typeM='Si',type2='O'):
+    #create bond angles for a type1-typeM-type2 bond ex: O-Si-O
+    #print(atoms.to_string())
+    t1atoms=atoms[atoms['type']==type1]
+    bangleList=[]
+    
+    for i, row in t1atoms.iterrows():
+        nbonds = row['bonds']
+
+        
+        tmn=[]
+
+        #create the list of type 2
+        for n in nbonds:
+            ni=n[0]
+            bo=n[1]
+            
+            if ni not in atoms.index:
+                continue
+            neitype=atoms.at[ni,'type']
+
+            if neitype == typeM:
+                if bo < SiOBondOrder:
+                    continue
+                tmn.append(ni)
+        
+        #run through the bonds of the middle atom and fill a list with any type 3 neighbors 
+        for tmi in tmn:
+            neibonds = atoms.at[tmi,'bonds']
+            
+            for neib in neibonds:
+                nei=neib[0]
+                neibo=neib[1]
+                
+                if nei not in atoms.index:
+                    continue
+                
+                if neibo < SiOBondOrder:
+                    continue
+
+                if nei ==i:
+                    continue
+                
+                neitype = atoms.at[nei,'type']
+                if neitype != type2:
+                    continue
+
+                
+  
+                p1=[i, tmi, nei]
+                p2=[nei, tmi, i]
+
+                #good pair if it got this far
+                #add this pair to the pair list              
+                if p1 not in bangleList and p2 not in bangleList:
+                    bangleList.append(p1)
+                    
+    #now we have a list of all acceptable bonds
+    retlist=[]
+    for trio in bangleList:
+        i1=trio[0]
+        im=trio[1]
+        i2=trio[2]
+        
+        pos1=atoms.at[i1,'pos']
+        posm=atoms.at[im,'pos']
+        pos2=atoms.at[i2,'pos']
+        (ang,[v1,v2]) = angle_between_pts(pos1,pos2,posm,box)
+        retlist.append((posm,ang[0]))
+
+    return retlist
+        
+
+def plot_all_bondang_vs_h(basedf,dist,maxang=180,all=False,bulk=False):
+    #not just doing bond angle on our pairs but every atom in a sim
+    df=basedf.copy()
+    csvlist=df["csvname"].unique()
+    subfolder="angle-all-OSiO-bond/"
+    colranges=[0,1.8,2.8,3.8,10]
+    valcol="Pair angle"
+    #print(df.to_string())
+    #box=np.array(df.iloc[0]['box'])
+    
+    hnum=[]
+    angnum=[]
+    anglist=[]
+    for csvfile in csvlist:
+        dfc=df[df["csvname"]==csvfile]
+        
+        print(csvfile)
+        (ratio,Hnum)=stats_from_csv_name(csvfile)
+        
+        
+
+        
+        
+        
+        (posdf,box)=load_data_and_bonds_from_csv(csvfile)
+        if not all:
+            posdf=posdf[posdf.apply(limit_zpos_iface,axis=1,args=(bulk,'pos',))]
+        
+        bondAngleL=create_bond_angles(posdf,box)
+        print(len(bondAngleL))
+        
+        #dfc=angle_between_pts_df(dfc,valcol)
+        #dfc=dfc.apply(vz_idz,axis=1)
+        #dfc=dfc[dfc[valcol]<maxang]
+        
+        for ba in bondAngleL:
+            
+            pos=ba[0]
+            an=ba[1]
+            # if an > maxang:
+            #     continue
+            #print("plot_bondang_vdz on "+ str(csvfile)
+            
+            #fulldf=apply_dist_from_pos(dfc,box,pos,col='iPos')
+            hdist=apply_dist_from_pos(posdf,box,pos,"H")
+            
+            numH=0
+            for ind, row in hdist.iterrows():
+                if row['type']=="H" and row['dist']<dist:
+                    numH+=1
+            
+            
+            #angdf=fulldf[fulldf[valcol]<maxang]
+            #meanpa=np.mean(pa)
+            hnum.append(numH)
+            #angnum.append(len(angdf))
+            anglist.append(an)
+            
+            # plt.hist(bins[:-1],bins,weights=counts)
+            # plt.title(f"{len(fulldf)} Pair angles around {str(pos)}, avg:{round(meanpa,2)} - {numH}H nearby")
+            # plt.show()
+            
+            
+    fig, ax = plt.subplots()
+    pl=np.array([hnum,anglist]).T
+    # ax.scatter(hnum,angnum,s=6,facecolors='none',edgecolors='b')
+    title=f"# of H in range vs. % of pairs with angle < {maxang}° "
+    
+    if not all:
+        title+="in bulk " if bulk else  "near interface "
+    #title+=f"for x={ratio} w/ {Hnum}H"
+    ax.set_title(title)
+    ax.set_xlabel(f"Number of H within {dist}Å.")
+    ax.set_ylabel(f"% of pair angles in range < 110°")
+    mplth=[]
+    mpltCount=[]
+    
+    #run through all the unique "number of H in range" values
+    for hn in np.unique(pl[:,0]):
+        tl = pl[pl[:,0]==hn]#list of angles with this number of H in range
+        tot=0
+        cnt=0
+        for a in tl[:,1]:
+            tot+=1
+            if a < maxang:
+                cnt+=1
+                
+        mtl=cnt/tot
+        mplth.append(hn)
+        mpltCount.append(mtl)
+        
+    print(mplth)
+    print(mpltCount)
+    ax.plot(mplth,mpltCount)
+    
+    
+    # fig1, ax1 = plt.subplots()
+    
+    # title=f"# of H in range vs. O-Si-O bond angle "
+    # if not all:
+    #     title+="in bulk " if bulk else  "near interface "
+    # #title+=f"for x={ratio} w/ {Hnum}H"
+    # ax1.set_title(title)
+    # ax1.set_xlabel(f"# of H within {dist}Å of bond")
+    # ax1.set_ylabel(f"O-Si-O bond angle(°)")
+    # ax1.scatter(hnum,anglist,s=6,facecolors='none',edgecolors='b')
+    # pl=np.array([hnum,anglist]).T
+    # mplth=[]
+    # mpltAvg=[]
+    # for hn in np.unique(pl[:,0]):
+    #     tl = pl[pl[:,0]==hn]
+    #     mtl=np.mean(tl[:,1])
+    #     mplth.append(hn)
+    #     mpltAvg.append(mtl)
+    #     print(f"{hn} H in range - avg bond angle: {mtl}")
+        
+    # ax1.plot(mplth,mpltAvg,c='r')#s=20,marker='x',
+    plt.show()
+
+def plot_bondang_vs_h(basedf,poslist,dist,maxang=180,bulk=False):
+    df=basedf.copy()
+    csvlist=df["csvname"].unique()
+    subfolder="angle-OSiO-bond/"
+    colranges=[0,1.8,2.8,3.8,10]
+    valcol="Pair angle"
+    #print(df.to_string())
+    #box=np.array(df.iloc[0]['box'])
+    
+    hnum=[]
+    angnum=[]
+    meanlist=[]
+    for csvfile in csvlist:
+        dfc=df[df["csvname"]==csvfile]
+        #print(dfc.to_string())
+        (ratio,Hnum)=stats_from_csv_name(csvfile)
+        
+
+        dfc=dfc[dfc.apply(limit_zpos_iface,axis=1,args=(bulk,))]
+        
+        (posdf,box)=load_data_from_csv(csvfile)
+        
+        dfc=angle_between_pts_df(dfc,valcol)
+        dfc=dfc.apply(vz_idz,axis=1)
+        #dfc=dfc[dfc[valcol]<maxang]
+        
+        for pos in poslist:
+            #print("plot_bondang_vdz on "+ str(csvfile)
+            
+            fulldf=apply_dist_from_pos(dfc,box,pos,col='iPos')
+            hdist=apply_dist_from_pos(posdf,box,pos,"H")
+            numH=0
+            for ind, row in hdist.iterrows():
+                if row['dist']<dist:
+                    numH+=1
+            
+            fulldf=fulldf[fulldf['dist']<dist]
+            
+            
+            # #print(fulldf.to_string())
+            # zpos=fulldf['zpos'].tolist()
+            pa=fulldf[valcol].tolist()
+            
+            #fig, ax = plt.subplots()
+            # plt.scatter(zpos,pa,s=5,facecolors='none',edgecolors='b')
+            #counts, bins = np.histogram(pa)
+            
+            angdf=fulldf[fulldf[valcol]<maxang]
+            meanpa=np.mean(pa)
+            hnum.append(numH)
+            angnum.append(len(angdf))
+            meanlist.append(meanpa)
+            
+            # plt.hist(bins[:-1],bins,weights=counts)
+            # plt.title(f"{len(fulldf)} Pair angles around {str(pos)}, avg:{round(meanpa,2)} - {numH}H nearby")
+            # plt.show()
+            
+            
+    fig, ax = plt.subplots()
+    pl=np.array([hnum,angnum]).T
+    ax.scatter(hnum,angnum,s=6,facecolors='none',edgecolors='b')
+    ax.set_title(f"Number of H in range vs. Number of pairs with angle < {maxang}")
+    ax.set_xlabel(f"Number of H within {dist}Å of pair.")
+    ax.set_ylabel(f"Number of pair angles < 110° in range.")
+    for hn in np.unique(pl[:,0]):
+        tl = pl[pl[:,0]==hn]
+        mtl=np.mean(tl[:,1])
+        ax.scatter(hn,mtl,s=20,marker='x',c='r')
+    
+    
+    fig1, ax1 = plt.subplots()
+    ax1.set_title(f"Number of H in range vs. average pair angle")
+    ax1.set_xlabel(f"Number of H within {dist}Å of pair.")
+    ax1.set_ylabel(f"Average pair angle(°).")
+    ax1.scatter(hnum,meanlist,s=6,facecolors='none',edgecolors='b')
+    pl=np.array([hnum,meanlist]).T
+    for hn in np.unique(pl[:,0]):
+        tl = pl[pl[:,0]==hn]
+        mtl=np.mean(tl[:,1])
+        ax1.scatter(hn,mtl,s=20,marker='x',c='r')
+    plt.show()
+
+def limit_zpos_iface(row,bulk,col='iPos'):
+    zipos = np.array(row[col])[2]
+    if zipos > 20 and zipos <28:#adjust for any positions on the z periodic boudary
+        return bulk
+    return not bulk
+
 
  
-def vz_dz(row,var='zpos'):
+def vz_idz(row,var='zpos'):
+    #read the position of the pair and create a new column for the z coordinate
+    zipos = np.array(row['iPos'])[2]
+    if zipos < 10:#adjust for any positions on the z periodic boudary
+        box=np.array(row['box'],dtype=float)
+        if zipos < 10:
+            zipos+=box[2,1]-box[2,0]
+        
+    row[var]=zipos
+    return row
 
+def vz_dz(row,var='zpos'):
     zipos = np.array(row['iPos'])[2]
     zfpos = np.array(row['fPos'])[2]
     if zipos < 10 or zfpos < 10:#adjust for any positions on the z periodic boudary
@@ -1151,6 +1689,9 @@ def vz_dz(row,var='zpos'):
         
     row[var]=(zfpos+zipos)/2
     return row
+
+
+
      
 def plot_vz_df(basedf,col='FEB'):
     df=basedf.copy()  
@@ -1173,7 +1714,7 @@ def plot_vz_df(basedf,col='FEB'):
 def plot_vang_2dhist(basedf,col='FEB',refvec=[0,0,1]):
     df=basedf.copy()   
     csvlist=df["csvname"].unique()
-    subfolder="angle-histogram/"
+    subfolder="angle-2d-histogram/"
     for csvfile in csvlist:
         dfc=df[df["csvname"]==csvfile]
 
@@ -1268,7 +1809,7 @@ def dist_from_df(basedf,col="FEB",units="eV",plot=False):
         total=len(csdf)
 
         
-        num_bins=50
+        num_bins=10
         N=len(dist)
         fig,ax = plt.subplots()
         ax.set_title(f'{col} Distribution for {total} runs using {str(csvfile).split("/")[-1]}')

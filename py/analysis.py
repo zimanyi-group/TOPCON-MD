@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 from ovito.io import import_file, export_file
 import ovito.modifiers as m#import BondAnalysisModifier, CreateBondsModifier,CoordinationAnalysisModifier,TimeSeriesModifier
 import glob, os
@@ -26,6 +27,14 @@ colors = ["r","g","b","y","c"]
 from ovito.data import *
 import numpy as np
 from ovito.modifiers import *
+
+
+
+
+def create_NEB_gif(folder,dumpname):
+    pipeline=import_file(f"{dumpname}.*.dump")
+
+
 
 def modify(frame: int, data: DataCollection, typeA = 2, typeB = 1, cutoff_radius = 3.6):
     
@@ -255,14 +264,14 @@ def rdfTimeseries(file,range,out):
     # def animate(i):
     #     return i
               
-def bondAnalysis(folder,plot):
+def bondAnalysis(datafile,plot):
     try: 
-        datafile=''
-        # os.chdir(folder)
-        for root, dirs, files in os.walk(folder):
-            for file in files:
-                if file.endswith(".data"):#uses a data file not log file
-                    datafile=os.path.join(root,file)
+        # datafile=''
+        # # os.chdir(folder)
+        # for root, dirs, files in os.walk(folder):
+        #     for file in files:
+        #         if file.endswith(".data"):#uses a data file not log file
+        #             datafile=os.path.join(root,file)
     
     
         pipeline = import_file(datafile)

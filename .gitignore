@@ -6,6 +6,7 @@
 output/*
 output-save/*
 output-farm/*
+neb-out/*
 sandbox/*
 *.data
 density-matching/*

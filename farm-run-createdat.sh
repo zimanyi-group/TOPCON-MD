@@ -1,13 +1,13 @@
 #!/bin/sh
 #SBATCH -D ./
 #SBATCH --job-name=creDat
-#SBATCH --partition=med2 # Partition you are running on. Options: low2, med2, high2
+#SBATCH --partition=high2 # Partition you are running on. Options: low2, med2, high2
 #SBATCH --output=/home/agoga/sandbox/topcon/slurm-output/j-%j.txt
 #SBATCH --mail-user="adgoga@ucdavis.edu"
 #SBATCH --mail-type=FAIL,END
 
 
-#SBATCH --ntasks=512
+#SBATCH --ntasks=256
 #SBATCH --ntasks-per-node=256
 #SBATCH --cpus-per-task=1 
 #SBATCH --mem=64G

@@ -25,7 +25,7 @@ variable datapath string "${output_folder}data/"
 
 variable i equal part
 
-read_data ${output_folder}${fileID}-NEBI.data
+read_data ${nebI}
 
 mass         1 ${massSi}
 mass         2 ${massO}
@@ -45,7 +45,7 @@ timestep ${dt}
 min_style quickmin
 
 
-dump d1 all custom ${printevery} ${output_folder}o-neb.dump id type q x y z ix iy iz mass element vx vy vz
+dump d1 all custom ${printevery} ${output_folder}${identifier}-neb.dump id type q x y z ix iy iz mass element vx vy vz
 dump_modify d1 element Si O H
 thermo_style custom step pe ke etotal epair
 thermo ${printevery}
@@ -56,13 +56,13 @@ fix r1 all qeq/reax 1 0.0 10.0 1e-6 reaxff
 
 
 
-group gNEB id ${atom_id}
+group gNEB id ${atom_id} ${h_id}
 
 fix n1 gNEB neb ${springconst} parallel ideal perp ${springconst}
 
 
-neb ${etol} ${etol} ${maxneb} ${maxclimb} 100 final ${output_folder}${fileID}-NEBF.data
+neb ${etol} ${etol} ${maxneb} ${maxclimb} 100 final ${nebF}
 
 
-write_dump all atom ${output_folder}o-neb.dump.$i
+write_dump all atom ${output_folder}${identifier}-neb.dump.$i
 run 0
