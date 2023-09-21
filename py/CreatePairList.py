@@ -1,8 +1,10 @@
 #!/usr/bin/env python
+
+from mpi4py import MPI
 import numpy as np
-from scipy import sparse
+#from scipy import sparse
 import matplotlib.pyplot as plt
-from skspatial.objects import Line, Sphere
+#from skspatial.objects import Line, Sphere
 import sys
 
 
@@ -10,10 +12,12 @@ import os
 import shutil
 import pandas as pd
 from pathlib import Path 
-import NEBTools as nt
+
+
 import string 
 
-from mpi4py import MPI
+import NEBTools as nt
+
 me = MPI.COMM_WORLD.Get_rank()
 numproc=MPI.COMM_WORLD.Get_size()
 
@@ -72,33 +76,10 @@ def closer_pair(apos,bpos):
         return True
     else:
         return False
+    
         
 
-def create_pair_list(datapath, dfile, distDir,writefile=False,split=1):
-def closer_pair(apos,bpos):
-    i1=16
-    i2=32
-    az=apos[2]
-    bz=bpos[2]
-    if az < 8:
-        az+=32
-    if bz < 8:
-        bz+=32
-    alow=abs(az-i1)
-    blow=abs(bz-i1)
-    
-    ahigh=abs(i2-az)
-    bhigh=abs(i2-bz)
-    
-    amin = min(alow,ahigh)
-    bmin = min(blow,bhigh)
-    if amin < bmin:#a is closer to the lower interface
-        return True
-    else:
-        return False
-        
-
-def create_pair_list(datapath, dfile, distDir,writefile=False,split=1):
+def create_all_zap_pair_list(datapath, dfile, distDir,writefile=False,split=1):
     
     SiRad=10
     
@@ -115,15 +96,6 @@ def create_pair_list(datapath, dfile, distDir,writefile=False,split=1):
     zmax=28
     filename=dfile.removesuffix('.dat').removesuffix('.data').removesuffix('.dump')
 
-    
-    # with open(datapath+dfile) as lammps_dump_fl_obj:
-    #     apos = ase.io.read(lammps_dump_fl_obj,format="lammps-data",style='charge',units='real',sort_by_id=True)#, format="lammps-data", index=0)
-    filename=dfile.removesuffix('.dat').removesuffix('.data').removesuffix('.dump')
-
-    
-    # with open(datapath+dfile) as lammps_dump_fl_obj:
-    #     apos = ase.io.read(lammps_dump_fl_obj,format="lammps-data",style='charge',units='real',sort_by_id=True)#, format="lammps-data", index=0)
-    
     #create_bond_file(datapath,dfile,bondfile)
     #atoms=read_bonds(datapath+'/scratchfolder/'+bondfile)
     (atoms, simbox) = nt.read_file_data_bonds(datapath,dfile)
@@ -288,13 +260,204 @@ def create_pair_list(datapath, dfile, distDir,writefile=False,split=1):
         
         if not os.path.exists(datapath+distDir):
             os.mkdir(datapath+distDir)
-        
-        numpairs=len(pairs)
+
 
         pairlists=np.array_split(npairs,split)
 
         for i in range(split):
-            curlen=int(pairlists[i].size/2)#double counts cause pairs
+            curlen=len(pairlists[i])
+            
+            
+            presplit=""
+            if split>1:
+                presplit=lowerletters[i]
+                
+            pairname=presplit+filename+"-pairlist.txt"
+            
+            pairfile=datapath+distDir+pairname
+
+            shutil.copyfile(datapath+dfile, datapath+distDir+presplit+dfile)
+            
+            with open(pairfile,"w") as tf:
+                for p in pairlists[i]:
+                    tf.write(f"{p[0]} {p[1]}\n")
+
+            print(f"{curlen} total pairs added to the file {pairname}.")
+    
+    return pairs
+
+def create_pinhole_zap_pair_list(datapath, dfile, distDir,pinholeCenter,writefile=False,split=1):
+    
+    SiRad=10
+    
+    zlowrange=[18,20]
+    zhighrange=[28,30]
+    zlowrange=[18,20]
+    zhighrange=[28,30]
+    
+    SiOBondOrder=nt.SiOBondOrder
+    SiOBondOrder=nt.SiOBondOrder
+
+    zmin=19
+    zmin=19
+    zmax=28
+    maxRad=12
+    filename=dfile.removesuffix('.dat').removesuffix('.data').removesuffix('.dump')
+
+    
+    (atoms, simbox) = nt.read_file_data_bonds(datapath,dfile)
+    numAtoms=len(atoms.index)
+
+
+    print(f'--------Running file: {dfile} with {numAtoms} atoms--------')
+
+    pairs=[]
+    counts=np.zeros(numAtoms+1)
+    counts=np.zeros(numAtoms+1)
+    hClose=[]
+    badO=[]
+
+    Oatoms=atoms[atoms['type']=='O']
+
+    numoh=0
+    #first run through and make a list of all O atoms that are bonded to a H or at too close to the interface
+    for i, row in Oatoms.iterrows():
+        curpos=row['pos']
+        nindices = row['bonds']#[0] take only the indexes of the bonds not bond order
+        hn=[]
+        on=[]
+        sin=[]
+        zpos=curpos[2]
+        
+
+        curpos=row['pos']
+        nindices = row['bonds']#[0] take only the indexes of the bonds not bond order
+        
+        sepVec=nt.pbc_vec_subtract(simbox,pinholeCenter,curpos)
+        
+        
+        #distance from pinhole center
+        dist=nt.pbc_dist(simbox,pinholeCenter,curpos)
+
+        
+        sepVecN=sepVec/np.linalg.norm(sepVec)
+            
+        if dist > maxRad or not (curpos[2]>17 and curpos[2]<30):
+            badO.append(i)
+            continue
+            
+        
+        #find all the H neighbors
+        for ni in nindices:
+            n=ni[0]
+            bo=ni[1]
+            neitype=atoms.at[n,'type']
+            
+            
+            
+            if neitype =='H':
+                hn.append(n)
+            elif neitype =='O':
+                
+                on.append(n)
+            elif neitype =='Si':
+                sin.append(n)
+                
+                
+        if len(sin)==1 and len(hn)==1:
+            # print(f"O atom - {i} is bonded to a Si AND H.")  
+            numoh+=1
+  
+        #if there are any H neighbors
+        if len(hn) > 0:
+            #print(f"atom {i+1} has H too close")
+            hClose.append(i)
+            badO.append(i)
+            continue
+
+    print(numoh)
+        
+    #run through
+    for i, row in Oatoms.iterrows():
+        cpos=row['pos']
+        nbonds = row['bonds']
+        dprint(i,f'Debug - zpos:{cpos[2]}')
+        
+        #if this oxygen is a bad then skip
+        if i in badO:
+            continue
+
+        on=[]
+        sin=[]
+
+        
+        #create the list of Si neighbors to run through
+        for n in nbonds:
+            ni=n[0]
+            bo=n[1]
+            
+            if bo < SiOBondOrder:
+                continue
+            
+            neitype=atoms.at[ni,'type']
+            if neitype =='Si':
+                sin.append(ni)
+        
+        dprint(i,f"debug - {on}")
+        
+        #run through the silicon bonds and fill a list with any oxygen 
+        for si in sin:
+            neibonds = atoms.at[si,'bonds']
+            
+            for neib in neibonds:
+                nei=neib[0]
+                neibo=neib[1]
+                
+                if neibo < SiOBondOrder:
+                    continue
+            
+                #skip if the oxygen is bad or if this is the current oxygen already looking at
+                if nei in badO or nei == i:
+                    continue
+                
+                neitype = atoms.at[nei,'type']
+                if neitype != 'O':
+                    continue
+        
+        
+                dprint(i,f"debug testing {n}")
+                    
+                    
+                neipos= atoms.at[nei,'pos']
+                
+                p1=(i,nei)
+                p2=(nei,i)
+                
+                #good pair if it got this far
+                #add this pair to the pair list              
+                if p1 not in pairs and p2 not in pairs:
+                    dprint(i,f"debug {nei} - success")
+                    counts[i]+=1
+                    counts[nei]+=1
+                    if closer_pair(cpos,neipos):
+                        pairs.append(p1)
+                    else:
+                        pairs.append(p2)
+                    #print(f"Thats a good one {str(p1)}")
+
+    npairs=np.array(pairs)
+
+
+    if writefile and me==0:
+        
+        if not os.path.exists(datapath+distDir):
+            os.mkdir(datapath+distDir)
+
+
+        pairlists=np.array_split(npairs,split)
+
+        for i in range(split):
+            curlen=len(pairlists[i])
             
             
             presplit=""
@@ -475,13 +638,11 @@ def create_oh_pair_list(datapath, dfile, distDir,writefile=False,split=1):
         
         if not os.path.exists(datapath+distDir):
             os.mkdir(datapath+distDir)
-        
-        numpairs=len(pairs)
 
         pairlists=np.array_split(npairs,split)
 
         for i in range(split):
-            curlen=int(pairlists[i].size/2)#double counts cause pairs
+            curlen=len(pairlists[i])
             
             
             presplit=""
@@ -588,10 +749,11 @@ def create_pinhole_pair_list_edge(datapath, dfile, distDir, pinholeCenter, write
             mindist=100
             minpos=None
             minvac=None
+            minsep=None
             for vac in neighvac:
                 p1=atoms.at[vac[0],'pos']
                 p2=atoms.at[vac[1],'pos']
-                
+
                 #get the midpoint of the neighboring vacancy
                 midpt=p1+np.array(nt.pbc_vec_subtract(simbox,p1,p2))/2
             
@@ -604,20 +766,22 @@ def create_pinhole_pair_list_edge(datapath, dfile, distDir, pinholeCenter, write
                     minvac=vac
                     minpos=midpt
                     mindist=vacdist
+                    minsep=sep
             
             
             
-            #pos=nt.find_local_minima_position(datapath+dfile,i,minvac)
+            
             
             #now check if the vacancy is on the 'get out of pinhole' path
             
             
             
-            ang=nt.angle_between_pts(fpos,minpos,curpos,simbox)[0][0]
+            ang=nt.angle_between_pts(simbox,fpos,minpos,curpos)[0][0]
             if ang > 50:
                 #print(f"-----FAILED Atom {i} with ang={ang}, pos: {curpos}------\n------Best vacancy: {minvac} with dist={mindist}-----")
                 continue
             
+            #pos=nt.find_bond_preference(datapath+dfile,i,minpos,minsep)
             pl=[i,minpos]
             print(f"-----Atom {i} with ang={ang}, pos: {curpos} dist to pinhole:{dist}------\n------Best vacancy: {minvac} with dist={mindist}, adding {pl}------")
             pairs.append(pl)
@@ -635,7 +799,7 @@ def create_pinhole_pair_list_edge(datapath, dfile, distDir, pinholeCenter, write
         pairlists=np.array_split(npairs,split)
 
         for i in range(split):
-            curlen=int(pairlists[i].size/2)#double counts cause pairs
+            curlen=len(pairlists[i])
             
             
             presplit=""
@@ -657,6 +821,7 @@ def create_pinhole_pair_list_edge(datapath, dfile, distDir, pinholeCenter, write
     return pairs
 
 def create_pinhole_center_out_pair_list(datapath, dfile, distDir, pinholeCenter, writefile=False,split=1):
+    #create pairlist to move O atoms from the inner pinhole to the outer pinhole with multiple jumps
     
     #togeather with the pinhole center, these define a shell which we can pick Oxygen's from
     minRad=7
@@ -701,13 +866,7 @@ def create_pinhole_center_out_pair_list(datapath, dfile, distDir, pinholeCenter,
         dist=nt.pbc_dist(simbox,pinholeCenter,curpos)
 
         
-        #@TODO  fucking ugly
-        sepVecN=np.zeros(3)
-        
-        for j in range(len(sepVec)):
-            sepVecN[j]=sepVec[j]/dist
-            
-            
+        sepVecN=sepVec/np.linalg.norm(sepVec)
             
         if dist > minRad and dist < maxRad:
             
@@ -758,7 +917,7 @@ def create_pinhole_center_out_pair_list(datapath, dfile, distDir, pinholeCenter,
         pairlists=np.array_split(npairs,split)
 
         for i in range(split):
-            curlen=int(pairlists[i].size/2)#double counts cause pairs
+            curlen=len(pairlists[i])#double counts cause pairs
             
             
             presplit=""
@@ -778,6 +937,94 @@ def create_pinhole_center_out_pair_list(datapath, dfile, distDir, pinholeCenter,
             print(f"{curlen} total pairs added to the file {pairname}.")
     
     return pairs
+
+
+def create_all_O_neighbors_pair_list(datapath, dfile, distDir, pinholeCenter, writefile=False,split=1):
+#create pairlist to move any O atoms within the pinhole to neighboring Si-Si BC
+    
+    maxRad=12#from center of pinhole
+    
+    #how far to move the O atoms
+    SiOBondOrder=nt.SiOBondOrder
+
+
+    filename=dfile.removesuffix('.dat').removesuffix('.data').removesuffix('.dump')
+
+    (atoms, simbox) = nt.read_file_data_bonds(datapath,dfile)
+    numAtoms=len(atoms.index)
+    
+
+    print(f'--------Running file: {datapath+dfile} with {numAtoms} atoms--------')
+
+    pairs=[]
+
+    Oatoms=atoms[atoms['type']=='O']
+    numadded=0
+    #first run through and make a list of all O atoms that are bonded to a H or at too close to the interface
+    for i, row in Oatoms.iterrows():
+        # if numadded > 10:
+        #     break
+        curpos=row['pos']
+        nindices = row['bonds']#[0] take only the indexes of the bonds not bond order
+        
+        sepVec=nt.pbc_vec_subtract(simbox,pinholeCenter,curpos)
+        
+        
+        #distance from pinhole center
+        dist=nt.pbc_dist(simbox,pinholeCenter,curpos)
+
+        
+        sepVecN=sepVec/np.linalg.norm(sepVec)
+            
+        if dist < maxRad and curpos[2]>17 and curpos[2]<30:
+            neisibc=find_neighboring_sibc(atoms,i) #get all neighboring Si BC vacancies
+            for sis in neisibc:
+                a1=sis[0]
+                a2=sis[1]
+                p1=atoms.at[a1,'pos']
+                p2=atoms.at[a2,'pos']
+                midpt=nt.pbc_midpoint(simbox,p1,p2)
+
+                sepv=nt.pbc_vec_subtract(simbox,p1,p2)
+                pos=nt.find_bond_preference(simbox,datapath+dfile,i,midpt,sepv)
+                pairs.append([i,pos,a1,a2])
+                numadded+=1
+
+
+
+    npairs=np.array(pairs,dtype=object)
+
+    if writefile and me==0:
+        
+        if not os.path.exists(datapath+distDir):
+            os.mkdir(datapath+distDir)
+        
+        numpairs=len(pairs)
+        pairlists=np.array_split(npairs,split)
+
+        for i in range(split):
+            curlen=len(pairlists[i])#double counts cause pairs
+            
+            
+            presplit=""
+            if split>1:
+                presplit=lowerletters[i]
+                
+            pairname=presplit+filename+"-pairlist.txt"
+            
+            pairfile=datapath+distDir+pairname
+
+            shutil.copyfile(datapath+dfile, datapath+distDir+presplit+dfile)
+            
+            with open(pairfile,"w") as tf:
+                for p in pairlists[i]:
+                    tf.write(f"{p[0]} {p[1][0]} {p[1][1]} {p[1][2]} {p[2]} {p[3]}\n")
+                    
+                    
+            print(f"{curlen} total pairs added to the file {pairname}.")
+    
+    return pairs
+
 
 def find_nearby_O():
     distdf=nt.apply_dist_from_pos(atoms,simbox,fpos,"O")         
@@ -925,38 +1172,35 @@ def find_neighboring_bc_chains(atoms,curatom):
                         break
             
     return si_bc_vac_chains
-        
-    
+         
 
 if __name__=='__main__':
 
     #current run defines
     debugatom=-1
+    farmpath="/home/agoga/sandbox/topcon/data/neb/"
+    datapath="/home/agoga/documents/code/topcon-md/data/neb/"
+    #datapath=farmpath
     
-    datapath="/home/agoga/documents/code/topcon-md/data/neb/"
-    datapath="/home/agoga/documents/code/topcon-md/data/neb/"
+    distDirectory="PinholeCenterAll/" #'FillFullSet/'
+    
+    fd=datapath  #+distDirectory
 
-    
-    distDirectory='pinholeCenter/'
-    fd=datapath+distDirectory
     if not os.path.exists(fd):
         os.makedirs(fd)
         
-    # f="1.6-381.dat"
-    # create_pair_list(datapath,f,distDirectory,True)
-    # f="1.6-381.dat"
-    # create_pair_list(datapath,f,distDirectory,True)
+
     
     #dlist = ["Hcon-1500-0.data","Hcon-1500-110.data","Hcon-1500-220.data","Hcon-1500-330.data","Hcon-1500-440.data","Hcon-1500-550.data","Hcon-1500-695.data","Hcon-1500-880.data","Hcon-1500-990.data"]
-    #dlist = ["Hcon-1500-0.data","Hcon-1500-110.data","Hcon-1500-220.data","Hcon-1500-330.data","Hcon-1500-440.data","Hcon-1500-550.data","Hcon-1500-695.data","Hcon-1500-880.data","Hcon-1500-990.data"]
-    
+
     i=1
     for d in Path(fd).glob('*.dat'):
-        if not str(d).endswith("Hcon-1500-695.dat"):
+        if not str(d).endswith("boom_1.6-695.dat"):
             continue
         print(f"{str(i)}) {str(d)}")
         dfile=str(d).split('/')[-1]
-        create_pinhole_pair_list_edge(datapath,dfile,distDirectory,[27,27,20],True)
+        #create_pinhole_zap_pair_list(datapath,dfile,distDirectory,[27,27,20],True)
+        create_all_O_neighbors_pair_list(datapath,dfile,distDirectory,[27,27,20],True) #pinhole center [27,27,20],
         i+=1
      
      

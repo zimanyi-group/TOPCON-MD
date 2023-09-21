@@ -21,7 +21,8 @@ start=`date +%s`
 maxneb=3000
 maxclimb=1000
 springconst=1
-plot=1
+plot=true
+create_gif=true
 data_folder=/home/agoga/documents/code/topcon-md/data/neb #/pinhole-dump-files/"
 
 setName=/pinholeCenter
@@ -32,55 +33,93 @@ mkdir -p $nebfolder$setName
 
 # for datafile in "$distFolder"/*.dat
 # do
-    
-#     # datafile=$data_folder"SiOxNEB-NOH.data"
-#     # # datafile="SiOxNEB-NOH.data"
-#     PAIRSFILE=${datafile%.*}"-pairlist.txt"
-#     echo $PAIRSFILE
-#     
-#     
+datafile="/home/agoga/documents/code/topcon-md/data/neb/pinholeCenter/Hcon-1500-695.dat"
+pairsfile=${datafile%.*}"-pairlist.txt"
+ 
 
-#     lastdone="385 1189"
-#     alreadydone=1 #set to 1 to run everything
+#lastdone="385 1189"
+#alreadydone=1 #set to 1 to run everything
 
 
 
-#     mapfile -t pairs < $PAIRSFILE
+# mapfile -t pairs < $pairsfile
 
-# mapfile -t pairs < data/Hpairs-v1.txt
-# atom_id=1642 #2041 #3898 #3339 #H #4090 #1649 #2776 #1659 
-# # atomremove=1638
 # for pair in "${pairs[@]}" # #"5976 5979" #
 # do
-#     if [[ $alreadydone  == 0  && $pair != $lastdone ]] ; then
-#         continue
-#     else
-#         alreadydone=1
-#     fi
+# if [[ $alreadydone  == 0  && $pair != $lastdone ]] ; then
+#     continue
+# else
+#     alreadydone=1
+# fi
+
+pariarray=($pair)
+
+
 datafile=$distFolder"Hcon-1500-695.dat"
 
-atom_id=822 #${pair% *}
-fPosx=38.856
-fPosy=32.47
-fPosz=13.9895
+#${pair% *}
+# fPosx=38.856
+# fPosy=32.47
+# fPosz=13.9895
 atomremove=0
 
 
-
+atom_id=822 
 jumpPairs="480 909,909 414,414 893,893 1321,1320 1321,1320 532"
-style="multijump"
+
+
+atom_id=1319 
+jumpPairs="308 1299,1299 437,437 309,309 461"
 
 
 
+
+
+
+# atom_id=790
+# j1="791 766"
+# j2="766 1197"
+# j3="1197 1196"
+# j0="786 791"
+# jumpPairs="$j1,$j2,$j3,$j2,$j1,$j0"
+
+
+
+atom_id=4657
+jumpPairsBase="1225 3163,3163 4654,4654 3856,3163 4654,1225 3163,3161 1225"
+
+
+#ends at an already 4 coordinated Si
+atom_id=3864
+jumpPairsBase="577 1232,1232 3161,3161 3862,1232 3161,577 1232,577 4286"
+
+
+atom_id=388 #non-converging
+jumpPairsBase="1339 359,359 1342,1342 397,359 1342,1339 359,361 1339"
+# forward only
+# atom_id=1257 
+# jumpPairsBase="172 826,172 820,820 4203,4203 6125,6125 4924,4924 5450,5450 5866,5866 5347"
+
+# atom_id=790
+# j1="791 766"
+# j2="766 1197"
+# j3="1197 1196"
+# j0="786 791"
+# jumpPairs="$j1,$j2,$j3,$j2,$j1,$j0"
+jumpPairs=$jumpPairsBase
+for ((i=1;i<1;i+=1))
+do
+    jumpPairs="$jumpPairs,$jumpPairsBase"
+done
+
+style="multi_jump"
 #atomremove=${pair#* }
 
 
-for etol in 7e-6 #5e-6 #3e-7 1e-7 # 1e-5 #3e-6 1e-6 7e-7 5e-7 3e-7 1e-7  #7e-5 5e-5 3e-5 1e-5 
+for etol in 7e-6 #7e-6  #3e-7 1e-7 # 1e-5 #3e-6 1e-6 7e-7 5e-7 3e-7 1e-7  #7e-5 5e-5 3e-5 1e-5 
 do 
     for timestep in 0.5 #$(seq 1.6 0.1 1.8) 
     do
-    # for atomremove in 3090 #4929 #3715 # 3341 # 3880  #1548 1545 3955 3632 3599
-    # do
         
         ((numruns++))
         name=${filename%.*}
@@ -106,8 +145,9 @@ do
         s=$out_folder$NAME"_SLURM.txt"
 
         neb_info_file=$out_folder"nebinfo.txt"
+        echo_string="to multijump "$atom_id
 
-        echo "----------------Prepping NEB for "$atom_id" ----------------"
+        echo "----------------Prepping NEB "$echo_string" ----------------"
         mpirun -np 4 python3 /home/agoga/documents/code/topcon-md/py/PrepNEB.py \
         --out=$out_folder --etol=$etol --ts=$timestep --dfile=$datafile --plot=$plot --atomid=$atom_id --info=$neb_info_file \
         --style=$style --bclist="$jumpPairs" 
@@ -129,15 +169,20 @@ do
                 log_file=$data_folder$logf
 
                 echo "----------------Running NEB for "$neb_identifier" ----------------"
-                mpirun -np 13 --oversubscribe lmp_mpi -partition 13x1 -nocite -log $log_file -in $out_folder$filename -var maxneb $maxneb -var maxclimb $maxclimb -var atom_id $neb_atom_id -var output_folder $out_folder -var nebI $nebI -var nebF $nebF -var identifier $neb_identifier -var etol $etol -var ts $timestep -var springconst $springconst -pscreen $out_folder/screen -var h_id $h_id 
+                mpirun -np 13 --oversubscribe lmp_mpi -partition 13x1 \
+                    -nocite -log $log_file -in $out_folder$filename -var maxneb $maxneb -var maxclimb $maxclimb \
+                    -var output_folder $out_folder -var ts $timestep -var etol $etol  -var springconst $springconst -pscreen $out_folder/screen \
+                    -var identifier $neb_identifier -var h_id $h_id -var atom_id $neb_atom_id -var nebI $nebI -var nebF $nebF                      
             fi
+
             
         done 3< "$neb_info_file"
 
-        echo "----------------Post NEB for "$atom_id" ----------------"
-        python3 /home/agoga/documents/code/topcon-md/py/Process-NEB.py $out_folder $atom_id $etol $timestep $atomremove $nebfolder $datafile $springconst $plot $neb_info_file
-        
-
+        echo "----------------Post NEB "$echo_string"  ----------------"
+        python3 /home/agoga/documents/code/topcon-md/py/Process-NEB.py \
+        --out=$out_folder --atomid=$atom_id --etol=$etol --ts=$timestep --remove=$atomremove --nebfolder=$nebfolder --dfile=$datafile \
+        --k=$springconst --plot=$plot --info=$neb_info_file --style=$style --gif=$create_gif
+    
     done
 done
 # done

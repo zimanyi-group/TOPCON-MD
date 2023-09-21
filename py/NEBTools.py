@@ -1,24 +1,27 @@
 #!/usr/bin/env python
-from mpl_toolkits.mplot3d import Axes3D
+# from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
+
+from sympy import Point3D, Line3D, Plane
 
 import numpy as np
 import statistics
 from scipy import stats
 from pathlib import Path
 from lammps import lammps
-import dask.dataframe as dd
-from dask.multiprocessing import get
-from operator import itemgetter
-from math import degrees
+
+# import dask.dataframe as dd
+# from dask.multiprocessing import get
+# from operator import itemgetter
+# from math import degrees
 import pandas as pd
 pd.options.mode.chained_assignment = None 
 from ast import literal_eval
 import os
 from mpi4py import MPI
 import time
-import matplotlib.cm as cm
-import matplotlib.colors as colors
+# import matplotlib.cm as cm
+# import matplotlib.colors as colors
 from ase.geometry import get_angles
 import ase.cell
 
@@ -42,6 +45,22 @@ datafolder="/home/agoga/documents/code/topcon-md/data/neb/"
 v=4.74e-20
 w=1.6e-7
 HNumToConcentration=w/v
+
+def pbc_midpoint(simbox,p1,p2):
+    ret=[0,0,0]
+    for i, (a, b) in enumerate(zip(p1, p2)):
+        delta = abs(b - a)
+        dimension=simbox[i,1]-simbox[i,0]
+        
+        if delta > dimension/2:
+            if b>a:
+                b+=dimension
+            else:
+                a+=dimension
+            
+        ret[i]=(b+a)/2
+        
+    return ret
 
 def pbc_vec_subtract(simbox, posi,posf):
     ret=[0,0,0]
@@ -69,10 +88,25 @@ def pbc_dist(simbox, pos1,pos2):
     return total ** 0.5
 
 
+def vec_projection(v1,v2):
+    return np.dot(v1,v2)/np.linalg.norm(v2)
+
+def vec_proj_to_plane(v1,v2):
+    s_proj=vec_projection(v1,v2)
+    return v1-s_proj*v2
+    
+
 def pbc_dist_point_to_vec(simbox, p1,p2,distPoint):
+    
+    if np.array_equal(p1,p2) or np.array_equal(p1,distPoint) or np.array_equal(distPoint,p2) :
+        return None
     vec1=pbc_vec_subtract(simbox,p1,p2)
     vec2=pbc_vec_subtract(simbox,distPoint,p1)
-    dist = norm(np.cross(vec1,vec2))/norm(vec1)
+    try:
+        dist = norm(np.cross(vec1,vec2))/norm(vec1)
+    except:
+        print(f"pbc_dist_point_to_vec failed p1: {p1} p2: {p2} dp: {distPoint}")
+        
     #print(f"pbc_dist_point_to_vec - {distPoint} to {p2}-{p1}={dist}")
     return dist
 
@@ -122,10 +156,17 @@ def stats_from_csv_name(csvname):
     #print(f"ratio: {ratio}, Hnum:{Hnum}")
     return (ratio,Hnum)
 
-def angle_between_pts(p1, p2,pm,box,debug=False):
+def angle_between_vec(box,v1,v2,debug=False):
+    cell=ase.cell.Cell([[box[0,0],box[1,1],box[2,1]],[box[0,1],box[1,0],box[2,1]],[box[0,1],box[1,1],box[2,0]]])
+    ang=get_angles([v1],[v2],cell,True)
+
+    return (ang,[v1,v2])
+
+
+def angle_between_pts(box,p1, p2,pm,debug=False):
     # if v1 is None or v2 is None:
     #     return 2*np.pi
-  
+
   
     cell=ase.cell.Cell([[box[0,0],box[1,1],box[2,1]],[box[0,1],box[1,0],box[2,1]],[box[0,1],box[1,1],box[2,0]]])
 
@@ -163,7 +204,10 @@ def angle_between_pts(p1, p2,pm,box,debug=False):
     v1=p1-imiddle
     v2=p2-fmiddle
     
-    ang=get_angles([v1],[v2],cell,True)
+    
+    
+    
+    ang=angle_between_vec(box,v1,v2)
 
     print(f"--- post fixing ---\np1{p1} p2{p2}\nimiddle{imiddle} fmiddle{fmiddle}\nbox{box}\nang={ang}") if debug else None
     return (ang,[v1,v2])
@@ -184,6 +228,149 @@ def find_atom_position(L,atomID):
 def NEB_min(L,etol):
     L.commands_string(f'''minimize {etol} {etol} 10000 10000''')
 
+def find_bond_preference(box,file,atom,midpoint,sepvec):
+    from sympy.abc import u,v
+    
+    
+    
+    ti=time.time()
+    #Need two lammps instances so that when removing an atom and minimizing we don't increase time for final NEB image minimization
+    L = lammps('mpi',["-log",'none',"-screen",'none'])
+    init_dat(L,file)
+    
+    L.commands_string(f'''
+        variable x{atom} equal x[{atom}]
+        variable y{atom} equal y[{atom}]
+        variable z{atom} equal z[{atom}]
+        ''')
+    
+    x = L.extract_variable(f'x{atom}')
+    y = L.extract_variable(f'y{atom}')
+    z = L.extract_variable(f'z{atom}')
+    orig=np.array([x,y,z])
+    #(df, box) = read_data(file)
+
+    
+    dplane=Plane(Point3D(midpoint),normal_vector=sepvec)
+    parametrizedpt=dplane.arbitrary_point(u,v)
+    zpoint_plane=np.array(parametrizedpt.subs({u:np.cos(0),v:np.sin(0)}).evalf(),dtype=float)-midpoint
+    
+    ang=angle_in_plane(box,midpoint,sepvec,orig,zpoint_plane)
+    
+    rtot=2
+    angtot=8
+    twopi=2*np.pi
+    tstep=0
+    tstart=ang
+    radius=0.04
+    pts=[]
+    rmin=0.3
+    rmax=0.6
+    parametrizedpt=dplane.arbitrary_point(u,v)
+
+    newpt=parametrizedpt.subs({u:radius*np.cos(ang),v:radius*np.sin(ang)}).evalf()
+    mpt=np.array(newpt)
+    
+    #     for offset in [0]: #[-0.01,0,0.01]:
+    #     for radius in np.linspace(rmin,rmax,rtot):
+    #         for theta in np.linspace(tstart,tstart+twopi/2,angtot,endpoint=False):
+    #             newpt=parametrizedpt.subs({u:radius*np.cos(theta),v:radius*np.sin(theta)}).evalf()
+    #             newpt.translate(0,offset,0)
+    #             pts.append([newpt,theta,radius])
+    #         tstart+=tstep
+
+
+
+    # tot=len(pts)
+    # xi, yi, zi = midpoint[0], midpoint[1], midpoint[2]
+    # L.commands_string(f'''
+    #         set atom {atom} x {xi} y {yi} z {zi}
+    #         ''')
+    # s=0
+    # Ef=0
+    # Ei = L.extract_compute('thermo_pe',0,0)*conv
+    # minE=0
+    # minpt=[midpoint,0,0]
+    # for ptt in pts:
+    #     pt=ptt[0]
+    #     xf=pt[0]
+    #     yf=pt[1]
+    #     zf=pt[2]
+        
+    #     L.commands_string(f'''
+    #         set atom {atom} x {xf} y {yf} z {zf}
+    #         run 0
+    #         ''')
+        
+    #     s+=1
+    #     Ef = L.extract_compute('thermo_pe',0,0)*conv
+        
+    #     if me==0:
+    #         print(f"Step {s}/{tot}: {Ef - Ei} ang:{ptt[1]} r:{ptt[2]}")
+            
+    #     if Ef < minE:
+    #         minE=Ef
+    #         minpt=ptt
+
+    # L.commands_string(f'''
+    #         set atom {atom} x {minpt[0][0]} y {minpt[0][1]} z {minpt[0][2]}
+    #         run 0
+    #         ''')
+
+    # x = L.extract_variable(f'x{atom}')
+    # y = L.extract_variable(f'y{atom}')
+    # z = L.extract_variable(f'z{atom}')
+    # mpt=[x,y,z]
+    # initialpos=[xi,yi,zi]
+    # tf=time.time()
+    # if me==0:
+    #     print(f"Atom {atom} from {initialpos} to {mpt}, ang:{minpt[1]}, r:{minpt[2]}\n{Ei}  {minE} in {tf-ti}s")
+        
+    return mpt
+
+def angle_in_plane(box,plane_point,plane_vec,orig_point,plane_zero_vec,ax=None):
+    # from sympy.abc import g,f
+    # dplane=Plane(Point3D(plane_point),normal_vector=plane_vec)
+    plane_point=np.array(plane_point,dtype=float)
+    plane_vec=np.array(plane_vec,dtype=float)
+    orig_point=np.array(orig_point,dtype=float)
+    orig_to_plane=pbc_vec_subtract(box,plane_point,orig_point)
+    # parametrizedpt=dplane.arbitrary_point(g,f)
+    # zpoint_plane=np.array(parametrizedpt.subs({g:np.cos(0),f:np.sin(0)}).evalf(),dtype=float)
+    # plane_zero_vec=zpoint_plane
+
+
+
+    orig_plane_proj=vec_proj_to_plane(orig_to_plane,plane_vec)
+    if all(t==0 for t in orig_plane_proj):
+        print("projection is [0,0,0]")
+        return 0
+
+    opp_vec=orig_plane_proj/np.linalg.norm(orig_plane_proj)
+
+
+    #find the angle between the two vecotrs IN THE PLANE
+    # n=sepvec/np.linalg.norm(sepvec)
+    angdeg=angle_between_vec(box,opp_vec,plane_zero_vec)[0][0]
+    anginplane_orig=np.radians(angdeg)#-np.dot(n,np.cross(opp_vec,plane_zero_vec))
+    #print(f"rad: {anginplane_orig} deg:{angdeg}")
+    dmat=[plane_zero_vec,plane_point+opp_vec,plane_vec]
+    sign=np.linalg.det(dmat)
+    anginplane_orig=anginplane_orig if sign > 0 else -anginplane_orig
+    
+    if ax is not None:
+        opp_pt=plane_point+orig_plane_proj
+        plto=np.array([plane_point,opp_pt]).T
+        ax.plot(plto[0],plto[1],plto[2],color='r')
+        
+        plto=np.array([orig_point,opp_pt]).T
+        ax.plot(plto[0],plto[1],plto[2],color='r')
+
+        # zv=np.array([plane_point,plane_zero_vec]).T
+        # ax.plot(zv[0],zv[1],zv[2],color='blue')
+        
+    return anginplane_orig
+
 def find_local_minima_position(file,atom,initial_guess):
     ti=time.time()
     #Need two lammps instances so that when removing an atom and minimizing we don't increase time for final NEB image minimization
@@ -191,7 +378,7 @@ def find_local_minima_position(file,atom,initial_guess):
     init_dat(L,file)
 
     len=1
-    perDim=3
+    perDim=10
     step=len/perDim
     elist=np.zeros([perDim,perDim,perDim])
 
@@ -199,10 +386,6 @@ def find_local_minima_position(file,atom,initial_guess):
     
     tot = perDim**3
     s=1
-    
-    minx=0
-    miny=0
-    minz=0
     
     
     xi, yi, zi = initial_guess[0], initial_guess[1], initial_guess[2]
@@ -328,8 +511,8 @@ def create_bond_file(datapath, file,bondfile):
 
         min_style quickmin
         
-        pair_style	    reaxff /home/agoga/documents/code/topcon-md/potential/topcon.control
-        pair_coeff	    * * /home/agoga/documents/code/topcon-md/potential/ffield_Nayir_SiO_2019.reax Si O H
+        pair_style	    reaxff potential/topcon.control
+        pair_coeff	    * * potential/ffield_Nayir_SiO_2019.reax Si O H
 
         neighbor        2 bin
         neigh_modify    every 10 delay 0 check no
@@ -493,90 +676,104 @@ def init_dat(L,file):
         run 0
         ''')
 
-def read_file_data_bonds(datapath,dfile):
+
+#@TODO rename plot bond investigation
+def temp(path,dfile):
+    (atoms,box) = read_file_data_bonds(path,dfile)
     
+    pinholeCenter=[27,27,20]
+    
+    siatoms=atoms[atoms['type']=='Si']
+
+    osiobonds=[]
+
+    for index,row in siatoms.iterrows():
+        bonds=row['bonds']
+        curpos=row['pos']
+        numbonds=len(bonds)
+        
+        pinholeCenterCurZ=pinholeCenter
+        pinholeCenterCurZ[2]=curpos[2]
+        
+        dist=pbc_dist(box,pinholeCenterCurZ,curpos)
+        if dist > 13:
+            continue
+        
+        
+        for ne in bonds:
+            ni=ne[0]
+            neitype=atoms.at[ni,'type']
+            
+            if neitype=='O' and ne[1]>SiOBondOrder:
+                
+                sibonds=atoms.at[ni,'bonds']
+                        
+                for nnn in sibonds:
+                    nnni=nnn[0]
+                    nnntype=atoms.at[nnni,'type']
+                    if nnntype=='Si'and nnni!=index and nnn[1]>SiOBondOrder:
+                        osiobonds.append([index,nnni,ni,numbonds])
+                        
+            
+    distlist=[]
+    anglist=[]
+    bondslist=[]
+    difflist=[]
+    ablist=[]
+    for ob in osiobonds:
+        si1=ob[0]
+        si2=ob[1]
+        oatom=ob[2]
+        
+        spos1=atoms.at[si1,'pos']    
+        spos2=atoms.at[si2,'pos']   
+        opos=atoms.at[oatom,'pos']
+        
+        d1=abs(np.linalg.norm(pbc_vec_subtract(box,opos,spos1)))
+        d2=abs(np.linalg.norm(pbc_vec_subtract(box,opos,spos2)))
+        
+        dis= pbc_dist_point_to_vec(box,spos1,spos2,opos)
+        ang=angle_between_pts(box,spos1,spos2,opos)[0][0]
+        if dis is not None:
+            distlist.append(dis)
+            anglist.append(ang)
+            bondslist.append(ob[3])
+            difflist.append(abs(d1-d2))
+        
+    # print(distlist)
+    # print(anglist)
+    # plt.scatter(bondslist,distlist)
+    # plt.show()
+    
+    for nb in range(1):
+        angblist=[]
+        for i in range(len(bondslist)):
+            #if bondslist[i]==nb:
+            angblist.append(distlist[i])
+
+        if len(angblist)==0:
+            continue
+        
+        plt.hist(angblist,bins=10)
+        plt.title(f"Distance from Oxygen atom to its bonded Si's seperation vector")
+        plt.xlabel("Distance(Angstroms)")
+        plt.ylabel("Counts")
+        plt.show()
+        # avg=np.mean(difflist)
+    # print(avg)
+
+def read_file_data_bonds(datapath,dfile):
+
     (dfdata,simbox)=read_data(datapath+dfile)
     filename=dfile.removesuffix('.dat').removesuffix('.data').removesuffix('.dump')
     bondfile=filename+".bonds"
+    os.makedirs(datapath+'/scratchfolder/', exist_ok=True)
     create_bond_file(datapath,dfile,bondfile)
+
     df=read_bonds(dfdata,datapath+'/scratchfolder/'+bondfile)
 
     return (df,simbox)
 
-
-
-from scipy.sparse import csr_matrix
-import networkx as nx
-
-def sparse_graph(df):     
-    csvlist=df["csvname"].unique()
-
-    for csvfile in csvlist:
-
-        print(csvfile)
-
-
-        dfc=df[df["csvname"]==csvfile]
-
-        (bonddf,box)=load_data_and_bonds_from_csv(csvfile)
-        
-        numatoms=len(bonddf)
-        
-        sg=nx.Graph()
-
-        for i in range(1,numatoms+1):
-            bonds=bonddf.at[i,"bonds"]
-            bl=[]
-            sg.add_node(i)
-            for b in bonds:
-                if b[0] != i:
-                    sg.add_edge(i,b[0])
-        
-        
-        sg.add_edge(1,2)
-        sg.add_edge(2,3)
-        sg.add_edge(1,3)
-        # for s in sg.edges:
-        #     print(s)
-        
-        #print(list(nx.edge_dfs(sg,5)))
-        
-        tstart=time.time()
-        # for s in sg.nodes:
-        ti=time.time()
-        cycle=nx.find_cycle(sg,10,orientation='reverse')
-        # for start_node in sg.nbunch_iter(s):
-        #     print(start_node)
-        l=list(cycle)
-        tf=time.time()
-        print(f"){l} took {tf-ti}s")
-            
-            
-
-
-        return
-            
-def get_path(Pr, i, j):
-    path = [j]
-    k = j
-    while Pr[i, k] != -9999:
-        path.append(Pr[i, k])
-        k = Pr[i, k]
-    return path[::-1]
-
-
-def find_rings(g,ring_size):
-
-    D,Pr =csg.shortest_path(g,directed=False, return_predecessors=True)
-    
-    
-    for r in range(1,4):
-        inds=list(zip(*np.where(D==r)))
-
-        for i in inds:
-            print(get_path(Pr,i[0],i[1]))
-        
-        
 
 def df_combine_H(df,spread=5):
     df=df.sort_values(["ratio","Hnum"])
@@ -624,6 +821,7 @@ def mean_str(col):
 def clean_csvs(csvlist,finalpath):
     dflist=[]
     numcsv=len(csvlist)
+    print(numcsv)
     for csvpath in csvlist:
         df = pd.read_csv(csvpath)
         csvn=csvpath.split('/')[-1]
@@ -631,8 +829,10 @@ def clean_csvs(csvlist,finalpath):
         df=df.assign(csvname=csvn)
         dflist.append(df)
 
-
-    combodf=pd.concat(dflist,ignore_index=True)
+    if len(dflist)>1:
+        combodf=pd.concat(dflist,ignore_index=True)
+    else:
+        combodf=dflist[0]
 
 
     #average over repeated runs, so any repeated pairs in a specific csv
@@ -707,6 +907,8 @@ def csv_to_df(csvpath,includebad=False):
     df=df.sort_values(by=['ratio'])
     return df
 
+
+
 def csvs_to_df(csvlist):
     dflist=[]
     for csvpath in csvlist:
@@ -758,10 +960,7 @@ def find_suitable_neighbors(df,curatom,zappdatom,natom="Si",nnatom="O"):
 def find_nnneighbor(df,curatom,zappdatom,natom="Si",nnatom="O"):
     curbonds=df.at[curatom,'bonds']
 
-    on=[]
-    sin=[]
-    checkatom=None
-    
+
     for n in curbonds:
         ni=n[0]
         bo=n[1]
@@ -811,7 +1010,7 @@ def angle_between_pts_df(df,valcol,posdf=None,box=None):
             # if pair=="4704-5380":
             #     debug = True
                 
-            (ang, ret) = angle_between_pts(ipos,fpos,middle,box,debug)
+            (ang, ret) = angle_between_pts(box,ipos,fpos,middle,debug)
             
             # if ang <20:
             #     print(f"fudge and crackers {pair}")
@@ -823,8 +1022,405 @@ def angle_between_pts_df(df,valcol,posdf=None,box=None):
     return df
 
 
+def find_final_si_pair(bonddf,simbox,mover,f_loc=None):
+    si_atoms=[]
     
-#Plotters
+    # if zapped is not None: 
+    #     #this is a zap style run
+    #     zappedbonds=bonddf.at[zapped,'bonds']
+
+    #     for n in zappedbonds:
+    #         ni=n[0]
+    #         bo=n[1]
+
+    #         neitype=bonddf.at[ni,'type']
+    #         if neitype =="Si":
+    #             si_atoms.append(ni)
+                
+    # elif f_loc is not None:
+    radius=1.75#ang
+    #this is a move to location style
+    distdf=apply_dist_from_pos(bonddf,simbox,f_loc,"Si")
+    distdf=distdf[distdf['dist']<radius]
+
+    for i,r in distdf.iterrows():
+        si_atoms.append(i)
+        
+    if len(si_atoms) != 2:
+        print(f'Found {len(si_atoms)} Si neighbors for location {f_loc}')
+        return []
+        
+    final_pair=None#[si_atoms[0],si_atoms[1]]
+    
+    moverbonds=bonddf.at[mover,'bonds']
+    
+    #now find the Si that is attached to the mover and put it first in the pair list
+
+    for n in moverbonds:
+        ni=n[0]
+        bo=n[1]
+
+        neitype=bonddf.at[ni,'type']
+        if neitype =="Si":
+            if ni == si_atoms[0]:
+                final_pair=[si_atoms[0],si_atoms[1]]
+                #print(f"For {mover} pair set as {final_pair}")
+                pt=1
+            if ni == si_atoms[1]:
+                final_pair=[si_atoms[1],si_atoms[0]]
+                #print(f"For {mover} pair set as {final_pair}")
+                pt=1
+   
+    if final_pair is None:
+        print('Issues in find_final_si_pair')
+    #final_pair=np.array(final_pair,dtype=int)  
+    return final_pair
+                
+    
+def feb_final_sort(entry1,entry2):
+    if entry1[2]>entry2[2]:
+        return 1
+    elif entry1[2]<entry2[2]:
+        return -1
+    else:
+        return 0
+
+def SiOH_final_Sort(entry1,entry2):
+    item1=entry1[3]
+    item2=entry2[3]
+    
+    #check number of Si first
+    if item1[0] > item2[0]:
+        return 1
+    elif item1[0] < item2[0]:
+        return -1
+    else:
+    #then check number of O
+        if item1[1] > item2[1]:
+            return 1
+        elif item1[1] < item2[1]:
+            return -1
+        else:
+    #then check number of H
+            if item1[2] > item2[2]:
+                return 1
+            elif item1[2] < item2[2]:
+                return -1
+            else:
+                return 0
+
+def calc_local_structure(basedf,pair_path):
+    df=basedf.copy()    
+    csvlist=df["csvname"].unique()
+
+    for csvfile in csvlist:
+
+        print("calc_local_structure on "+ str(csvfile))
+        
+        dfc=df[df["csvname"]==csvfile]
+        #print(dfc.to_string())
+        (ratio,Hnum)=stats_from_csv_name(csvfile)
+        
+        (posdf,box)=load_data_and_bonds_from_csv(csvfile)
+        
+        si_o_bondorder=0.9
+        si_si_bondorder=3
+        si_h_bondorder=1.7
+        
+        final_configs=[]
+        for index, row in dfc.iterrows():
+            f_loc=row['fPos']
+            mover=int(row['id'].split('-')[0])
+            zapped=int(row['id'].split('-')[1])
+            cell_origin=row['iPos']
+            initial_pair=[]
+            final_pair=[]
+            
+            
+            
+            blist_i=posdf.at[mover,'bonds']
+            for b in blist_i:
+                bi=b[0]
+                btype=posdf.at[bi,'type']
+                if btype=="Si":
+                    initial_pair.append(bi)
+            
+            blist_f=posdf.at[zapped,'bonds']
+            for b in blist_f:
+                bi=b[0]
+                btype=posdf.at[bi,'type']
+                if btype=="Si":
+                    final_pair.append(bi)
+                        
+            mid_si=find_movers_neighbor(posdf,mover,zapped)
+            
+            initial_si=None
+            for ip in initial_pair:
+                if mid_si != ip:
+                    initial_si=ip
+                elif mid_si==ip:
+                    fine=0
+                else:
+                    print('BAD calc_local_structure')
+            final_si=None
+            for fp in final_pair:
+                if mid_si != fp:
+                    final_si=fp
+                elif mid_si==fp:
+                    fine=0
+                else:
+                    print('BAD calc_local_structure')    
+                
+            #final_pair=find_final_si_pair(posdf,box,mover,f_loc=f_loc)
+            si_neis=[initial_si,mid_si,final_si]
+            # print(si_neis)
+            all_atoms=[]
+            
+            bad_o=[mover,zapped]
+            bad_si=si_neis
+            bad_h=[]
+            all_atoms=bad_si + bad_o
+            all_neis=[]
+            for si in si_neis:
+                si_count=0
+                o_count=0
+                h_count=0
+                blist_i=posdf.at[si,'bonds']
+                cur_atoms=[]
+                #print(blist_i)
+                for b in blist_i:
+                    bi=b[0]
+                    cur_atoms.append(bi)
+                    btype=posdf.at[bi,'type']
+                    if btype=="Si" and bi not in all_atoms:# and b[1]<si_si_bondorder:
+                        si_count+=1
+                        all_atoms.append(bi)
+                    elif btype=="O" and bi not in all_atoms:# and b[1]<si_o_bondorder:
+                        o_count+=1
+                        all_atoms.append(bi)
+                    elif btype=="H" and bi not in all_atoms:#and b[1]<si_h_bondorder:
+                        h_count+=1
+                        all_atoms.append(bi)
+                
+                all_neis.append([si_count,o_count,h_count])
+                    
+                    
+
+                
+            all_atoms += bad_o + bad_si + bad_h
+            feb=round(row['FEB'],3)
+            reb=round(row['REB'],3)
+        #Geometry:{final_bonds[0]}, {final_bonds[1]} 
+    
+            tmp=[mover,zapped,feb,reb,all_neis[0],all_neis[1],all_neis[2]]
+            cur_fc=tmp #np.array(tmp,dtype=object)
+            
+
+            current_folder=image_folder+csvfile.removesuffix(".csv")+'/'
+            if not os.path.exists(current_folder):
+                os.mkdir(current_folder)
+            image_name=current_folder+f"{cur_fc[0]}-{cur_fc[1]}.gif"
+            mv=f"{mover}-{zapped}:"
+            
+            txt_overlay=f"i:    {all_neis[0][0]}Si-{all_neis[0][1]}O-{all_neis[0][2]}H\nm:  {all_neis[1][0]}Si-{all_neis[1][1]}O-{all_neis[1][2]}H\nf:    {all_neis[2][0]}Si-{all_neis[2][1]}O-{all_neis[2][2]}H\nFEB={feb} REB={reb}"
+            
+            plot_small_chunk(csvfile,image_name,all_atoms,[mover,zapped],cell_origin,txt_overlay,pair_path)
+            
+            
+            final_configs.append(cur_fc)
+            #print()
+        from functools import cmp_to_key
+        
+            
+        final_configs.sort(key=cmp_to_key(feb_final_sort))
+        print("FEB > REB")
+        for fc in final_configs:
+            if fc[0] > fc[1]:
+                print(f"i={fc[4][0]}Si-{fc[4][1]}O-{fc[4][2]}H   m={fc[5][0]}Si-{fc[5][1]}O-{fc[5][2]}H   f={fc[6][0]}Si-{fc[6][1]}O-{fc[6][2]}H     FEB={fc[2]} REB={fc[3]}      {fc[0]}-{fc[1]} ")
+        
+        print("FEB < REB")
+        for fc in final_configs:
+            if fc[0] < fc[1]:
+                print(f"i={fc[4][0]}Si-{fc[4][1]}O-{fc[4][2]}H   m={fc[5][0]}Si-{fc[5][1]}O-{fc[5][2]}H   f={fc[6][0]}Si-{fc[6][1]}O-{fc[6][2]}H     FEB={fc[2]} REB={fc[3]}      {fc[0]}-{fc[1]} ")
+
+
+from ovito.pipeline import ModifierInterface
+from ovito.data import DataCollection
+from ovito.modifiers import AffineTransformationModifier
+from ovito.pipeline import ModifierInterface
+from traits.api import Range, observe
+import numpy as np
+class TurntableAnimation(ModifierInterface):
+    
+    # Parameter controlling the animation length (value can be changed by the user):
+    duration = Range(low=1, value=12)
+
+    def compute_trajectory_length(self, **kwargs):
+        return self.duration
+
+    def modify(self, data: DataCollection, *, frame: int, **kwargs):
+        
+        a = data.cell[:,0]
+        b = data.cell[:,1]
+        c = data.cell[:,2]
+        o = data.cell[:,3]
+        #print(f"{a} {b} {c}")
+        # Apply a rotational transformation to the whole dataset with a time-dependent angle of rotation:
+        theta = np.deg2rad(frame * 360 / self.duration)
+        x=o[0]+a[0]/2
+        y=o[1]+b[1]/2
+        z=o[2]+c[2]/2
+        cost=np.cos(theta)
+        sint=np.sin(theta)
+        tm = [[cost, -sint, 0, -x*cost+y*sint+x],
+                [sint,  cost, 0, -x*sint-y*cost+y],
+                [ 0, 0, 1, z]]
+        data.apply(AffineTransformationModifier(transformation=tm))
+
+    # This is needed to notify the pipeline system whenever the animation length is changed by the user:
+    @observe("duration")
+    def anim_duration_changed(self, event):
+        self.notify_trajectory_length_changed()
+        
+        
+class ShrinkWrap(ModifierInterface):
+    
+    def modify(self, data: DataCollection, *, frame: int, **kwargs):  
+            # There's nothing we can do if there are no input particles.
+            if not data.particles or data.particles.count == 0:
+                return
+
+            # Compute min/max range of particle coordinates.
+            coords_min = np.amin(data.particles.positions, axis=0)
+            coords_max = np.amax(data.particles.positions, axis=0)
+            
+
+            # Build the new 3x4 cell matrix:
+            #   (x_max-x_min  0            0            x_min)
+            #   (0            y_max-y_min  0            y_min)
+            #   (0            0            z_max-z_min  z_min)
+            matrix = np.empty((3,4))
+            matrix[:,:3] = np.diag(coords_max - coords_min)
+            matrix[:, 3] = coords_min
+
+            # Assign the cell matrix - or create whole new SimulationCell object in
+            # the DataCollection if there isn't one already.
+            data.create_cell(matrix, (False, False, False))
+    
+    
+    
+# #Plotters
+def plot_small_chunk(csv_file,imagename,all_atoms,select_atoms,cell_origin,text_overlay,pair_path):
+    from ovito.io import import_file, export_file
+    import ovito.data
+    import ovito.modifiers
+    from ovito import scene
+    from ovito.vis import TextLabelOverlay, Viewport, PythonViewportOverlay, CoordinateTripodOverlay
+    from ovito.qt_compat import QtCore 
+    from ovito.vis import TachyonRenderer
+    from ovito.qt_compat import QtGui
+    from PySide6.QtGui import QFont, QFontDatabase, QFontInfo
+
+
+    
+    #clear the scene in case it isnt already
+    for pipe in scene.pipelines:
+        pipe.remove_from_scene()
+        
+    dfile=pair_path+csv_file.removesuffix(".csv")+".dat"
+
+    if not os.path.exists(dfile):
+        print(f'plot_small_chunk fail because {dfile} does not exist')
+                
+    pipeline=import_file(dfile)
+    
+    expr=""
+    for atom in all_atoms:
+        expr+=f"ParticleIdentifier=={atom}||"
+    expr=expr.removesuffix("||")
+
+    pipeline.modifiers.append(ovito.modifiers.ExpressionSelectionModifier(expression = expr))
+    pipeline.modifiers.append(ovito.modifiers.InvertSelectionModifier())
+    pipeline.modifiers.append(ovito.modifiers.DeleteSelectedModifier())
+    pipeline.modifiers.append(ovito.modifiers.ClearSelectionModifier())
+    
+    expr=""
+    for atom in select_atoms:
+        expr+=f"ParticleIdentifier=={atom}||"
+    expr=expr.removesuffix("||")
+    pipeline.modifiers.append(ovito.modifiers.ExpressionSelectionModifier(expression = expr))
+    pipeline.modifiers.append(ovito.modifiers.AssignColorModifier(color=(0, 1, 0)))
+    # #pipeline.modifiers.append(ovito.modifiers.AffineTransformationModifier(operate_on = {'cell'}, # Transform particles but not the box.
+    #                                                                         transformation = [[1, 0, 0, cell_origin[0]],
+    #                                                                                             [0, 1, 0, cell_origin[1]],
+    #                                                                                             [0, 0, 1, cell_origin[2]]]))
+    pipeline.modifiers.append(ShrinkWrap())
+    pipeline.modifiers.append(TurntableAnimation())
+    
+    
+
+    
+    
+
+    # Create the overlay:
+    print(text_overlay)
+    
+
+    pipeline.add_to_scene()
+    data=pipeline.compute()
+
+    data.cell.vis.enabled = False  
+
+    vp = Viewport(type=Viewport.Type.Front)
+    
+    
+    # overlay = TextLabelOverlay(text=text_overlay,font_size=0.05,text_color=(1,0,0), alignment=QtCore.Qt.AlignTop ^ QtCore.Qt.AlignLeft)
+    # vp.overlays.append(overlay)
+
+    imagesize=(600,600)
+    vp.zoom_all(size=imagesize)
+
+
+    #image=vp.render_image(filename=imagename,size=imagesize,renderer=TachyonRenderer(ambient_occlusion=False, shadows=False))
+    image=vp.render_anim(filename=imagename,fps=1,size=imagesize,renderer=TachyonRenderer(ambient_occlusion=False, shadows=False))
+    pipeline.remove_from_scene()
+    
+    
+    from PIL import Image, ImageFont, ImageDraw, ImageSequence
+    import io
+    im=Image.open(imagename)
+
+
+    fnt=ImageFont.truetype("Arial", 32)
+    color=(0,0,0,255)
+    frames=[]
+    duration=[]
+    for i in range(im.n_frames):
+        im.seek(i)
+        frame = im.convert('RGBA').copy()
+        duration.append(im.info['duration'])
+        # Draw the text on the frame
+        d = ImageDraw.Draw(frame)
+        d.text((0,0),text_overlay,font=fnt,fill=color)
+        del d
+
+        # However, 'frame' is still the animated image with many frames
+        # It has simply been seeked to a later frame
+        # For our list of frames, we only want the current frame
+
+        # Saving the image without 'save_all' will turn it into a single frame image, and we can then re-open it
+        # To be efficient, we will save it to a stream, rather than to file
+        b = io.BytesIO()
+        frame.save(b, format="GIF")
+        frame = Image.open(b)
+
+        # Then append the single frame image to a list of frames
+        frames.append(frame)
+    # Save the frames as a new image
+    frames[0].save(imagename, save_all=True, append_images=frames[1:])
+
+    
+    
 
 def plot_any_split_hist(basedf,col,var,colranges,numbins,vartitle,xlabel,units,subfolder,plotfilename):
     df=basedf.copy()
@@ -1045,92 +1641,128 @@ def plot_pair_angle(basedf,col="FEB"):
     plt.show()
     return df
     
-def plot_multi_distribution(setdf,col="FEB",units="eV",plot=False):
-    df=dist_from_df(setdf,col,units,plot)
+def plot_multi_distribution(setdf,cols=["FEB","REB"],units="eV",plot=False):
+    df=setdf.copy()
+    colstxt=""
+    
+    numcol=len(cols)
+    fig, axes=plt.subplots(2,numcol,sharex=True,height_ratios=[15,1])
     
     
-    #1%, 3%, 5%, 6%, 7%, 9%, 11%, 13%
+    if numcol>1:
+        for i in range(numcol):
+            if i!=0:
+                a1=axes[0,0]
+                a1.get_shared_y_axes().join(a1, axes[0,i])
+            
+            colstxt+=cols[i]
+            if i == numcol-2:
+                colstxt+=" and "
+            elif i == numcol-1:
+                colstxt+=""
+            else:
+                colstxt+=", "
+    else:
+        colstxt=cols[0]
 
-    fig, (ax1,ax2)=plt.subplots(2,1,sharex=True,height_ratios=[15,1])
-
+            
     fig.subplots_adjust(hspace=0.1) 
-    t=0
-
-    ratios=df["ratio"].unique()
-    
-    for r in ratios:
-
-
-        dfr=df[df["ratio"]==r]
-
-        dfr=dfr.sort_values(by=['Hnum'])
-
-        xvals=[]#np.array([0,1,3,5,6,7,9,11,13])
-
-        min=10
-        max=0
         
-        xvals=dfr['Hnum'].to_numpy(dtype=float)
-        yvals=dfr['mean'].to_numpy(dtype=float)
-        xvals=xvals*HNumToConcentration
-        ax1.set_xscale('log')
-        ax2.set_xscale('log')
-        #Setting tick and label text to smaller font
-        axisfontsize=10
-        fig.suptitle(f'Mean forward barrier for Oxygen migration in SiOx',fontsize=axisfontsize+1)
+    #fig, axes=plt.subplots(2,numcol,height_ratios=[15,1])
+    for i in range(numcol):  
+        col=cols[i]
+        tdf=dist_from_df(df,col,units,plot)
 
- 
-        ax2.tick_params(axis='both', which='major', labelsize=axisfontsize)
-        ax2.tick_params(axis='both', which='minor', labelsize=axisfontsize)
-        ax1.tick_params(axis='both', which='major', labelsize=axisfontsize)
-        ax1.tick_params(axis='both', which='minor', labelsize=axisfontsize)
+        if numcol>1:
+            ax1=axes[0,i]
+            ax2=axes[1,i]
+        else:
+            ax1=axes[0]
+            ax2=axes[1]
+        #1%, 3%, 5%, 6%, 7%, 9%, 11%, 13%
         
         
+        t=0
 
-        fig.supxlabel('Areal Hydrogen Density(H/cm$^2$)',fontsize=axisfontsize)
-        fig.supylabel(f'{col} - mean ({units})',fontsize=axisfontsize)
 
-        ax2.set_yticks((0,10))
-        ax2.set_ylim(0,0.5)
-        # ax1.set_ylim(min-.1,max+.1)
-    
-
-        ax1.spines.bottom.set_visible(False)
-        ax2.spines.top.set_visible(False)
-        ax1.xaxis.tick_top()
+        ratios=tdf[f"{col}ratio"].unique()
         
+        for r in ratios:
 
 
+            dfr=tdf[tdf[f"{col}ratio"]==r]
 
-        ax1.tick_params(labeltop=False)  # don't put tick labels at the top
-        ax2.xaxis.tick_bottom()
+            dfr=dfr.sort_values(by=[f"{col}Hnum"])
 
+            xvals=[]#np.array([0,1,3,5,6,7,9,11,13])
 
-        d = .5  # proportion of vertical to horizontal extent of the slanted line
-        kwargs = dict(marker=[(-1, -d), (1, d)], markersize=12,
-                    linestyle="none", color='k', mec='k', mew=1, clip_on=False)
-        ax1.plot([0, 1], [0, 0], transform=ax1.transAxes, **kwargs)
-        ax2.plot([0, 1], [1, 1], transform=ax2.transAxes, **kwargs)
+            min=10
+            max=0
+            
+            xvals=dfr[f"{col}Hnum"].to_numpy(dtype=float)
+            yvals=dfr[f"{col}mean"].to_numpy(dtype=float)
+            xvals=xvals*HNumToConcentration
+            ax1.set_xscale('log')
+            ax2.set_xscale('log')
+            #Setting tick and label text to smaller font
+            axisfontsize=10
+            
 
-        #make sure that 0 shows up fine on the log plot
-        if xvals[0]==0:
-            low=xvals[1]
-            low=low/2
-            xvals[0]=low
-            ax1.set_xlim(low,xvals[-1]*1.1)
-
-
-        erb=ax1.scatter(xvals, yvals, label=str(r))#,yerr=yer[1])
-        ax1.legend(title="Value of x")
-        t+=1
     
-    
-    
-    # avgSiO2=109.4
-    # ax1.axhline(avgSiO2,linestyle="dashed")
-    # ax1.text(0.3,.08,f'Average O-Si-O bond angle in a-SiO2:{avgSiO2}{units}', size=9,transform=ax1.transAxes)
-    
-    
+            ax2.tick_params(axis='both', which='major', labelsize=axisfontsize)
+            ax2.tick_params(axis='both', which='minor', labelsize=axisfontsize)
+            ax1.tick_params(axis='both', which='major', labelsize=axisfontsize)
+            ax1.tick_params(axis='both', which='minor', labelsize=axisfontsize)
+            
+            
+
+            fig.supxlabel('Areal Hydrogen Density(H/cm$^2$)',fontsize=axisfontsize)
+            ax1.set_title(f"{col}",fontsize=axisfontsize)
+            ax1.set_ylabel(f'{col} - mean ({units})',fontsize=axisfontsize)
+
+            ax2.set_yticks((0,10))
+            ax2.set_ylim(0,0.5)
+            # ax1.set_ylim(min-.1,max+.1)
+
+            if i!=0:
+                ax1.tick_params(labelleft=False)
+
+            ax1.spines.bottom.set_visible(False)
+            ax2.spines.top.set_visible(False)
+            ax1.xaxis.tick_top()
+            
+
+
+
+            ax1.tick_params(labeltop=False)  # don't put tick labels at the top
+            ax2.xaxis.tick_bottom()
+
+
+            d = .5  # proportion of vertical to horizontal extent of the slanted line
+            kwargs = dict(marker=[(-1, -d), (1, d)], markersize=12,
+                        linestyle="none", color='k', mec='k', mew=1, clip_on=False)
+            ax1.plot([0, 1], [0, 0], transform=ax1.transAxes, **kwargs)
+            ax2.plot([0, 1], [1, 1], transform=ax2.transAxes, **kwargs)
+
+            #make sure that 0 shows up fine on the log plot
+            if xvals[0]==0:
+                low=xvals[1]
+                low=low/2
+                xvals[0]=low
+                ax1.set_xlim(low,xvals[-1]*1.1)
+
+
+            erb=ax1.scatter(xvals, yvals, label=str(r))#,yerr=yer[1])
+            ax1.legend(title="Value of x")
+            t+=1
+        
+        
+        
+        # avgSiO2=109.4
+        # ax1.axhline(avgSiO2,linestyle="dashed")
+        # ax1.text(0.3,.08,f'Average O-Si-O bond angle in a-SiO2:{avgSiO2}{units}', size=9,transform=ax1.transAxes)
+    fig.suptitle(f'Mean {colstxt} for Oxygen migration in SiOx',fontsize=axisfontsize+1)
+        
     name=f"{col}vH"
     dirname=image_folder+"/individual-dist/"
     os.makedirs(dirname, exist_ok=True)
@@ -1451,13 +2083,13 @@ def create_bond_angles(atoms,box,type1='O',typeM='Si',type2='O'):
         pos1=atoms.at[i1,'pos']
         posm=atoms.at[im,'pos']
         pos2=atoms.at[i2,'pos']
-        (ang,[v1,v2]) = angle_between_pts(pos1,pos2,posm,box)
+        (ang,[v1,v2]) = angle_between_pts(box,pos1,pos2,posm)
         retlist.append((posm,ang[0]))
 
     return retlist
         
 
-def plot_all_bondang_vs_h(basedf,dist,maxang=180,all=False,bulk=False):
+def plot_all_bondang_vs_atom(basedf,dist,atype="H",maxang=180,all=False,bulk=False):
     #not just doing bond angle on our pairs but every atom in a sim
     df=basedf.copy()
     csvlist=df["csvname"].unique()
@@ -1501,11 +2133,11 @@ def plot_all_bondang_vs_h(basedf,dist,maxang=180,all=False,bulk=False):
             #print("plot_bondang_vdz on "+ str(csvfile)
             
             #fulldf=apply_dist_from_pos(dfc,box,pos,col='iPos')
-            hdist=apply_dist_from_pos(posdf,box,pos,"H")
+            hdist=apply_dist_from_pos(posdf,box,pos,atype)
             
             numH=0
             for ind, row in hdist.iterrows():
-                if row['type']=="H" and row['dist']<dist:
+                if row['type']==atype and row['dist']<dist:
                     numH+=1
             
             
@@ -1519,61 +2151,61 @@ def plot_all_bondang_vs_h(basedf,dist,maxang=180,all=False,bulk=False):
             # plt.title(f"{len(fulldf)} Pair angles around {str(pos)}, avg:{round(meanpa,2)} - {numH}H nearby")
             # plt.show()
             
+    if maxang != 180:
+        fig, ax = plt.subplots()
+        pl=np.array([hnum,anglist]).T
+        # ax.scatter(hnum,angnum,s=6,facecolors='none',edgecolors='b')
+        title=f"# of {atype} in range vs. % of pairs with angle < {maxang}° "
+        
+        if not all:
+            title+="in bulk " if bulk else  "near interface "
+        #title+=f"for x={ratio} w/ {Hnum}H"
+        ax.set_title(title)
+        ax.set_xlabel(f"Number of {atype} within {dist}Å.")
+        ax.set_ylabel(f"% of pair angles in range < 110°")
+        mplth=[]
+        mpltCount=[]
+        
+        #run through all the unique "number of H in range" values
+        for hn in np.unique(pl[:,0]):
+            tl = pl[pl[:,0]==hn]#list of angles with this number of H in range
+            tot=0
+            cnt=0
+            for a in tl[:,1]:
+                tot+=1
+                if a < maxang:
+                    cnt+=1
+                    
+            mtl=cnt/tot
+            mplth.append(hn)
+            mpltCount.append(mtl)
             
-    fig, ax = plt.subplots()
-    pl=np.array([hnum,anglist]).T
-    # ax.scatter(hnum,angnum,s=6,facecolors='none',edgecolors='b')
-    title=f"# of H in range vs. % of pairs with angle < {maxang}° "
+        print(mplth)
+        print(mpltCount)
+        ax.plot(mplth,mpltCount)
     
+    
+    fig1, ax1 = plt.subplots()
+    
+    title=f"# of {atype} in range vs. O-Si-O bond angle "
     if not all:
         title+="in bulk " if bulk else  "near interface "
     #title+=f"for x={ratio} w/ {Hnum}H"
-    ax.set_title(title)
-    ax.set_xlabel(f"Number of H within {dist}Å.")
-    ax.set_ylabel(f"% of pair angles in range < 110°")
+    ax1.set_title(title)
+    ax1.set_xlabel(f"# of {atype} within {dist}Å of bond")
+    ax1.set_ylabel(f"O-Si-O bond angle(°)")
+    ax1.scatter(hnum,anglist,s=6,facecolors='none',edgecolors='b')
+    pl=np.array([hnum,anglist]).T
     mplth=[]
-    mpltCount=[]
-    
-    #run through all the unique "number of H in range" values
+    mpltAvg=[]
     for hn in np.unique(pl[:,0]):
-        tl = pl[pl[:,0]==hn]#list of angles with this number of H in range
-        tot=0
-        cnt=0
-        for a in tl[:,1]:
-            tot+=1
-            if a < maxang:
-                cnt+=1
-                
-        mtl=cnt/tot
+        tl = pl[pl[:,0]==hn]
+        mtl=np.mean(tl[:,1])
         mplth.append(hn)
-        mpltCount.append(mtl)
+        mpltAvg.append(mtl)
+        print(f"{hn} H in range - avg bond angle: {mtl}")
         
-    print(mplth)
-    print(mpltCount)
-    ax.plot(mplth,mpltCount)
-    
-    
-    # fig1, ax1 = plt.subplots()
-    
-    # title=f"# of H in range vs. O-Si-O bond angle "
-    # if not all:
-    #     title+="in bulk " if bulk else  "near interface "
-    # #title+=f"for x={ratio} w/ {Hnum}H"
-    # ax1.set_title(title)
-    # ax1.set_xlabel(f"# of H within {dist}Å of bond")
-    # ax1.set_ylabel(f"O-Si-O bond angle(°)")
-    # ax1.scatter(hnum,anglist,s=6,facecolors='none',edgecolors='b')
-    # pl=np.array([hnum,anglist]).T
-    # mplth=[]
-    # mpltAvg=[]
-    # for hn in np.unique(pl[:,0]):
-    #     tl = pl[pl[:,0]==hn]
-    #     mtl=np.mean(tl[:,1])
-    #     mplth.append(hn)
-    #     mpltAvg.append(mtl)
-    #     print(f"{hn} H in range - avg bond angle: {mtl}")
-        
-    # ax1.plot(mplth,mpltAvg,c='r')#s=20,marker='x',
+    ax1.plot(mplth,mpltAvg,c='r')#s=20,marker='x',
     plt.show()
 
 def plot_bondang_vs_h(basedf,poslist,dist,maxang=180,bulk=False):
@@ -1786,7 +2418,7 @@ def dist_from_df(basedf,col="FEB",units="eV",plot=False):
 
     csvfiles=grpdf["csvname"].unique()
     setdf = pd.DataFrame({"csvname":csvfiles})
-    cols=["ratio","Hnum","mean","stddev"]
+    cols=[f"{col}ratio",f"{col}Hnum",f"{col}mean",f"{col}stddev"]
     for c in cols:
         setdf[c]=""
         
@@ -1798,10 +2430,10 @@ def dist_from_df(basedf,col="FEB",units="eV",plot=False):
         dist=csdf[col].tolist()
         
         (ratio,Hnum)=stats_from_csv_name(csvfile)
-        setdf.at[csvfile,"ratio"]=ratio
-        setdf.at[csvfile,"Hnum"]=Hnum
-        setdf.at[csvfile,"mean"]=mean=statistics.mean(dist)
-        setdf.at[csvfile,"stddev"]=stddev=statistics.stdev(dist)
+        setdf.at[csvfile,f"{col}ratio"]=ratio
+        setdf.at[csvfile,f"{col}Hnum"]=Hnum
+        setdf.at[csvfile,f"{col}mean"]=mean=statistics.mean(dist)
+        setdf.at[csvfile,f"{col}stddev"]=stddev=statistics.stdev(dist)
         
         
         setdf[cols]=setdf[cols].apply(pd.to_numeric, errors='coerce')
@@ -1977,46 +2609,174 @@ def recursive_fun(df, og, path=[], badpaths=[],debug=False):
      
     return [mindepth, minpath]
 
+# from scipy.sparse import csr_matrix
+# import networkx as nx
+
+# def sparse_graph(df):     
+#     csvlist=df["csvname"].unique()
+
+#     for csvfile in csvlist:
+
+#         print(csvfile)
+
+
+#         dfc=df[df["csvname"]==csvfile]
+
+#         (bonddf,box)=load_data_and_bonds_from_csv(csvfile)
+        
+#         numatoms=len(bonddf)
+        
+#         sg=nx.Graph()
+
+#         for i in range(1,numatoms+1):
+#             bonds=bonddf.at[i,"bonds"]
+#             bl=[]
+#             sg.add_node(i)
+#             for b in bonds:
+#                 if b[0] != i:
+#                     sg.add_edge(i,b[0])
+        
+        
+#         sg.add_edge(1,2)
+#         sg.add_edge(2,3)
+#         sg.add_edge(1,3)
+#         # for s in sg.edges:
+#         #     print(s)
+        
+#         #print(list(nx.edge_dfs(sg,5)))
+        
+#         tstart=time.time()
+#         # for s in sg.nodes:
+#         ti=time.time()
+#         cycle=nx.find_cycle(sg,10,orientation='reverse')
+#         # for start_node in sg.nbunch_iter(s):
+#         #     print(start_node)
+#         l=list(cycle)
+#         tf=time.time()
+#         print(f"){l} took {tf-ti}s")
+            
+            
+
+
+#         return
+            
+# def get_path(Pr, i, j):
+#     path = [j]
+#     k = j
+#     while Pr[i, k] != -9999:
+#         path.append(Pr[i, k])
+#         k = Pr[i, k]
+#     return path[::-1]
+
+
+# def find_rings(g,ring_size):
+
+#     D,Pr =csg.shortest_path(g,directed=False, return_predecessors=True)
+    
+    
+#     for r in range(1,4):
+#         inds=list(zip(*np.where(D==r)))
+
+#         for i in inds:
+#             print(get_path(Pr,i[0],i[1]))
+        
+        
+
 if __name__ == "__main__":       
         
+    # nebfolder="/home/agoga/documents/code/topcon-md/neb-out/"
+
+
+    # group=["FullSet/"] #"farm/6169019/","farm/6169020/","farm/6169021/","farm/6169022/"]#
+    # #group=["farm/perpPairs/","farm/parallelPairs/"]
+
+    # multiplot=[]
+
+
+    # for g in group:
+    #     csvlist=[]
+    #     gpath=nebfolder+g
+    #     csvlist=[]
+    #     for d in Path(gpath).glob('*.csv'):
+    #         csvlist.append(str(d))
+        
+    #     dstats=[]
+    #     #setdf=csv_to_df(csvlist[0])
+    #     #df=dist_from_df(setdf,False)
+    #     csvname=csvlist[0].split('/')[-1].removesuffix('.csv')
+        
+    #     (posdf,box)=load_datafile_from_csv(csvname)
+
+    #     depthlist=[]
+    #     for index, row in posdf.iterrows():
+    #         if row['type']=='O':
+    #             path=double_recursive_fun(posdf,index)
+    #             if path is not None:
+    #                 depthlist.append(path)
+
+    #             # path=recursive_fun(posdf,index)
+    #             # if path is not None:
+    #             #     depthlist.append(len(path))
+            
+        
+    #     print(np.mean(depthlist))
+    #     print(np.min(depthlist))
+    #     print(np.max(depthlist))
+    #     #nt.plot_multi_distribution(df)
+        
+    #     #rangeddf =plot_atominrange(setdf,10,'H')
+    
+    from mpl_toolkits.mplot3d import Axes3D
+    import matplotlib.pyplot as plt
+    import pandas as pd
+    import numpy as np
+
+    import statistics
+    from pathlib import Path
+    from operator import itemgetter
+
+
+    pairspath="/home/agoga/documents/code/topcon-md/data/neb/FullSet/"
     nebfolder="/home/agoga/documents/code/topcon-md/neb-out/"
 
 
-    group=["FullSet/"] #"farm/6169019/","farm/6169020/","farm/6169021/","farm/6169022/"]#
+    group=["PinholeCenterZap/"] #"farm/6169019/","farm/6169020/","farm/6169021/","farm/6169022/"]#
     #group=["farm/perpPairs/","farm/parallelPairs/"]
 
     multiplot=[]
+    clean=False #do this very rarely when you get lots of new data from farm
 
 
     for g in group:
-        csvlist=[]
+        
         gpath=nebfolder+g
-        csvlist=[]
-        for d in Path(gpath).glob('*.csv'):
-            csvlist.append(str(d))
+    
+        print(gpath)
         
-        dstats=[]
-        #setdf=csv_to_df(csvlist[0])
-        #df=dist_from_df(setdf,False)
-        csvname=csvlist[0].split('/')[-1].removesuffix('.csv')
         
-        (posdf,box)=load_datafile_from_csv(csvname)
-
-        depthlist=[]
-        for index, row in posdf.iterrows():
-            if row['type']=='O':
-                path=double_recursive_fun(posdf,index)
-                if path is not None:
-                    depthlist.append(path)
-
-                # path=recursive_fun(posdf,index)
-                # if path is not None:
-                #     depthlist.append(len(path))
+        if clean:
+            cleanlist=[] 
+            subfolders="farm-folders/"
+            subfolders=""   
+            print(f"Cleaning the {g+subfolders} directory, this may take a while.")
+            for d in Path(gpath+subfolders).rglob('**/*.csv'):
+                cleanlist.append(str(d))        
+            cleandf=clean_csvs(cleanlist,gpath)
             
-        
-        print(np.mean(depthlist))
-        print(np.min(depthlist))
-        print(np.max(depthlist))
-        #nt.plot_multi_distribution(df)
-        
-        #rangeddf =plot_atominrange(setdf,10,'H')
+            #nt.clean_pairfiles(cleandf,pairspath)
+        else:
+            csvlist=[]
+            i=0
+            for d in Path(gpath).glob('*.csv'):
+                csvlist.append(str(d))
+                # if i >1:
+                #     break
+                # i+=1
+                
+
+            #print(csvlist[0])
+            setdf=csvs_to_df(csvlist)
+            
+    pair_path="/home/agoga/documents/code/topcon-md/data/neb/PinholeCenterZap/"
+
+    t=calc_local_structure(setdf,pair_path) #,["REB"])

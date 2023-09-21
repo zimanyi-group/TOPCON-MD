@@ -23,7 +23,7 @@ rank = comm.Get_rank()
 
 a=5.43
 dt=0.5
-etol=1e-11
+etol=7e-6
 #conversion from kcal/mol to eV
 conv=0.043361254529175
 
@@ -41,8 +41,6 @@ def NEB_min(L=None):
         return lstr
     
 
-
-def create_lmp_file(file,out,dumpstep=0):
 def create_lmp_file(file,out,dumpstep=0):
     lammps_str=f'''
         clear
@@ -91,8 +89,8 @@ def create_lmp_file(file,out,dumpstep=0):
         read_data {file}
                         '''
 
-    lammps_str+=f'''
-        '''
+    # lammps_str+=f'''
+    #     '''
     elif file.endswith(".data") or file.endswith(".dat"):
         lammps_str+=f'''
         read_data {file}
@@ -126,7 +124,7 @@ def create_lmp_file(file,out,dumpstep=0):
 
         reset_atom_ids
         '''
-    #lammps_str += NEB_min()
+    lammps_str += NEB_min()
         
     lammps_str+=f'''
         group gSi type 1
@@ -142,9 +140,43 @@ def create_lmp_file(file,out,dumpstep=0):
         write_data {out} '''
     print(f"Saving file with path: {out}")
     return lammps_str
+
+def extract_box(L):
+    bbox=L.extract_box()
+    return np.array([[bbox[0][0],bbox[1][0]],[bbox[0][1],bbox[1][1]],[bbox[0][2],bbox[1][2]]])
+
+def find_atom_position(L,atomI):
+    L.commands_string(f'''
+        variable x{atomI} equal x[{atomI}]
+        variable y{atomI} equal y[{atomI}]
+        variable z{atomI} equal z[{atomI}]
+        ''')
+    
+    x = L.extract_variable(f'x{atomI}')
+    y = L.extract_variable(f'y{atomI}')
+    z = L.extract_variable(f'z{atomI}')
+    
+    return (x,y,z)
+
+def recenter_sim(L,atom_id=2370):
+    
+    r=find_atom_position(L,atom_id)
+    bbox= extract_box(L)
+
+    xhlen=abs(bbox[0][1]-bbox[0][0])/2
+    yhlen=abs(bbox[1][1]-bbox[1][0])/2
+    zhlen=abs(bbox[2][1]-bbox[2][0])/2
+    # print(xhlen)
+    # print(xhlen-r[0])
+    
+    L.commands_string(f'''
         
-        
-def create_dat(file,out,dumpstep=0):
+        #displace_atoms all move {xhlen-r[0]} {yhlen-r[1]} {zhlen-r[2]}
+        displace_atoms all move {xhlen-r[0]} {yhlen-r[1]} 0
+        run 0''')
+    
+    return bbox
+
 def create_dat(file,out,dumpstep=0):
     #Initialize and load the dump file
     
@@ -157,6 +189,12 @@ def create_dat(file,out,dumpstep=0):
 
     L = lammps('mpi',cmdargs=["-var","infile",file,'-var',"outfile",out])
     L.commands_string(lstr)
+    
+    recenter_sim(L)
+    
+    L.commands_string('''
+                      write_data /home/agoga/documents/code/topcon-md/data/neb/centered_Hcon-1500-695.dat
+                      ''')
     
 
 def prep_data(file,dumpstep,outfolder):
@@ -174,7 +212,6 @@ def prep_data(file,dumpstep,outfolder):
     #L = lammps('mpi',["-var",f"infile {file}",'-var',f"outfile {outfile}"])
     create_dat(file,outfile,dumpstep)
 
-         
     return
 
 

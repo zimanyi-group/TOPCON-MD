@@ -16,7 +16,8 @@ import sys
 import csv 
 # import itertools
 import collections
-
+from argparse import ArgumentParser
+import argparse
 
 #matplotlib.use('tkagg')
 comm = MPI.COMM_WORLD
@@ -39,9 +40,6 @@ plt.rcParams["figure.autolayout"] = True
 #conversion from kcal/mol to eV
 conv=0.043361254529175
 #I need to read a reax.dat file and a reax.log file and get values from both.
-
-etol=sys.argv[3]
-timestep=sys.argv[4]
 
 
 def read_log(file, mod=0):
@@ -67,46 +65,71 @@ def MEP(file):
     RD=last[8]                  #total reaction cood space
     return R, ms , efb, erb, RD
 
-def plot_mep(file,figPath,plot,hnum=0, xo= 0.01):
-    
-    r,pe,EF,ER, RD = MEP(file)
-    my_barriers=[]
-    points=[]
-    mytext="FEB ={0:.3f} REB = {1:.3f}"
-    indices, vals, nb = calc_barrier(file)
-    if not (nb):
-        points.append([0,0,0])
-    else:
-        for i in range(nb):
-            l, p, s = vals[i]
-            a,b,c = indices[i]
-            feb = p-l
-            reb = p-s
-            print(mytext.format(feb,reb))
-            my_barriers.append([feb,reb])
-            points.append([r[a], r[b], r[c]])
-            
+def plot_mep(args,logfiles,figPath,hnum=0, plot=True, xo= 0.01):
+    etol=args.etol
+    timestep=args.ts
+    plot=plot if args.plot is True else False
+    #print(logfiles)
+    numfiles=len(logfiles)
+    rl=[]
+    pel=[]
+    last_r=0#to move the replica distance forward for multiple plots
+    last_pe=0
+    txtl=[]
+    for lfile in range(numfiles):
+        logfile=logfiles[lfile]
+        r,pe,EF,ER, RD = MEP(logfile)
+        my_barriers=[]
+        points=[]
+        mytext="FEB ={0:.3f} REB = {1:.3f}"
+        indices, vals, nb = calc_barrier(logfile)
+        if not (nb):
+            points.append([0,0,0])
+        else:
+            for i in range(nb):
+                l, p, s = vals[i]
+                a,b,c = indices[i]
+                feb = p-l
+                reb = p-s
+                print(mytext.format(feb,reb))
+                my_barriers.append([feb,reb])
+                points.append([r[a], r[b], r[c]])
+        
+        first_r=r[0]
+        first_pe=pe[0]
+        for p in range(len(r)):
+            cr=r[p]+last_r-first_r
+            cpe=pe[p]+last_pe-first_pe
+            rl.append(cr)
+            pel.append(cpe)
+        last_r=cr
+        last_pe=cpe
+        txt=(r"Forward E$_A $ = {0:.2f} eV"+"\n"
+             r"Reverse E$_A $ = {1:.2f} eV"+"\n"
+             r"Replica distance={0:.2f}$\AA $").format(EF, ER, RD)
+        txtl.append(txt)
+                
 
     if plot:
-        fig = plt.figure(figsize=[6,6])
-        plt.scatter(r,pe, marker = '^', color = 'darkgreen', s=180)
-        #plt.plot(r,pe, linestyle = '--', linewidth = 3.0, color = 'darkgreen')
-        #plt.scatter(points,vals, color='r', s=20)
-        txt=(r"Forward E$_A $ = {0:.2f} eV"+"\n"
-            + r"Reverse E$_A $ = {1:.2f} eV"+"\n").format(EF, ER)
-        txt2 = "Replica distance={0:.2f}".format(RD) + r"$\AA $"
-        plt.text(xo, np.max(pe)*0.8, txt, fontsize = 14)
+        fig = plt.figure(figsize=[6*numfiles,6])
+        plt.scatter(rl,pel, marker = '^', color = 'darkgreen', s=180)
+
+        for text in txtl:
+            print(f"max pe: {np.max(pel)}")
+            plt.text(xo, np.max(pel)*0.8, text, fontsize = 13)
+            xo+=1
         
-        plt.text(xo, np.max(pe)*0.68, txt2,fontsize=14)
+        #plt.text(xo, np.max(pe)*0.68, txt2,fontsize=14)
         plt.title(f"MEP with E-tol': {etol} & timestep: {timestep}")
         plt.ylabel("PE (eV)")
         plt.xlabel(r'$x_{replica} $')
         #plt.axes().yaxis.set_major_locator(MaxNLocator(integer=True))
         plt.grid('on',axis='y',linewidth=1)
         plt.savefig(figPath)
+        plt.close()
     
     return (EF,ER,my_barriers,RD,r,pe)
-    return (EF,ER,my_barriers,RD,r,pe)
+
 
 
 def calc_barrier(file):
@@ -234,11 +257,8 @@ def calc_dist():
             print(pair)
             skip+=1
             
-            
-    print(len(dist))
     #counts,bins=np.histogram(dist)
-    print(total)
-    print(skip)
+
 
     mean=statistics.mean(dist)
     stddev=statistics.stdev(dist)
@@ -298,8 +318,8 @@ def check_convergence(filename,maxneb,maxclimbing,numpart=13):
         else:
             return True
     
-def check_bad_NEB(feb,pe):
-    cutoff=feb/2
+def check_bad_NEB(feb,reb,pe):
+    cutoff=max(feb,reb)/2
     for i in range(pe.size-1):
         diff=abs(pe[i+1]-pe[i])
         if abs(diff)>cutoff:
@@ -354,7 +374,7 @@ def render_neb_gif(dumpfiles, gifname, atom):
     from ovito.vis import TachyonRenderer
     
     
-    vp = Viewport(type = Viewport.Type.Ortho)
+    
     pipeline=import_file(dumpfiles)
     
     expr=f'ParticleIdentifier=={atom}'
@@ -367,7 +387,7 @@ def render_neb_gif(dumpfiles, gifname, atom):
     
     idata=pipeline.compute()
     numframes=pipeline.source.num_frames
-    print(f"{numframes} for {dumpfiles}")
+    #print(f"{numframes} for {dumpfiles}")
     fdata=pipeline.compute(numframes-1)
     
     ipos=idata.particles_.positions_[idata.particles.selection != 0][0]
@@ -402,41 +422,104 @@ def render_neb_gif(dumpfiles, gifname, atom):
     
     pipeline.remove_from_scene()
     
+    
+
+    
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
 
 
+#python3 /home/agoga/documents/code/topcon-md/py/Process-NEB.py \
+ #       $out_folder $atom_id $etol $timestep $atomremove $nebfolder $datafile $springconst $plot $neb_info_file
 if __name__=='__main__':
     
-    dirname=sys.argv[1]
-    atomID=sys.argv[2]
-    removeID=sys.argv[5]
-    nebfolder=sys.argv[6] #second+"/NEB/"
-    datafile=sys.argv[7]
-    springconst=sys.argv[8]  
-    plot= True if int(sys.argv[9]) == 1 else False
-    neb_info_file=sys.argv[10]
+    parser = ArgumentParser()
+    parser.add_argument('--style',type=str)
+    parser.add_argument('--out',type=str)
+    parser.add_argument('--atomid',type=int)
+    parser.add_argument('--etol',type=float)
+    parser.add_argument('--ts',type=float)
+    parser.add_argument('--remove',type=int)
+    parser.add_argument('--nebfolder',type=str)
+    parser.add_argument('--dfile',type=str)
+    parser.add_argument('--gif',type=str2bool, nargs='?',
+                        const=True, default=False,
+                        help="Activate nice mode.")
+    parser.add_argument('--plot',type=str2bool, nargs='?',
+                        const=True, default=False,
+                        help="Activate nice mode.")
+    parser.add_argument('--k')
+    parser.add_argument('--info',type=str)
+    parser.add_argument('--neblog',type=str)
+    parser.add_argument('--cylen',type=int)
+    
+
+    args=parser.parse_args()
+
+    
+    makegif=args.gif
+    
+    dirname=args.out
+    atomID=args.atomid
+    removeID=args.remove
+    nebfolder=args.nebfolder #second+"/NEB/"
+    datafile=args.dfile
+    springconst=args.k  
+    plot= args.plot#True if int(sys.argv[9]) == 1 else False
+    neb_info_file=args.info
+    style=args.style
+    etol=args.etol
+    timestep=args.ts
+    neb_log=args.neblog
+    lengthcycle=args.cylen
+    
     fileID=atomID
     
     csvID=str(atomID)+'-'+str(removeID)
-    col_names=["pair","etol","ts","fail","dist","FEB","REB","K"]
+    col_names=["pair","id","etol","ts","fail","dist","FEB","REB","K"]
     col_names_tail=["A","B","C","D","E","F","G","H"]
-    col_names=["pair","etol","ts","fail","dist","FEB","REB","K"]
-    col_names_tail=["A","B","C","D","E","F","G","H"]
+
     
-    #dirname="/home/agoga/documents/code/topcon-md/data/HNEB1/"#os.path.dirname(os.path.realpath(pth))
     
-    print(datafile)
-    print(springconst)
-    print(plot)
+
+    datend=".dat"
+    dataend=".data"
+    if datafile.endswith(datend) or datafile.endswith(dataend):
+            if '/' in datafile:
+                datafile = datafile.split('/')[-1]
+            datafile=datafile[:-len(datend)]
     
     neb_runs=[]
+    #Find all times we were supposed to run the lammps neb file 
     with open(neb_info_file,'r') as infoF:
         
         for line in infoF:
             if line.startswith("neb"):
                 neb_runs.append(line)
-                
+               
+    
+    
+    
     figpaths=[]
     identifierlist=[]
+    if style == "multijump":
+        csvfile=nebfolder+datafile+"-"+style+str(atomID)+".csv"
+    else:
+        csvfile=nebfolder+datafile+".csv"
+    splt=dirname[:-1].split("/")
+    c_run_folder=splt[-1]#name of the output folder 'NEB125-126_1-0.01_11'
+
+
+    
+    
+    log_file_list=[]
     for l in neb_runs:
         #"neb {i} {atomI} {identifier} {nebI} {nebF} {identifier}-{atomI}.log\n"+
         line=l.split()
@@ -447,35 +530,32 @@ if __name__=='__main__':
         nebFFile=line[5]
         log=line[6]
         logFile=f"{dirname}logs/{log}"
-        # infolog=f"{dirname}logs/PrepNEB-If.log"
-        splt=dirname[:-1].split("/")
-        tname=splt[-1]#name of the output folder 'NEB125-126_1-0.01_11'
-        second="/".join(splt[:-1])
+                
+
+
         
         identifierlist.append(identifier)
         
-        datend=".dat"
-        dataend=".data"
         
-        if datafile.endswith(datend) or datafile.endswith(dataend):
-            if '/' in datafile:
-                datafile = datafile.split('/')[-1]
-            datafile=datafile[:-len(datend)]
+        #print(f"splt: {splt}, c_run_folder: {c_run_folder}, second: {second}, nebfolder: {nebfolder}")
         
-        
-        #print(f"splt: {splt}, tname: {tname}, second: {second}, nebfolder: {nebfolder}")
-        csvfile=nebfolder+datafile+".csv"
 
         
         
         figPath=dirname+identifier+"-NEB.png"
         
-        figpaths.append(figPath)
-        ret=plot_mep(logFile,figPath,plot)#,hnum)
-
-        badneb=check_bad_NEB(ret[0],ret[5])
-        convergence=check_convergence(logFile,3000,1000)
         
+        log_file_list.append(logFile)
+        pl=False
+        
+        ret=plot_mep(args,[logFile],figPath,plot=pl)#,hnum)
+        
+        if pl:
+            figpaths.append(figPath)
+            
+        badneb=check_bad_NEB(ret[0],ret[1],ret[5])
+        convergence=check_convergence(logFile,3000,1000)
+        #@TODO for multi jump runs make sure to crash the entire run if an earlier NEB has a maximum energy at final replica
 
         print('-----NEB did not converge-----') if not convergence else None
         print('-----NEB produced bad MEB-----') if badneb else None
@@ -484,7 +564,7 @@ if __name__=='__main__':
         #     print("-----Could not find Zi or Zf in log file-----")
         bad= "False" if (not badneb and convergence) else "True"
         
-        dat=[csvID,etol,timestep,bad,ret[3],ret[0],ret[1],springconst]
+        dat=[csvID,identifier,etol,timestep,bad,ret[3],ret[0],ret[1],springconst]
         log_entries=find_NEB_info(neb_info_file)
         
         #print(log_entries)
@@ -507,151 +587,198 @@ if __name__=='__main__':
     # except:
     #     print('Failed to analyze NEB')
     
+    
+    if lengthcycle==0 or lengthcycle>len(identifierlist):
+        lengthcycle=len(identifierlist)
+    
+    halfcycle=int(lengthcycle/2) if lengthcycle > 1 else 1
+    numplot=int(len(identifierlist)/lengthcycle)
+    numcomboplot=int(len(identifierlist)/halfcycle)
+    lencomboplot=int(len(identifierlist)/numcomboplot)
+    cstart=0
+    cend=halfcycle
+    print(f"lencycle;{lengthcycle} halfcycle;{halfcycle} np;{numplot} ncp;{numcomboplot} lcp;{lencomboplot}")
+    
+    #print(log_file_list)
+    for cp in range(numplot):
+        figPath1=dirname+f"-NEB{cp}-1.png"
+        clist=log_file_list[cstart:cstart+halfcycle]
+        #print(f"{cp} and {clist}")
+        plot_mep(args,clist,figPath1)
+        figpaths.append(figPath1)
+        
+        if lengthcycle > 1:
+            clist=log_file_list[cstart+halfcycle:cstart+lengthcycle]
+            #print(f"{cp} and {clist}")
+            figPath2=dirname+f"-NEB{cp}-2.png"
+            plot_mep(args,clist,figPath2)
+            figpaths.append(figPath2)
+            cstart+=lengthcycle
+        
+        
     plt.close()
-    makegif=True
+    
+    
+    
+    final_image_name=nebfolder+c_run_folder[3:] 
+
     #now do the image stuff
     if plot:
         import numpy as np
         from PIL import Image, ImageSequence
-
-
-        plot_paths=[]
-        gif_paths=[]
-        
-        if makegif:
-            for id in identifierlist:
-                #create the NEB gif
-                dumplist=dirname+id+"-neb.dump.*"
-                gifname=dirname+id+".gif" 
-                
-                render_neb_gif(dumplist,gifname,int(atomID))
-                gif_paths.append(gifname)
-        
-        
         nebim=find_NEB_images(neb_info_file)
-        for l in nebim:
-            plot_paths.append(l)
-        for p in figpaths:
-            plot_paths.append(p)
         
+        #print(f"figpaths {figpaths}")
+        for cplot in range(numplot):
+           #print(f"lencomboplot {lencomboplot}")
+            figpathCur=figpaths[(cplot*2):(cplot*2)+2]
+            identifierlistCur=identifierlist[(cplot)*lengthcycle:(cplot+1)*lengthcycle]
+            nebimCur=nebim[cplot*lengthcycle:(cplot+1)*lengthcycle]
+            
+            # print(figpathCur)
+            # print(identifierlistCur)
+            # print(nebimCur)
+            plot_paths=[]
+            gif_paths=[]
 
-        imgs=[]
-        gifs=[]
-        totwidth=0
-        maxheight=0
-        maxwidth=0
-        
-        for g in gif_paths:
-            gf=catch(Image.open,g)
-            if gf is not None:
-                gifs.append(gf)
-                width, height = gf.size
-                totwidth+=width
-                if height > maxheight:
-                    maxheight=height
-            else:
-                print(f"{g} is None")
-        
-        maxwidth=totwidth
-        totwidth=0
-        
-        for i in plot_paths:
-            im=catch(Image.open,i)
-            if im is not None:
-                imgs.append(im)
-                width, height = im.size
-                totwidth+=width
-                if height > maxheight:
-                    maxheight=height
-            else:
-                print(f"{i} is None")
-        if totwidth>maxwidth:
-            maxwidth=totwidth
+            if makegif:
+                for id in identifierlistCur:
+                    #create the NEB gif
+                    dumplist=dirname+id+"-neb.dump.*"
+                    gifname=dirname+id+".gif" 
+                    
+                    render_neb_gif(dumplist,gifname,int(atomID))
+                    gif_paths.append(gifname)
+
             
-        
-        #ALL GIFS MUST HAVE THE SAME NUMBER OF FRAMES
-        if makegif:
-            numrun=len(gifs)
             
-            curw=0
-            frames = []
-            final_frame_count=0
-            sequential=False
             
-            for g in gifs:
-                print(f"Frames += {g.n_frames}")
-                if sequential:
-                    final_frame_count += g.n_frames 
+            for l in nebimCur:
+                plot_paths.append(l)
+            for p in figpathCur:
+                plot_paths.append(p)
+            
+            
+
+            imgs=[]
+            gifs=[]
+            totwidth=0
+            maxheight=0
+            maxwidth=0
+            
+            for g in gif_paths:
+                gf=catch(Image.open,g)
+                if gf is not None:
+                    gifs.append(gf)
+                    width, height = gf.size
+                    totwidth+=width
+                    if height > maxheight:
+                        maxheight=height
                 else:
-                    final_frame_count = g.n_frames 
-
-            curgif=0
+                    print(f"{g} is None")
             
-            for f in range(final_frame_count):
-                newframe=Image.new("RGB",(maxwidth,maxheight*2),'white')#frame.resize((totwidth,maxheight))
-                curw=0
-                nextgif=False
-                for i in range(len(gifs)):
-                    g=gifs[i]
-                    width, height = g.size
-                    gifframe=0
-                    
-                    
-                    
-                    lastframe=g.n_frames-1
-                    
-                    if sequential:
-                        
-                        #play the first gif then the second ......
-                        #so while the first gif is playing, the rest should be pasting their initial frame
-                        #while the second gif is playing, the first should play it's last frame
-                        if i==curgif:
-                            gifframe=f-g.n_frames*i#
-                            #print(f"{i} {curgif} Curgif gifframe: {gifframe} w/ lastframe: {lastframe}")
-                            
-                            if gifframe == lastframe:
-                                nextgif=True
-
-                        elif i<curgif:      
-                            gifframe=lastframe
-                
-
-                        # print(f"gif {i} frame: {gifframe}")
-                        if gifframe > lastframe:
-                            gifframe=lastframe
-                    else:
-                        gifframe=f
-                        
-                    g.seek(gifframe)
-                    
-                    newframe.paste(g,(curw,maxheight))
-                    curw+=int(maxwidth/numrun)
-                    
-                if nextgif:
-                    curgif+=1
-                    
-                curw=0
-                for im in imgs:
-
+            maxwidth=totwidth
+            totwidth=0
+            
+            for i in plot_paths:
+                im=catch(Image.open,i)
+                if im is not None:
+                    imgs.append(im)
                     width, height = im.size
-
-                    newframe.paste(im,(curw,0))
-                    curw+=width
-                    
-                frames.append(newframe)
-            dur=250
-            frames[0].save(dirname+f"Full.gif",save_all=True,loop=0, append_images=frames[1:],duration=dur) 
-            # print(tname)
-            frames[0].save(nebfolder+tname[3:] +".gif",save_all=True,loop=0, append_images=frames[1:],duration=dur)
-        else:
-            # pick the image which is the smallest, and resize the others to match it (can be arbitrary image shape here)
-            min_shape = sorted( [(np.sum(i.size), i.size ) for i in imgs])[0][1]
-            imgs_comb = np.hstack([i.resize(min_shape) for i in imgs])
-
+                    totwidth+=width
+                    if height > maxheight:
+                        maxheight=height
+                else:
+                    print(f"{i} is None")
+            if totwidth>maxwidth:
+                maxwidth=totwidth
+                
             
-            #print(imgs_comb)
-            #imgs_comb=imgs
-            # save that beautiful picture
-            imgs_comb = Image.fromarray(imgs_comb)
-            imgs_comb.save(nebfolder+tname[3:] +".png")
-            imgs_comb.save(dirname+f"Full.png")
+            #ALL GIFS MUST HAVE THE SAME NUMBER OF FRAMES
+            if makegif:
+                numrun=len(gifs)
+                
+                curw=0
+                frames = []
+                final_frame_count=0
+                sequential=False
+                
+                for g in gifs:
+                # print(f"Frames += {g.n_frames}")
+                    if sequential:
+                        final_frame_count += g.n_frames 
+                    else:
+                        final_frame_count = g.n_frames 
+
+                curgif=0
+                
+                for f in range(final_frame_count):
+                    newframe=Image.new("RGB",(maxwidth,maxheight*2),'white')#frame.resize((totwidth,maxheight))
+                    curw=0
+                    nextgif=False
+                    for i in range(len(gifs)):
+                        g=gifs[i]
+                        width, height = g.size
+                        gifframe=0
+                        
+                        lastframe=g.n_frames-1
+                        
+                        if sequential:
+                            
+                            #play the first gif then the second ......
+                            #so while the first gif is playing, the rest should be pasting their initial frame
+                            #while the second gif is playing, the first should play it's last frame
+                            if i==curgif:
+                                gifframe=f-g.n_frames*i#
+                                #print(f"{i} {curgif} Curgif gifframe: {gifframe} w/ lastframe: {lastframe}")
+                                
+                                if gifframe == lastframe:
+                                    nextgif=True
+
+                            elif i<curgif:      
+                                gifframe=lastframe
+                    
+
+                            # print(f"gif {i} frame: {gifframe}")
+                            if gifframe > lastframe:
+                                gifframe=lastframe
+                        else:
+                            gifframe=f
+                            
+                        g.seek(gifframe)
+                        
+                        newframe.paste(g,(curw,maxheight))
+                        curw+=int(maxwidth/numrun)
+                        
+                    if nextgif:
+                        curgif+=1
+                        
+                    curw=0
+                    for im in imgs:
+
+                        width, height = im.size
+
+                        newframe.paste(im,(curw,0))
+                        curw+=width
+                        
+                    frames.append(newframe)
+                dur=250
+
+                frames[0].save(dirname+f"Full.gif",save_all=True,loop=0, append_images=frames[1:],duration=dur) 
+                # print(c_run_folder)
+                frames[0].save(final_image_name+"-"+str(cplot)+".gif",save_all=True,loop=0, append_images=frames[1:],duration=dur)
+                
+                
+                
+            else:
+                # pick the image which is the smallest, and resize the others to match it (can be arbitrary image shape here)
+                min_shape = sorted( [(np.sum(i.size), i.size ) for i in imgs])[0][1]
+                imgs_comb = np.hstack([i.resize(min_shape) for i in imgs])
+
+                
+                #print(imgs_comb)
+                #imgs_comb=imgs
+                # save that beautiful picture
+                imgs_comb = Image.fromarray(imgs_comb)
+                imgs_comb.save(final_image_name+".png")
+                imgs_comb.save(dirname+f"Full.png")

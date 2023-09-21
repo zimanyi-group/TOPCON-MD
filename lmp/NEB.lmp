@@ -65,4 +65,5 @@ neb ${etol} ${etol} ${maxneb} ${maxclimb} 100 final ${nebF}
 
 
 write_dump all atom ${output_folder}${identifier}-neb.dump.$i
+# write_data ${dataf}.$i.dat
 run 0
