@@ -1020,7 +1020,7 @@ def prep_neb_zap_single(args):
     if me == 0 and plot:
         #Now create ovito plot of atoms for future use
         atoms=[[atomI,ri],[atomF,rf]]
-        create_ovito_plot(nebI,ovitoFig,atoms,infofile)
+        #create_ovito_plot(nebI,ovitoFig,atoms,infofile)
     
     ret = create_PES(L1,atomI)
     elist=ret[1]
@@ -1135,7 +1135,7 @@ def prep_neb_boomerang_zap(args):
     identifier=f'{args.atomid}'
     #fpos=np.array([args.fposx,args.fposy,args.fposz])
     
-    total_run=10+1
+    total_run=int(args.repeat)+1
     
     
     
@@ -1155,8 +1155,9 @@ def prep_neb_boomerang_zap(args):
     #@TODO make this use neb multi jump function by moving that function to locatio and not bond center
     pos_list=[]
     for i in range(total_run):
-        pos_list.append(fpos)
         pos_list.append(ipos)
+        pos_list.append(fpos)
+        
     
 
 
@@ -1358,8 +1359,7 @@ if __name__ == "__main__":
         prep_neb_to_location(args,fileIdent,ident,fpos,datafile=None,L1=None,dumpstep=0)
     elif args.style=='single_zap':
         args.zapid=int(args.zapid)
-        prep_neb_boomerang_zap(args)
-        #prep_neb_zap_single(args)
+        prep_neb_zap_single(args)
     elif args.style=='boomerang':
         
         prep_neb_boomerang(args)
@@ -1370,7 +1370,8 @@ if __name__ == "__main__":
         # fpos=np.array([args.fposx,args.fposy,args.fposz])
         # prep_neb_to_location_boomerang(args,fileIdent,ident,fpos,datafile=None,L1=None,dumpstep=0,boomerang=repeats)
         
-    
+    elif args.style=='boomerang_zap':
+        prep_neb_boomerang_zap(args)
     
 
     MPI.Finalize()

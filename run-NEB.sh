@@ -20,7 +20,7 @@ maxneb=3000
 maxclimb=1000
 springconst=1
 plot=true
-create_gif=false
+create_gif=true
 data_folder=/home/agoga/documents/code/topcon-md/data/neb #/pinhole-dump-files/"
 
 setName=/InsidePinhole/
@@ -43,11 +43,11 @@ multi_zap="multi_zap"
 multi_jump="multi_jump"
 single_jump="single_jump"
 boomerang="boomerang"
-
+boomerang_zap="boomerang_zap"
 
 ########################################################
 ########################################################
-style=$single_zap
+style=$boomerang_zap
 ########################################################
 ########################################################
 
@@ -73,7 +73,7 @@ do
 
         run_id="$atom_id-$zap_id"
         echo_string="to zap from "$run_id
-        create_gif=false
+        create_gif=true
         
 
     #Multi zap(OH migration)
@@ -130,6 +130,19 @@ do
 
         run_id="$atom_id"
         echo_string="to jump "$run_id" to BC of "$atomF1"-"$atomF2
+        create_gif=true 
+
+    elif [[ $style == $boomerang_zap ]];then
+        cyclelen=2
+        atom_id=${pairarray[0]} 
+
+        zap_id=${pairarray[1]}
+
+        run_id="$atom_id-$zap_id"
+        echo_string="to zap from "$run_id
+
+        num_repeat=10
+
         create_gif=true 
         
 

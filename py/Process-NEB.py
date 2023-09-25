@@ -473,6 +473,7 @@ if __name__=='__main__':
     datafile=args.dfile
     springconst=args.k  
     plot= args.plot#True if int(sys.argv[9]) == 1 else False
+
     neb_info_file=args.info
     style=args.style
     etol=args.etol
@@ -771,14 +772,15 @@ if __name__=='__main__':
                 
                 
             else:
-                # pick the image which is the smallest, and resize the others to match it (can be arbitrary image shape here)
-                min_shape = sorted( [(np.sum(i.size), i.size ) for i in imgs])[0][1]
-                imgs_comb = np.hstack([i.resize(min_shape) for i in imgs])
+                if len(imgs) > 0:
+                    # pick the image which is the smallest, and resize the others to match it (can be arbitrary image shape here)
+                    min_shape = sorted( [(np.sum(i.size), i.size ) for i in imgs])[0][1]
+                    imgs_comb = np.hstack([i.resize(min_shape) for i in imgs])
 
-                
-                #print(imgs_comb)
-                #imgs_comb=imgs
-                # save that beautiful picture
-                imgs_comb = Image.fromarray(imgs_comb)
-                imgs_comb.save(final_image_name+".png")
-                imgs_comb.save(dirname+f"Full.png")
+                    
+                    #print(imgs_comb)
+                    #imgs_comb=imgs
+                    # save that beautiful picture
+                    imgs_comb = Image.fromarray(imgs_comb)
+                    imgs_comb.save(final_image_name+".png")
+                    imgs_comb.save(dirname+f"Full.png")
