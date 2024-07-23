@@ -287,7 +287,8 @@ def create_all_zap_pair_list(datapath, dfile, distDir,writefile=False,split=1):
     return pairs
 
 def create_pinhole_zap_pair_list(datapath, dfile, distDir,pinholeCenter,writefile=False,split=1):
-    
+    #pinatoms=[3032,3041,3053,3087,3091,3041,3091,3105,2985,2984,3087,3101,2985,3396,2985,2984,2984,3530,3521,1535,3530,3521,3434,3434,3323,3529,3482,3410,3434,3434,3478,3482,3573,3581,3493,3921,4021,3933,4024,4029,4025,4139,4141,4139,4106,6089,3445,3101,3445,3437,3439,3445,3434,3437,3434,3437,3491,3487,3491,3410,3411,3410,3491,3487,3493,3494,3409,3411,3497,3493,3534,3546,3109,3162,5102,3163,3124,3162,3162,3163,5050,3029,3469,3564,3564,3370,3370,3635,3564,3634,5533,3649,5578]
+        
     SiRad=10
     
     zlowrange=[18,20]
@@ -308,6 +309,34 @@ def create_pinhole_zap_pair_list(datapath, dfile, distDir,pinholeCenter,writefil
     (atoms, simbox) = nt.read_file_data_bonds(datapath,dfile)
     numAtoms=len(atoms.index)
 
+    si_si_bond=0
+#temp
+    Siatoms=atoms[atoms['type']=='Si']
+    for i, row in Siatoms.iterrows():
+        curpos=row['pos']
+        nindices = row['bonds']#
+        
+        if curpos[2]<zmin or curpos[2]>zmax:
+            continue
+        
+        o_yes=False
+        si_yes=False
+        for ni in nindices:
+            n=ni[0]
+            bo=ni[1]
+            neitype=atoms.at[n,'type']
+            
+            
+            if neitype =='O':
+                o_yes=True
+            if neitype =='Si':
+                si_yes=True
+                
+        if o_yes and si_yes:
+            si_si_bond+=1
+        
+    print(f'Num Si_Si bonds {si_si_bond}')
+#temp testing
 
     print(f'--------Running file: {dfile} with {numAtoms} atoms--------')
 
@@ -340,11 +369,11 @@ def create_pinhole_zap_pair_list(datapath, dfile, distDir,pinholeCenter,writefil
         dist=nt.pbc_dist(simbox,pinholeCenter,curpos)
 
         
-        sepVecN=sepVec/np.linalg.norm(sepVec)
+        # sepVecN=sepVec/np.linalg.norm(sepVec)
             
-        if dist > maxRad or not (curpos[2]>17 and curpos[2]<30):
-            badO.append(i)
-            continue
+        # if dist > maxRad or not (curpos[2]>17 and curpos[2]<30):
+        #     badO.append(i)
+        #     continue
             
         
         #find all the H neighbors
@@ -433,8 +462,12 @@ def create_pinhole_zap_pair_list(datapath, dfile, distDir,pinholeCenter,writefil
                 p1=(i,nei)
                 p2=(nei,i)
                 
+                # if i not in pinatoms and nei not in pinatoms:
+                #     continue
                 #good pair if it got this far
-                #add this pair to the pair list              
+                
+                #add this pair to the pair list       
+                   
                 if p1 not in pairs and p2 not in pairs:
                     dprint(i,f"debug {nei} - success")
                     counts[i]+=1
@@ -662,6 +695,78 @@ def create_oh_pair_list(datapath, dfile, distDir,writefile=False,split=1):
             print(f"{curlen} total pairs added to the file {pairname}.")
     
     return pairs
+
+def place_random_O(L,zlims,seed):
+    L.commands_string(f''' 
+                    region r_randO block EDGE EDGE EDGE EDGE {zlims[0]} {zlims[1]}
+                    # #   create_atoms 2 random 1 12345 r_randO overlap 1.0 maxtry 1000
+                    # group new_atom empty
+                    fix fdep all deposit 1 2 1 {seed} region r_randO id max near 2
+                    run 1
+                      ''')
+
+# def create_interstitial_list(datapath, dfile, total_runs, distDir, pinholeCenter, writefile=False,split=1):
+
+#     z_max=29
+#     z_min=18
+
+#     general_outfolder="/home/adam/code/topcon-md/output/"
+    
+    
+#     for i in range(total_runs):
+#     filename=dfile.removesuffix('.dat').removesuffix('.data').removesuffix('.dump')
+
+
+#     (atoms, simbox) = nt.read_file_data_bonds(datapath,dfile)
+#     numAtoms=len(atoms.index)
+    
+    
+#     print(f'--------Running file: {datapath+dfile} with {numAtoms} atoms--------')
+#     atom_loc=[]
+    
+    
+#     L1 = nt.get_lammps(f'{outfolder}/logs/PrepNEB-I.log')
+    
+#     fileIdent=f'{seed}'
+
+#     reset1=outfolder+f'{fileIdent}-NEBI.dump'
+#     reset2=outfolder+f'{fileIdent}-NEBF.dump'
+#     nebI=outfolder+f'{fileIdent}-NEBI.data'
+#     nebF=outfolder+f'{fileIdent}-NEBF.data'
+#     full= outfolder+ f'{fileIdent}-Full.data'
+    
+#     PESimage=outfolder+f"PES({fileIdent}).png"
+#     ovitoFig=outfolder+f"{fileIdent}-Ovito.png"
+    
+#     # selection=[atomI,atomF]
+    
+    
+#     #initilize the data files 
+#     if file.endswith(".dump"):
+#         LT = get_lammps(f'{outfolder}/logs/PrepNEB-LT.log')
+#         #do this first initialize to get around reaxff issues(charge stuff I think)
+#         init_dump(LT,file,dumpstep)
+#         LT.commands_string(f'''
+#             write_data {full}
+#             ''')
+#         #
+#         init_dat(L1,full)
+#         # init_dat(L2,full)
+        
+#     elif file.endswith(".data") or file.endswith(".dat"):
+#         init_dat(L1,file)
+#         # init_dat(L2,file)
+#     else:
+#         print("File is not a .data or .dump")
+#         return
+    
+#     # place_random_O(L1,[bulk_low_z,bulk_high_z],seed)
+    
+#     atomI=L1.get_natoms()
+    
+    
+    
+
 
 def create_pinhole_pair_list_edge(datapath, dfile, distDir, pinholeCenter, writefile=False,split=1):
     
@@ -1179,11 +1284,11 @@ if __name__=='__main__':
     #current run defines
     debugatom=-1
     farmpath="/home/agoga/sandbox/topcon/data/neb/"
-    datapath="/home/agoga/documents/code/topcon-md/data/neb/"
+    datapath="/home/adam/code/topcon-md/data/neb/"
     #datapath=farmpath
     
-    distDirectory="PinholeCenterAll/" #'FillFullSet/'
-    
+    distDirectory="PinholeFileAll/" #'FillFullSet/'
+    distDirectory="minimized/"
     fd=datapath  #+distDirectory
 
     if not os.path.exists(fd):
@@ -1195,12 +1300,14 @@ if __name__=='__main__':
 
     i=1
     for d in Path(fd).glob('*.dat'):
-        if not str(d).endswith("boom_1.6-695.dat"):
+        if not str(d).endswith("1.6-135.dat"):
             continue
         print(f"{str(i)}) {str(d)}")
         dfile=str(d).split('/')[-1]
         #create_pinhole_zap_pair_list(datapath,dfile,distDirectory,[27,27,20],True)
-        create_all_O_neighbors_pair_list(datapath,dfile,distDirectory,[27,27,20],True) #pinhole center [27,27,20],
+        print(f'{datapath} | {dfile} | {distDirectory}')
+        create_all_zap_pair_list(datapath,dfile,distDirectory)
+        #create_all_O_neighbors_pair_list(datapath,dfile,distDirectory,[27,27,20],True) #pinhole center [27,27,20],
         i+=1
      
      

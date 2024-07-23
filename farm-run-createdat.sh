@@ -10,8 +10,8 @@
 #SBATCH --ntasks=512
 #SBATCH --ntasks-per-node=256
 #SBATCH --cpus-per-task=1 
-#SBATCH --mem=64G
-#SBATCH -t 4-0
+#SBATCH --mem=512G
+#SBATCH -t 1-0
 
 j=$SLURM_JOB_ID
 

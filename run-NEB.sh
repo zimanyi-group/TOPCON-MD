@@ -5,14 +5,14 @@
 
 
 
-neb_file=/home/agoga/documents/code/topcon-md/lmp/NEB.lmp
+neb_file=/home/adam/code/topcon-md/lmp/NEB.lmp
 
 export OMP_NUM_THREADS=1
 
 etol=0.01
 timestep=1
 
-num_replica=13
+num_replica=12
 skippes=1
 numruns=0
 start=`date +%s`
@@ -21,19 +21,20 @@ maxclimb=1000
 springconst=1
 plot=true
 create_gif=true
-data_folder=/home/agoga/documents/code/topcon-md/data/neb #/pinhole-dump-files/"
+data_folder=/home/adam/code/topcon-md/data/neb #/pinhole-dump-files/"
 
 setName=/InsidePinhole/
-setName=/PinholeCenterZap/
+setName=/PinholeFileAll/
+setName=/minimized/
 distFolder=$data_folder$setName"/"
-nebfolder="/home/agoga/documents/code/topcon-md/neb-out/"
+nebfolder="/home/adam/code/topcon-md/neb-out/"
 mkdir -p $nebfolder$setName
 
 
 # for data_file in "$distFolder"/*.dat
 # do
-data_file="${data_folder}${setName}/pinhole_1.6-551.dat"
-data_file="${data_folder}${setName}/Hcon-1500-695.dat"
+data_file="${data_folder}${setName}/1.6-135.dat"
+# data_file="${data_folder}${setName}/Hcon-1500-695.dat"
 #data_file="${data_folder}${setName}/boom_1.6-551.dat"
 pairsfile=${data_file%.*}"-pairlist.txt"
  
@@ -44,10 +45,11 @@ multi_jump="multi_jump"
 single_jump="single_jump"
 boomerang="boomerang"
 boomerang_zap="boomerang_zap"
+interstitial="interstitial"
 
 ########################################################
 ########################################################
-style=$boomerang_zap
+style=$single_jump
 ########################################################
 ########################################################
 
@@ -59,7 +61,7 @@ cyclelen=1
 
 mapfile -t pairs < $pairsfile
 
-for pair in "${pairs[@]}" # #"5976 5979" #
+for pair in "3229 22.163834824030072 15.725295307441327 29.029897218634833" # "${pairs[@]}" # #"5976 5979" #
 do
 
     pairarray=($pair)
@@ -141,11 +143,20 @@ do
         run_id="$atom_id-$zap_id"
         echo_string="to zap from "$run_id
 
-        num_repeat=10
+        num_repeat=1
 
         create_gif=true 
         
+    elif [[ $style == $interstitial ]];then
 
+        atom_id="${pairarray[0]}${pairarray[1]}"
+        zap_id=
+
+        run_id="$atom_id"
+        echo_string="interstitial w/ seed "$run_id
+
+
+        create_gif=true 
     fi
 
     
@@ -157,7 +168,7 @@ do
             ((numruns++))
 
 
-
+            good_run=false
             unique_tag=$run_id"_"$(date +%H%M%S)
 
             cwd=$(pwd) #current working directory
@@ -176,7 +187,7 @@ do
             # do
             neb_info_file=$out_folder"nebinfo_"$iboom".txt"
             echo "----------------Prepping NEB "$echo_string" ----------------"
-            mpirun -np 3 python3 /home/agoga/documents/code/topcon-md/py/PrepNEB.py \
+            mpiexec -np 2 python3 /home/adam/code/topcon-md/py/PrepNEB.py \
             --out=$out_folder --etol=$etol --ts=$timestep --dfile=$data_file --plot=$plot --atomid=$atom_id --info=$neb_info_file \
             --style=$style --fposx=$fPosx --fposy=$fPosy --fposz=$fPosz --bc1=$atomF1 --bc2=$atomF2 --bclist="$jumpPairs" --repeat=$num_repeat --zapid=$zap_id #  
             
@@ -187,6 +198,7 @@ do
                 
                 if [[ $line == neb* ]] #if the line starts with "neb"
                 then
+                    good_run=true
                     nebline=($line)
                     neb_atom_id=${nebline[2]}
                     neb_identifier=${nebline[3]}
@@ -199,8 +211,9 @@ do
                     log_file=$data_folder$logf
                     # final_data_file=$data_folder$dataf
 
+
                     echo "----------------Running NEB for "$neb_identifier" ----------------"
-                    mpirun -np $num_replica --oversubscribe lmp_mpi -partition "$num_replica"x1 \
+                    mpiexec -np 24 lmp_mpi -partition "$num_replica"x2 \
                         -nocite -log $log_file -in $neb_file -var maxneb $maxneb -var maxclimb $maxclimb -screen none \
                         -var output_folder $out_folder -var ts $timestep -var etol $etol  -var springconst $springconst -pscreen none \
                         -var identifier $neb_identifier -var h_id $h_id -var atom_id $neb_atom_id -var nebI $nebI -var nebF $nebF #-var dataf $final_data_file     
@@ -227,11 +240,14 @@ do
             #     fi
             # done
 
-            echo "----------------Post NEB "$echo_string"  ----------------"
-            python3 /home/agoga/documents/code/topcon-md/py/Process-NEB.py \
-            --out=$out_folder --etol=$etol --ts=$timestep --nebfolder=$nebfolder --dfile=$data_file \
-            --k=$springconst --plot=$plot --info=$neb_info_file --style=$style --gif=$create_gif --neblog=$log_file \
-            --atomid=$atom_id --cylen=$cyclelen #--remove=$zap_id 
+            if [[ $good_run == true ]]
+            then
+                echo "----------------Post NEB "$echo_string"  ----------------"
+                python3 /home/adam/code/topcon-md/py/Process-NEB.py \
+                --out=$out_folder --etol=$etol --ts=$timestep --nebfolder=$nebfolder --dfile=$data_file \
+                --k=$springconst --plot=$plot --info=$neb_info_file --style=$style --gif=$create_gif --neblog=$log_file \
+                --atomid=$neb_atom_id --cylen=$cyclelen #--remove=$zap_id 
+            fi
         
         done
     done

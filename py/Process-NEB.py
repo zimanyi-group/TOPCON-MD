@@ -116,7 +116,10 @@ def plot_mep(args,logfiles,figPath,hnum=0, plot=True, xo= 0.01):
 
         for text in txtl:
             print(f"max pe: {np.max(pel)}")
-            plt.text(xo, np.max(pel)*0.8, text, fontsize = 13)
+            maxpe=np.max(pel)
+            minpe=np.min(pel)
+            pelin=np.linspace(minpe,maxpe,num=20)
+            plt.text(xo, pelin[16], text, fontsize = 13)
             xo+=1
         
         #plt.text(xo, np.max(pe)*0.68, txt2,fontsize=14)
@@ -374,7 +377,7 @@ def render_neb_gif(dumpfiles, gifname, atom):
     from ovito.vis import TachyonRenderer
     
     
-    
+    print(dumpfiles)
     pipeline=import_file(dumpfiles)
     
     expr=f'ParticleIdentifier=={atom}'
@@ -389,10 +392,25 @@ def render_neb_gif(dumpfiles, gifname, atom):
     numframes=pipeline.source.num_frames
     #print(f"{numframes} for {dumpfiles}")
     fdata=pipeline.compute(numframes-1)
+    iselect_list=idata.particles_.positions_[idata.particles.selection != 0]
+    fselect_list=fdata.particles_.positions_[fdata.particles.selection != 0]
     
-    ipos=idata.particles_.positions_[idata.particles.selection != 0][0]
-    fpos=fdata.particles_.positions_[fdata.particles.selection != 0][0]
+    if len(iselect_list) > 0: 
+        ipos=iselect_list[0]
+    else:
+        ipos=None
+        print('i whoops')
+        
+    if len(fselect_list) > 0: 
+        fpos=fselect_list[0]
+    else:
+        fpos=None
+        print('f whoops')
     
+    if ipos is None and fpos is None:
+        print(f"Failed with {expr}")
+        return
+    print(f"Running with {expr}")
     midpt=[(fpos[0]+ipos[0])/2,(fpos[1]+ipos[1])/2,(fpos[2]+ipos[2])/2]
     width=[(fpos[0]-ipos[0]),(fpos[1]-ipos[1]),(fpos[2]-ipos[2])]
     data=pipeline.compute()

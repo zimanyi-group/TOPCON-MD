@@ -8,19 +8,24 @@ from mpi4py import MPI
 from matplotlib import pyplot as plt
 from random import gauss
 
-#from mpl_toolkits.axes_grid1 import make_axes_locatable
-import ovito
-from ovito.io import import_file, export_file
-from ovito.data import *
-from ovito.modifiers import *
-from ovito.vis import Viewport
-from ovito.vis import TachyonRenderer
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+#commented out 2/13/2024
+# import ovito
+# from ovito.io import import_file, export_file
+# from ovito.data import *
+# from ovito.modifiers import *
+# from ovito.vis import Viewport
+# from ovito.vis import TachyonRenderer
 import matplotlib.gridspec as gridspec
 import matplotlib as mpl
 from argparse import ArgumentParser
 
 
-skipPES=1
+skipPES=0
+dt=0.5
+etol=7e-6
+a=5.43
 class MidpointNormalize(mpl.colors.Normalize):
     def __init__(self, vmin, vmax, midpoint=0, clip=False):
         self.midpoint = midpoint
@@ -294,20 +299,20 @@ def plot_PES(PESimage,markerPts,xlist,zlist,elist,title):
     ab=maxE
     
     
-    # if abs(minE) >ab:
-    #     ab=abs(minE)
-    # max=12
+    maxE=56
+    minE=-8
+    
     # if minE < -max:
-    #     minE=-max
+    #     minE=-8
     # if maxE > max:
     #     maxE=max
         
-    # elist[elist<-max]=-max
-    # elist[elist>max]=max
-    #minE=-maxE
+    elist[elist<minE]=minE
+    elist[elist>maxE]=maxE
+    # minE=-maxE
     # maxE=2*abs(minE)
-    # if maxE<18:
-    #     maxE=18
+    # if maxE<max:
+    #     maxE=max
     # elist[elist>maxE]=maxE
     
     
@@ -330,7 +335,7 @@ def plot_PES(PESimage,markerPts,xlist,zlist,elist,title):
     plt.ylabel('Δz(Å)',labelpad=0.05)
     
     
-    #divider = make_axes_locatable(ax)
+    divider = make_axes_locatable(ax)
     cax = divider.append_axes('right', size='5%', pad=0.05)
     cbar=fig.colorbar(im,cax=cax,orientation='vertical')
     cbar.set_label('ΔE(eV)')
@@ -394,11 +399,56 @@ def recenter_sim(L,r):
     
     return bbox
 
+
+
 def get_lammps(log):
     return lammps('mpi',["-log",log,'-screen','none'])
 
 
+def place_random_O(L,zlims,seed):
+    L.commands_string(f''' 
+                    region r_randO block EDGE EDGE EDGE EDGE {zlims[0]} {zlims[1]}
+                    create_atoms 2 random 1 {seed} r_randO overlap 1.0 maxtry 1000
+                    # group new_atom empty
+                    # fix fdep all deposit 1 2 1 {seed} region r_randO id max near 2
+                    # run 1
+                      ''')
+    
+def find_neighboring_sibc(atoms,oi):
+    #start with an Oxygen and find all neighboring Si with BC vacancies
+    nindices=atoms.at[oi,'bonds']
+    #look to see if this atom has any neighboring SI with vacancies
+    print(f'numbonds={len(nindices)}')
+    si_bc_vac=[]
+    badsi=[]
+    for n in nindices:
+        
+        ni=n[0]
+        neitype=atoms.at[ni,'type']
+        if neitype=='Si':
 
+            sibonds=atoms.at[ni,'bonds']
+                    
+            badsi=[]  
+            for b in sibonds:
+                bi=b[0]
+                btype=atoms.at[bi,'type']
+                if btype=='H' or btype=='O':
+                    bb=atoms.at[bi,'bonds']
+                    for bn in bb:
+                        bni=bn[0]
+                        bntype=atoms.at[bni,'type']
+                        if bntype=='Si' and bni !=ni:
+                            badsi.append(bni)
+        
+            
+            for nnn in sibonds:
+                nnni=nnn[0]
+                nnntype=atoms.at[nnni,'type']
+                if nnntype=='Si'and nnni not in badsi:
+                    si_bc_vac.append([ni,nnni])
+    
+    return si_bc_vac
 
 def prep_neb_zap_multi(file,dumpstep,atomI,aditionalAtoms,atomF,outfolder,infofile,plot,skipPES=True):
     
@@ -692,7 +742,6 @@ def prep_neb_to_bond_center(args,ident,atomF1=None,atomF2=None,datafile=None,dum
     return prep_neb_to_location(args,ident,fileIdent,midpoint,L1=L1,dumpstep=dumpstep,write_info=write_info)
     
 
-
 def prep_neb_to_location(args,fileIdent,ident,fpos,datafile=None,L1=None,dumpstep=0,write_info=True):
     outfolder=args.out
     atomI=args.atomid
@@ -942,7 +991,8 @@ def prep_neb_zap_single(args):
     file=args.dfile
     plot=args.plot
     dumpstep=0
-    skipPES=1
+    skipPES=0
+    
     
     plt.rcParams["figure.autolayout"] = True
     
@@ -959,7 +1009,7 @@ def prep_neb_zap_single(args):
     nebF=outfolder+f'{fileIdent}-NEBF.data'
     full= outfolder+ f'{fileIdent}-Full.data'
     
-    PESimage=outfolder+f"PES({fileIdent}).png"
+    PESimage="/home/adam/code/topcon-md/neb-out/"+f"PES({fileIdent}).png"
     ovitoFig=outfolder+f"{fileIdent}-Ovito.png"
     
     selection=[atomI,atomF]
@@ -988,8 +1038,7 @@ def prep_neb_zap_single(args):
     ##### L1 - create the initial NEB data file
     ri = find_atom_position(L1,atomI)
     rf = find_atom_position(L1,atomF)
-    
-        
+
     if me==0:
         #write info file
         with open(infofile,'a') as f:
@@ -1111,7 +1160,10 @@ def prep_neb_zap_single(args):
     redXPts=np.transpose([[0,0]])
     allPts=[['x',redXPts]]
     
+    
+    print(f'got here 2')
     if skipPES != 1 and me==0:
+        print(f'plotting PES - {PESimage}')
         plot_PES(PESimage,allPts,xlist,zlist,elist,plottitle)
     
     
@@ -1268,6 +1320,145 @@ def prep_neb_boomerang(args):
             #             )
 
 
+def prep_interstitial(args):
+    
+    
+    import NEBTools as nt
+    import warnings
+    
+    
+    warnings.filterwarnings('ignore', message='Setting an item of incompatible dtype is deprecated and will raise in a future error of pandas.*')
+    outfolder=args.out
+   
+    seed=args.atomid
+    
+    infofile=args.info
+    file=args.dfile
+    plot=args.plot
+    dumpstep=0
+    skipPES=1
+    
+    
+    bulk_low_z = 18
+    bulk_high_z = 29
+    
+    plt.rcParams["figure.autolayout"] = True
+    
+    L1 = get_lammps(f'{outfolder}/logs/PrepNEB-I.log')
+    
+    fileIdent=f'{seed}'
+
+
+    nebI=outfolder+f'{fileIdent}-NEBI.data'
+    nebF=outfolder+f'{fileIdent}-NEBF.data'
+    full= outfolder+ f'{fileIdent}-Full.data'
+    
+    # PESimage=outfolder+f"PES({fileIdent}).png"
+    # ovitoFig=outfolder+f"{fileIdent}-Ovito.png"
+
+    
+    #initilize the data files 
+    if file.endswith(".dump"):
+        LT = get_lammps(f'{outfolder}/logs/PrepNEB-LT.log')
+        #do this first initialize to get around reaxff issues(charge stuff I think)
+        init_dump(LT,file,dumpstep)
+        LT.commands_string(f'''
+            write_data {full}
+            ''')
+        #
+        init_dat(L1,full)
+        # init_dat(L2,full)
+        
+    elif file.endswith(".data") or file.endswith(".dat"):
+        init_dat(L1,file)
+        # init_dat(L2,file)
+    else:
+        print("File is not a .data or .dump")
+        return
+    
+    if me==0:
+        print(f'seed - {seed}')
+    
+    pre_atoms=L1.get_natoms()
+    
+    # try:
+    #      find_atom_position(L1,pre_atoms+1)
+    # except Exception as e:
+    #     print(e)
+    
+    tempfile_name1=f'{fileIdent}-pre_addedO.data'
+    tempfile1=outfolder+f'{tempfile_name1}'
+    
+    L1.commands_string(f'''
+        write_data {tempfile1}
+        ''')
+
+    place_random_O(L1,[bulk_low_z,bulk_high_z],seed)
+    
+    atomI=L1.get_natoms()
+    
+    if me==0:
+        print(f"pre {pre_atoms} post {atomI}")
+    
+    
+    
+    NEB_min(L1)
+    
+    ##### L1 - create the initial NEB data file
+    ri = find_atom_position(L1,atomI)
+
+
+    tempfile_name=f'{fileIdent}-addedO.data'
+    tempfile=outfolder+f'{tempfile_name}'
+    L1.commands_string(f'''
+        write_data {tempfile}
+        ''')
+    if me==0:
+        print('here1')
+    (atoms, simbox) = nt.read_file_data_bonds(outfolder,tempfile_name)
+    if me==0:
+        print('here2')
+        
+    sibc=find_neighboring_sibc(atoms,atomI)
+    
+    if len(sibc) == 0:
+        print('No suitible bond centers found?')
+        return
+    
+    if me==0:
+        print('here3')
+        
+    args.atomid=atomI
+    args.dfile=tempfile
+    
+    
+    prep_neb_to_bond_center(args,seed,atomF1=sibc[0][0],atomF2=sibc[0][1])
+    
+    # # if me==0:
+    # #     #write info file
+    # #     with open(infofile,'a') as f:
+    # #         f.write(f"zap\n")
+    # #         f.write(f"neb 0 {atomI} {fileIdent} {nebI} {nebF} {fileIdent}.log {atomI}\n"+#bash file is expecting a h atom after log file
+    # #                 f"initial-dat-0 {nebI}\n"+
+    # #                 f"final-dat-0 {nebF}\n"
+    # #                 )
+    
+    
+    # icoord=ri#have to use the coordinates before recentering
+    # #print(L1.extract_compute('thermo_pe',0,0)*conv)
+    # bbox=recenter_sim(L1,ri)
+    # #print(L1.extract_compute('thermo_pe',0,0)*conv)
+
+    # #ri = find_atom_position(L1,atomI)
+    # NEB_min(L1)
+    # r_initial = find_atom_position(L1,atomI)
+    
+    # L1.commands_string(f'''
+    # write_data {nebI}
+    # ''')
+
+
+
 def str2bool(v):
     if isinstance(v, bool):
         return v
@@ -1319,7 +1510,7 @@ if __name__ == "__main__":
     #conversion from kcal/mol to eV
     conv=0.043361254529175
 
-    xzhalfwidth = 20.1
+    xzhalfwidth = 5.1
     yhwidth=5.1
     step = .5
     buff=1
@@ -1350,6 +1541,7 @@ if __name__ == "__main__":
     # prep_neb_zap_single(datafile,dumpstep,atomI,zapID,outfolder,infofile,plot)
 
     #print(f"{outfolder} {etol} {dt} {datafile} {atomI} {numjumps} {bondcenter_list}")
+
     if args.style=='multi_jump':
         nebFiles =prep_neb_multi_jump(args)#,datafile,dumpstep,atomI,outfolder,infofile,plot)
     elif args.style=='single_jump':
@@ -1372,6 +1564,9 @@ if __name__ == "__main__":
         
     elif args.style=='boomerang_zap':
         prep_neb_boomerang_zap(args)
+        
+    elif args.style =='interstitial':
+        prep_interstitial(args)
     
 
     MPI.Finalize()

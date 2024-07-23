@@ -54,7 +54,7 @@ def create_lmp_file(file,out,dumpstep=0):
         variable NA equal 6.02e23
  
 
-        variable printevery equal 100
+        variable printevery equal 10000
         variable restartevery equal 0#500000
         variable datapath string "data/"
         timestep {dt}
@@ -62,15 +62,6 @@ def create_lmp_file(file,out,dumpstep=0):
         variable massSi equal 28.0855 #Si
         variable massO equal 15.9991 #O
         variable massH equal  1.00784 #H 
-        print $(v_infile)
-        print $(v_outfile)
-        '''
-    print(f"Loading file with path: {file}")
-    if  file.endswith(".dump"):
-        lammps_str+=f'''
-        variable massH equal  1.00784 #H 
-        print $(v_infile)
-        print $(v_outfile)
         '''
     print(f"Loading file with path: {file}")
     if  file.endswith(".dump"):
@@ -89,12 +80,12 @@ def create_lmp_file(file,out,dumpstep=0):
         read_data {file}
                         '''
 
-    # lammps_str+=f'''
-    #     '''
-    elif file.endswith(".data") or file.endswith(".dat"):
-        lammps_str+=f'''
-        read_data {file}
-                        '''
+    # # lammps_str+=f'''
+    # #     '''
+    # elif file.endswith(".data") or file.endswith(".dat"):
+    #     lammps_str+=f'''
+    #     read_data {file}
+    #                     '''
 
     lammps_str+=f'''
         
@@ -121,15 +112,36 @@ def create_lmp_file(file,out,dumpstep=0):
         
         fix r1 all qeq/reax 1 0.0 10.0 1e-6 reaxff
 
-
+        
         reset_atom_ids
+        
         '''
-    lammps_str += NEB_min()
         
     lammps_str+=f'''
         group gSi type 1
         group gO type 2
         group gH type 3
+        
+        region wafer block EDGE EDGE EDGE EDGE 1.0 2.0 units lattice
+        group CRYST region wafer
+
+
+
+        group SILICON type 1
+        group OXYGEN type 2
+        group HYDROGEN type 3
+
+        group cSi intersect CRYST SILICON
+
+        group mobile subtract all cSi
+        
+        fix h1 mobile nvt temp 300 300 $(100.0 * dt)
+        run  1000000
+        
+        '''
+    lammps_str += NEB_min()
+        
+    lammps_str+=f'''
         
         variable tot equal $(count(gSi)+count(gO)+count(gH))
         variable Htot equal count(gH)
@@ -138,6 +150,7 @@ def create_lmp_file(file,out,dumpstep=0):
         print '~$(v_perctH)% Hydrogen'
         
         write_data {out} '''
+        
     print(f"Saving file with path: {out}")
     return lammps_str
 
@@ -185,16 +198,11 @@ def create_dat(file,out,dumpstep=0):
     L = lammps('mpi',cmdargs=["-var","infile",file,'-var',"outfile",out])
     L.commands_string(lstr)
     
-    lstr=create_lmp_file(file,out,dumpstep)
-
-    L = lammps('mpi',cmdargs=["-var","infile",file,'-var',"outfile",out])
-    L.commands_string(lstr)
+    # recenter_sim(L)
     
-    recenter_sim(L)
-    
-    L.commands_string('''
-                      write_data /home/agoga/documents/code/topcon-md/data/neb/centered_Hcon-1500-695.dat
-                      ''')
+    # L.commands_string('''
+    #                   write_data /home/adam/code/topcon-md/data/neb/centered_Hcon-1500-695.dat
+    #                   ''')
     
 
 def prep_data(file,dumpstep,outfolder):
@@ -202,15 +210,16 @@ def prep_data(file,dumpstep,outfolder):
     nprocs = MPI.COMM_WORLD.Get_size()
     
     outfile=file.removesuffix('.dat').removesuffix('.data').removesuffix('.dump')+".data"
+    outfile=outfile.split('/')[-1]
     print(outfile)
     #L = lammps('mpi',["-var",f"infile {file}",'-var',f"outfile {outfile}"])
-    create_dat(file,outfile,dumpstep)
+    create_dat(file,outfolder+outfile,dumpstep)
 
          
-    outfile=file.removesuffix('.dat').removesuffix('.data').removesuffix('.dump')+".data"
-    print(outfile)
-    #L = lammps('mpi',["-var",f"infile {file}",'-var',f"outfile {outfile}"])
-    create_dat(file,outfile,dumpstep)
+    # outfile=file.removesuffix('.dat').removesuffix('.data').removesuffix('.dump')+".data"
+    # print(outfile)
+    # #L = lammps('mpi',["-var",f"infile {file}",'-var',f"outfile {outfile}"])
+    # create_dat(file,outfile,dumpstep)
 
     return
 
@@ -229,12 +238,16 @@ if __name__ == "__main__":
 
     # flist=["Hcon-1500-110.dump","Hcon-1500-220.dump","Hcon-1500-330.dump","Hcon-1500-440.dump","Hcon-1500-550.dump","Hcon-1500-695.dump","Hcon-1500-880.dump","Hcon-1500-990.dump"]
     # flist=["1.6-381.dat","1.7-276.dat","1.8-280.dat"]
-    folderpath="/home/agoga/documents/code/topcon-md/data/pinhole-dump-files/"
-    outfolder="/home/agoga/documents/code/topcon-md/data/NEB/"
-    f="Hcon-1500-695.dump"
-    dumpstep=1510053
+    # folderpath="/home/adam/code/topcon-md/data/pinhole-dump-files/"
+    # outfolder="/home/adam/code/topcon-md/data/neb/"
+    # f="Hcon-1500-695.dump"
+    # dumpstep=1510053
+    
+    folderpath="/home/adam/code/topcon-md/data/neb/"
+    outfolder="/home/adam/code/topcon-md/data/neb/minimized/"
+    f="1.6-135.dat"
     filepath=os.path.join(folderpath,f)
-    nebFiles =prep_data(filepath,dumpstep,outfolder)
+    nebFiles =prep_data(filepath,0,outfolder)
 
     # outfolder="/home/agoga/documents/code/topcon-md/data/NEB/"
     # #filepath=os.path.join(folderpath,file)

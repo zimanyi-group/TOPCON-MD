@@ -23,8 +23,8 @@ variable massH equal  1.00784 #H
 
 # create_box 3 sim
 
-print "${infile}"
-read_data ${infile} #0 x y z box yes add keep
+
+read_data /home/adam/code/topcon-md/data/neb/1.6-551_pre_pinhole.dat #0 x y z box yes add keep
 
 mass         3 $(v_massH)
 mass         2 $(v_massO)
@@ -32,6 +32,19 @@ mass         1 $(v_massSi)
 
 lattice none 1.0
 min_style quickmin
+
+region wafer block EDGE EDGE EDGE EDGE 1.0 2.0 units lattice
+group CRYST region wafer
+
+
+
+group SILICON type 1
+group OXYGEN type 2
+group HYDROGEN type 3
+
+group cSi intersect CRYST SILICON
+
+group mobile subtract all cSi
 
 pair_style	    reaxff potential/topcon.control 
 pair_coeff	    * * potential/ffield_Nayir_SiO_2019.reax Si O H
@@ -45,13 +58,26 @@ thermo $(v_printevery)
 thermo_style custom step temp density press vol pe ke etotal #flush yes
 thermo_modify lost ignore
 
+dump d1 all custom 1000 /home/adam/code/topcon-md/data/createdat.dump id type q x y z ix iy iz mass element vx vy vz
+dump_modify d1 element Si O H
+
 log none
 
 fix r1 all qeq/reax 1 0.0 10.0 1e-6 reaxff
 #compute c1 all property/atom x y z
 
-reset_atom_ids
-minimize 1e-9 1e-9 2000000 2000000
+
+# reset_atom_ids
+
+
+
+fix h1 mobile nvt temp 300 300 $(100.0 * dt)
+run  750000
+
+
+minimize 1e-8 1e-8 100000 100000
+
+
 group gSi type 1
 group gO type 2
 group gH type 3
@@ -62,4 +88,4 @@ variable perctH equal round($(100*v_Htot/v_tot))
 
 print '~$(v_perctH)% Hydrogen'
 
-write_data ${outfile}
+write_data /home/adam/code/topcon-md/data/createdat.dat 
