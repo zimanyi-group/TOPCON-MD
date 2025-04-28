@@ -21,3 +21,6 @@ data/zeke/*
 *.dat
 *.bonds
 *.txt
+*COLVAR
+*HILLS
+*out

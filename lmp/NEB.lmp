@@ -33,8 +33,9 @@ mass         3 ${massH}
 
 
 
-pair_style	    reaxff potential/topcon.control
-pair_coeff	    * * potential/ffield_Nayir_SiO_2019.reax Si O H
+pair_style	    reaxff NULL
+# pair_coeff	    * * potential/ffield_Nayir_SiO_2019.reax Si O H
+pair_coeff	    * * potential/ffield_Fogarty.reax Si O H
 #Pair style reaxff requires use of exactly one of the fix qeq/reaxff or fix qeq/shielded or fix acks2/reaxff commands 
 
 
@@ -42,7 +43,7 @@ neighbor        2 bin
 neigh_modify    every 10 delay 0 check no
 
 timestep ${dt}
-min_style quickmin
+min_style fire
 
 
 dump d1 all custom ${printevery} ${output_folder}${identifier}-neb.dump id type q x y z ix iy iz mass element vx vy vz
@@ -58,7 +59,7 @@ fix r1 all qeq/reax 1 0.0 10.0 1e-6 reaxff
 
 group gNEB id ${atom_id} ${h_id}
 
-fix n1 gNEB neb ${springconst} parallel ideal perp ${springconst}
+fix n1 all neb ${springconst} parallel ideal perp ${springconst}
 
 
 neb ${etol} ${etol} ${maxneb} ${maxclimb} 100 final ${nebF}

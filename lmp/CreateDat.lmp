@@ -9,7 +9,7 @@ variable seed equal 12345
 variable NA equal 6.02e23
 
 
-variable printevery equal 10000
+variable printevery equal 100000
 variable restartevery equal 0#500000
 timestep 0.5
 
@@ -17,14 +17,14 @@ variable massSi equal 28.0855 #Si
 variable massO equal 15.9991 #O
 variable massH equal  1.00784 #H
 
-# region sim block 0 1 0 1 0 1
+region sim block 0 1 0 1 0 1
+        
+        
+lattice diamond {a}
 
-# lattice diamond 5.43
+create_box 3 sim
 
-# create_box 3 sim
-
-
-read_data /home/adam/code/topcon-md/data/neb/1.6-551_pre_pinhole.dat #0 x y z box yes add keep
+read_dump ${infile} {dumpstep} x y z box yes add keep
 
 mass         3 $(v_massH)
 mass         2 $(v_massO)
@@ -58,25 +58,28 @@ thermo $(v_printevery)
 thermo_style custom step temp density press vol pe ke etotal #flush yes
 thermo_modify lost ignore
 
-dump d1 all custom 1000 /home/adam/code/topcon-md/data/createdat.dump id type q x y z ix iy iz mass element vx vy vz
+
+
+dump d1 all custom 100000 ${output_folder}createdat.dump id type q x y z ix iy iz mass element vx vy vz
 dump_modify d1 element Si O H
 
-log none
+
 
 fix r1 all qeq/reax 1 0.0 10.0 1e-6 reaxff
 #compute c1 all property/atom x y z
 
-
-# reset_atom_ids
-
+reset_atom_ids
 
 
 fix h1 mobile nvt temp 300 300 $(100.0 * dt)
-run  750000
+run  600000
+unfix h1
 
+fix h2 mobile nvt temp 300 1 $(100.0 * dt)
+run  8000000
+unfix h2
 
-minimize 1e-8 1e-8 100000 100000
-
+minimize 7e-06 7e-06 100000 100000
 
 group gSi type 1
 group gO type 2
@@ -88,4 +91,4 @@ variable perctH equal round($(100*v_Htot/v_tot))
 
 print '~$(v_perctH)% Hydrogen'
 
-write_data /home/adam/code/topcon-md/data/createdat.dat 
+write_data ${outfile}

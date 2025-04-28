@@ -1,17 +1,24 @@
-#!/bin/sh
+#!/bin/bash -l
+#! -cwd
+#! -j y
+#! -S /bin/bash
 #SBATCH -D ./
 #SBATCH --job-name=creDat
 #SBATCH --partition=med2 # Partition you are running on. Options: low2, med2, high2
 #SBATCH --output=/home/agoga/sandbox/topcon/slurm-output/j-%j.txt
 #SBATCH --mail-user="adgoga@ucdavis.edu"
 #SBATCH --mail-type=FAIL,END
+#SBATCH --exclude=cpu-3-67,cpu-4-86,cpu-4-90
 
-
-#SBATCH --ntasks=512
+#SBATCH --ntasks=256
 #SBATCH --ntasks-per-node=256
 #SBATCH --cpus-per-task=1 
-#SBATCH --mem=512G
-#SBATCH -t 1-0
+#SBATCH --mem=128G
+#SBATCH -t 10-0
+
+export OMP_NUM_THREADS=1
+module load fftw
+module load openblas
 
 j=$SLURM_JOB_ID
 
@@ -55,14 +62,14 @@ cp $IN_FILE $OUT_FOLDER
 
 
 
-export OMP_NUM_THREADS=1
+
 # export OMP_PLACES=threads
 # export OMP_PROC_BIND=true
 
 SF=/home/agoga/sandbox/topcon/slurm-output/j-$j.txt
 
 #                       Creates a variable in lammps ${output_folder}
-if srun /home/agoga/lammps-23Jun2022/build/lmp_mpi -nocite -log $LOG_FILE -in $OUT_FOLDER$FILENAME -var infile $INPUTFILE -var outfile $OUTPUTFILE -var output_folder $OUT_FOLDER ; 
+if srun /home/zmcrawfo/lmp_mpi -nocite -log $LOG_FILE -in $OUT_FOLDER$FILENAME -var infile $INPUTFILE -var outfile $OUTPUTFILE -var output_folder $OUT_FOLDER ; 
 
 #after srun exits
 then #rename the output directory to show it's finished

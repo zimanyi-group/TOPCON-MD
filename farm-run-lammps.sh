@@ -31,7 +31,7 @@ fi
 if [ -z "$5" ]; #if no time given then default to 4 days
 then
     set -- "$@" '4-0'
-elif [$5 != *"-"*];
+elif ["$5" != *"-"*];
 then
     echo $usagestr
     echo 'Acceptable time formats include "days-hours", "days-hours:minutes" and "days-hours:minutes:seconds", maybe I should fix this if I want shorter times.'
@@ -47,13 +47,13 @@ sbatch <<-EOT
 #SBATCH --partition=$4 # Partition you are running on. Options: low2, med2, high2
 #SBATCH --output=/home/agoga/sandbox/topcon/slurm-output/j-%j.txt
 #SBATCH --mail-user="adgoga@ucdavis.edu"
-#SBATCH --mail-type=FAIL,END
+#SBATCH --mail-type=FAIL,EN
 
 
 #SBATCH --ntasks=$3
 #SBATCH --ntasks-per-node=$3
 #SBATCH --cpus-per-task=1 
-#SBATCH --mem=64G
+#SBATCH --mem=250G
 #SBATCH -t $5
 
 j=\$SLURM_JOB_ID
@@ -84,14 +84,14 @@ cp \$IN_FILE \$OUT_FOLDER
 
 
 
-export OMP_NUM_THREADS=1
+export OMP_NUM_THREADS=2
 # export OMP_PLACES=threads
 # export OMP_PROC_BIND=true
 
 SF=/home/agoga/sandbox/topcon/slurm-output/j-\$j.txt
 
 #                       Creates a variable in lammps \${output_folder}
-if srun /home/agoga/lammps-23Jun2022/build/lmp_mpi -nocite -log \$LOG_FILE -in \$OUT_FOLDER\$FILENAME -var output_folder \$OUT_FOLDER ; 
+if srun /home/agoga/lammps-29Aug2024/build/lmp_mpi -nocite -log \$LOG_FILE -in \$OUT_FOLDER\$FILENAME -var output_folder \$OUT_FOLDER ; 
 
 #after srun exits
 then #rename the output directory to show it's finished
