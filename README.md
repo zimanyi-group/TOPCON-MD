@@ -15,7 +15,7 @@ The important steps and files in the NEB pipeline;
      - A Python script to analyze the results, save the data, and create a plot/animation of the process that the NEB calculation was done on(example shown on right) - [Process-NEB.py](py/Process-NEB.py).
 4) The polished images/gifs and csv file containing the pipeline results default to [neb-out/](/neb-out/) while the specific log and debug files are placed in the [output/](output/) folder for deeper analysis or bug fixing.
 
-## Styles of NEB process
+## Types of NEB processes implemented
 There are a number of styles that are currently available to create an NEB process from.
 1) Single/Multi 'Zap' - This process simulates vacancy migration in a solid. It takes the ID of an initial atom and a final atom, the final atom is deleted and its position is used as the final location for the NEB process. The multi-version of this takes a number of atom IDs for the final atom and does an NEB process for each of these using the final image of the previous NEB jump as the initial image of the next jump. This was used to study oxygen atoms vacating a specific region.
 2) Single/Multi jump - This process takes the ID of an initial atom and a location that the atom will move to, the multi version proceeds similarly to the above. This type of process needs a fair bit of analysis ahead of time during the creation of the pairlist. This can be used to simulate lots of different processes, depending on what is needed, and is the primary function you should start using.
