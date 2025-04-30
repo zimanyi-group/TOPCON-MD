@@ -21,7 +21,7 @@ neb_file=/home/adam/code/topcon-md/lmp/NEB.lmp
 
 export OMP_NUM_THREADS=1
 
-
+#placeholder values that get overwritten
 etol=0.01
 timestep=1
 
