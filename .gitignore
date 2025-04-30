@@ -24,3 +24,5 @@ data/zeke/*
 *COLVAR
 *HILLS
 *out
+__pycache__/*
+py/__pycache__/*
