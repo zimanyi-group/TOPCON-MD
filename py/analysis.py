@@ -1,4 +1,9 @@
 #!/usr/bin/env python
+"""
+Author: Adam Goga
+This script contains functions for studying samples using the Ovito python library. Primarly used for doing coordination and RDF analysis
+on samples to determine if they have properties which match up with experiments.
+"""
 from ovito.io import import_file, export_file
 import ovito.modifiers as m#import BondAnalysisModifier, CreateBondsModifier,CoordinationAnalysisModifier,TimeSeriesModifier
 import glob, os
@@ -37,6 +42,15 @@ def create_NEB_gif(folder,dumpname):
 
 
 def modify(frame: int, data: DataCollection, typeA = 2, typeB = 1, cutoff_radius = 3.6):
+    """
+    Modify the data collection by computing various properties based on the input parameters.
+    :param frame - the frame number
+    :param data - the data collection to be modified
+    :param typeA - the type of particle A
+    :param typeB - the type of particle B
+    :param cutoff_radius - the cutoff radius for computing properties
+    :return None
+    """
     
     data.apply(SelectTypeModifier(types = {typeA}))
     data.apply(ComputePropertyModifier(output_property = f'Type{typeA}-Type{typeB}-coord', only_selected = True, cutoff_radius = cutoff_radius, neighbor_expressions = (f'ParticleType == {typeB}',)))    
@@ -49,6 +63,12 @@ def modify(frame: int, data: DataCollection, typeA = 2, typeB = 1, cutoff_radius
     print(f"Fraction of Type{typeB} atoms: {data.attributes['SelectType.num_selected.2']/data.particles.count:.2f}")
     
 def coordinationTimeseries(folderList,coordList):
+    """
+    Generate a time series data for coordination values based on the provided folder list and coordination list.
+    :param folderList - List of folders containing data files
+    :param coordList - List of coordination values
+    :return Time series data for coordination values
+    """
     pipelineList=[]
     numCoordNumbers=len(coordList)
 
@@ -121,7 +141,14 @@ def coordinationTimeseries(folderList,coordList):
         
     return tsData
 
-def plotTimeSeries(data,coordList,reduction=0,timestepLabels=[],title=''):
+def plotTimeSeries(data,coordList,timestepLabels=[],title=''):
+    """
+    Create a time series plot for the given coordination list.
+    :param data - the data to be plotted
+    :param coordList - list of atoms types with their coordinations to be plotted
+    :param timestepLabels - labels for each time step
+    :param title - title for the plot
+    """
     fig = plt.figure()
     linecycler = cycle(lines)
     colorcycler = cycle(colors)
@@ -201,6 +228,12 @@ def plotTimeSeries(data,coordList,reduction=0,timestepLabels=[],title=''):
     plt.show()
     
 def rdfTimeseries(file,range,out):
+    """
+    Generate a timeseries plot for radial distribution function (RDF) data.
+    :param file - the input file containing RDF data
+    :param range - the range of values to consider
+    :param out - the output directory to save the plots
+    """
     # fig = plt.figure() 
     
     # # marking the x-axis and y-axis
@@ -265,6 +298,12 @@ def rdfTimeseries(file,range,out):
     #     return i
               
 def bondAnalysis(datafile,plot):
+    """
+    Perform bond analysis on the datafile and optionally plot the results.
+    :param datafile - the file containing the data for bond analysis
+    :param plot - a boolean indicating whether to plot the results
+    :return None
+    """
     try: 
         # datafile=''
         # # os.chdir(folder)
@@ -279,7 +318,7 @@ def bondAnalysis(datafile,plot):
         #numframes=pipeline.source.num_frames
 
         pipeline.modifiers.append(m.CreateBondsModifier(cutoff = 2.7))
-        pipeline.modifiers.append(m.BondAnalysisModifier(partition=m.BondAnalysisModifier.Partition.ByParticleType,bins = 200))
+        pipeline.modifiers.append(m.BondAnalysisModifier(partition=m.BondAnalysisModifier.Partition.ByParticleType,bins = 100))
         
         # Export bond angle distribution to an output text file.
         #export_file(pipeline, 'output/bond_angles.txt', 'txt/table', key='bond-angle-distr', end_frame=1)
@@ -311,12 +350,12 @@ def bondAnalysis(datafile,plot):
         peakAngle=angleBins[np.argmax(angleCounts)]
         angTitle= "Angle distribution for bond types: {} with a max angle of {:.1f}".format(name,peakAngle)
         outlist.append(angTitle)
-        if plot:
-            plt.bar(angleBins,angleCounts)
-            plt.title(angTitle)
-            plt.xlabel('Angle(Degrees)')
-            plt.ylabel('Count')
-            plt.show()
+        # if plot:
+        #     plt.bar(angleBins,angleCounts)
+        #     plt.title(angTitle)
+        #     plt.xlabel('Angle(Degrees)')
+        #     plt.ylabel('Count')
+        #     plt.show()
     
     
     lenTables=data.tables['bond-length-distr'].xy()
@@ -338,9 +377,14 @@ def bondAnalysis(datafile,plot):
             
             # plt.ylim(min_y_lim, max_y_lim)
             plt.title(lenTitle)
-            plt.xlabel('Length(r’$\AA$’')
-            plt.bar(bondBins,bondCounts)
+            plt.xlabel(r'Length($\AA$)')
+            plt.bar(bondBins,bondCounts,width=.2)
             plt.show()
+            print(lenTitle)
+            for i in range(len(bondBins)):
+                if bondCounts[i]<1:
+                    continue
+                print(f"{bondBins[i]:0.3f}-{bondCounts[i]}")
         
     for s in outlist:
         print(s)

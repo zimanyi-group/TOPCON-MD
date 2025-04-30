@@ -1,4 +1,10 @@
 #!/usr/bin/env python
+"""
+Author: Adam Goga
+This script contains functions for post NEB pipeline analysis. Many of the functions require a csv file that has been created by the pipeline and will
+create plots that study different features of the distribution of barriers that the pipeline created. Such as the relationship between the barrier for 
+vacancy migration and the angle between the initial and final location that the atom traveled over.
+"""
 # from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 import os
@@ -9,26 +15,22 @@ from ovito.modifiers import AffineTransformationModifier
 from ovito.pipeline import ModifierInterface
 from traits.api import Range, observe
 import numpy as np
-from sympy import Point3D, Line3D, Plane
+
 
 import numpy as np
 import statistics
-from scipy import stats
+
 from pathlib import Path
 from lammps import lammps
+import NEBTools_setup as nts
 
-# import dask.dataframe as dd
-# from dask.multiprocessing import get
-# from operator import itemgetter
-# from math import degrees
 import pandas as pd
 pd.options.mode.chained_assignment = None 
 from ast import literal_eval
 import os
 from mpi4py import MPI
 import time
-# import matplotlib.cm as cm
-# import matplotlib.colors as colors
+
 from ase.geometry import get_angles
 import ase.cell
 
@@ -43,119 +45,20 @@ me = MPI.COMM_WORLD.Get_rank()
 numproc=MPI.COMM_WORLD.Get_size()
 
 
-conv=0.043361254529175
-
+#fixed bond order maximum
 SiOBondOrder=0.9
+
 neb_data_if_folder="/home/adam/code/topcon-md/neb-out/data/"
 image_folder="/home/adam/code/topcon-md/neb-out/analysis-images/"
 datafolder="/home/adam/code/topcon-md/data/neb/"
 
+#calculation to take number of H in sample to a concentration as found in the Kang paper
 v=4.74e-20
 w=1.6e-7
 HNumToConcentration=w/v
 
-def pbc_midpoint(simbox,p1,p2):
-    ret=[0,0,0]
-    for i, (a, b) in enumerate(zip(p1, p2)):
-        delta = abs(b - a)
-        dimension=simbox[i,1]-simbox[i,0]
-        
-        if delta > dimension/2:
-            if b>a:
-                b+=dimension
-            else:
-                a+=dimension
-            
-        ret[i]=(b+a)/2
-        
-    return ret
 
-def pbc_vec_subtract(simbox, posi,posf):
-    ret=[0,0,0]
-    for i, (a, b) in enumerate(zip(posi, posf)):
-        delta = abs(b - a)
-        dimension=simbox[i,1]-simbox[i,0]
-        if delta > dimension/2:
-            if b < a:
-                b+=dimension
-            else:
-                a+=dimension
-            
-        ret[i]=b-a
-        
-    return ret
-
-def pbc_dist(simbox, pos1,pos2):
-    total = 0
-    for i, (a, b) in enumerate(zip(pos1, pos2)):
-        delta = abs(b - a)
-        dimension=simbox[i,1]-simbox[i,0]
-        if delta > dimension- delta:
-            delta = dimension - delta
-        total += delta ** 2
-    return total ** 0.5
-
-
-def vec_projection(v1,v2):
-    return np.dot(v1,v2)/np.linalg.norm(v2)
-
-def vec_proj_to_plane(v1,v2):
-    s_proj=vec_projection(v1,v2)
-    return v1-s_proj*v2
     
-
-def pbc_dist_point_to_vec(simbox, p1,p2,distPoint):
-    
-    if np.array_equal(p1,p2) or np.array_equal(p1,distPoint) or np.array_equal(distPoint,p2) :
-        return None
-    vec1=pbc_vec_subtract(simbox,p1,p2)
-    vec2=pbc_vec_subtract(simbox,distPoint,p1)
-    try:
-        dist = norm(np.cross(vec1,vec2))/norm(vec1)
-    except:
-        print(f"pbc_dist_point_to_vec failed p1: {p1} p2: {p2} dp: {distPoint}")
-        
-    #print(f"pbc_dist_point_to_vec - {distPoint} to {p2}-{p1}={dist}")
-    return dist
-
-
-def apply_point_vec_dist(df,simbox,p1,p2,atomtype=None,col='pos'):
-    pvdcol='pointvecDist'
-    if df.empty:
-        return df
-    distdf=df.copy()
-    
-    if atomtype is not None:
-        distdf=distdf[distdf["type"]==atomtype]
-
-    distdf[pvdcol]=distdf.apply(lambda row: pbc_dist_point_to_vec(simbox,p1,p2,row[col]),axis=1)
-
-    return (distdf,pvdcol)
-           
-
-def apply_dist_from_pos(df,simbox,pos,atomtype=None,col='pos'):
-    distdf=df.copy()
-    #pos=df.at[atom,'pos']
-    
-    if atomtype is not None:
-        distdf=distdf[distdf["type"]==atomtype]
-    #partdf=dd.from_pandas(distdf,npartitions=numproc)
-    # print(distdf.iloc[0].to_string())
-    #.swifter.progress_bar(False).allow_dask_on_strings(enable=True).apply
-    distdf['dist']=distdf.apply(lambda row: pbc_dist(simbox,row[col],pos),axis=1)
-    # print(distdf.iloc[0].to_string())
-    #distdf['dist']=partdf.map_partitions(lambda df: df.apply((lambda row: pbc_dist(simbox,row['pos'],pos)),axis=1),meta=('pos', object)).compute(scheduler='threads')
-
-    #distdf.drop(index=atom,inplace=True,errors='ignore')
-    return distdf #for now just return the number of atoms
-
-def unit_vector(vector):
-    try:
-        ret=vector / np.linalg.norm(vector)
-        return ret
-    except:
-        print('got')
-        print(vector)
 
 def stats_from_csv_name(csvname):
     filename=csvname.removesuffix('.dat').removesuffix('.data').removesuffix('.dump').removesuffix('.csv')
@@ -165,297 +68,16 @@ def stats_from_csv_name(csvname):
     #print(f"ratio: {ratio}, Hnum:{Hnum}")
     return (ratio,Hnum)
 
-def angle_between_vec(box,v1,v2,debug=False):
-    cell=ase.cell.Cell([[box[0,0],box[1,1],box[2,1]],[box[0,1],box[1,0],box[2,1]],[box[0,1],box[1,1],box[2,0]]])
-    ang=get_angles([v1],[v2],cell,True)
 
-    return (ang,[v1,v2])
-
-
-def angle_between_pts(box,p1, p2,pm,debug=False):
-    # if v1 is None or v2 is None:
-    #     return 2*np.pi
-
-  
-    cell=ase.cell.Cell([[box[0,0],box[1,1],box[2,1]],[box[0,1],box[1,0],box[2,1]],[box[0,1],box[1,1],box[2,0]]])
-
-            
-    # print(v1.dtype)
-    # print(f"{v1} {v2} {cell}")
-    
-    
-    print(f"--- angle_between_pts ---\np1{p1} p2{p2}\npm{pm}\nbox{box}") if debug else None
-    
-    lenlist=[(box[0,1]-box[0,0]),(box[1,1]-box[1,0]),(box[2,1]-box[2,0])]
-    #@TODO fix this for periodic boundary conditions, any atoms that have one or more over an  edge will produce low angles
-    imiddle=pm.copy()
-    fmiddle=pm.copy()
-    for k in range(len(p1)):#go through each dimension
-        
-        if abs(p1[k]-imiddle[k]) > lenlist[k]/2:
-            
-            if p1[k]<imiddle[k]:
-                p1[k]=p1[k]+lenlist[k]
-                print(f"{k}th dimension (a)") if debug else None
-            else:
-                imiddle[k]=imiddle[k]+lenlist[k]
-                print(f"{k}th dimension (b)") if debug else None
-                
-        if abs(p2[k]-fmiddle[k]) > lenlist[k]/2:
-            if p2[k]<fmiddle[k]:
-                p2[k]=p2[k]+lenlist[k]
-                print(f"{k}th dimension (c)") if debug else None
-            else:
-                fmiddle[k]=fmiddle[k]+lenlist[k]
-                print(f"{k}th dimension (d)") if debug else None
-                
-    
-    v1=p1-imiddle
-    v2=p2-fmiddle
-    
-    
-    
-    
-    ang=angle_between_vec(box,v1,v2)
-
-    print(f"--- post fixing ---\np1{p1} p2{p2}\nimiddle{imiddle} fmiddle{fmiddle}\nbox{box}\nang={ang}") if debug else None
-    return (ang,[v1,v2])
-
-def find_atom_position(L,atomID):
-    L.commands_string(f'''
-        variable x{atomID} equal x[{atomID}]
-        variable y{atomID} equal y[{atomID}]
-        variable z{atomID} equal z[{atomID}]
-        ''')
-    
-    x = L.extract_variable(f'x{atomID}')
-    y = L.extract_variable(f'y{atomID}')
-    z = L.extract_variable(f'z{atomID}')
-    
-    return (x,y,z)
-
-def NEB_min(L,etol):
-    L.commands_string(f'''minimize {etol} {etol} 10000 10000''')
-
-def find_bond_preference(box,file,atom,midpoint,sepvec):
-    from sympy.abc import u,v
-    
-    
-    
-    ti=time.time()
-    #Need two lammps instances so that when removing an atom and minimizing we don't increase time for final NEB image minimization
-    L = lammps('mpi',["-log",'none',"-screen",'none'])
-    init_dat(L,file)
-    
-    L.commands_string(f'''
-        variable x{atom} equal x[{atom}]
-        variable y{atom} equal y[{atom}]
-        variable z{atom} equal z[{atom}]
-        ''')
-    
-    x = L.extract_variable(f'x{atom}')
-    y = L.extract_variable(f'y{atom}')
-    z = L.extract_variable(f'z{atom}')
-    orig=np.array([x,y,z])
-    #(df, box) = read_data(file)
-
-    
-    dplane=Plane(Point3D(midpoint),normal_vector=sepvec)
-    parametrizedpt=dplane.arbitrary_point(u,v)
-    zpoint_plane=np.array(parametrizedpt.subs({u:np.cos(0),v:np.sin(0)}).evalf(),dtype=float)-midpoint
-    
-    ang=angle_in_plane(box,midpoint,sepvec,orig,zpoint_plane)
-    
-    rtot=2
-    angtot=8
-    twopi=2*np.pi
-    tstep=0
-    tstart=ang
-    radius=0.04
-    pts=[]
-    rmin=0.3
-    rmax=0.6
-    parametrizedpt=dplane.arbitrary_point(u,v)
-
-    newpt=parametrizedpt.subs({u:radius*np.cos(ang),v:radius*np.sin(ang)}).evalf()
-    mpt=np.array(newpt)
-    
-    #     for offset in [0]: #[-0.01,0,0.01]:
-    #     for radius in np.linspace(rmin,rmax,rtot):
-    #         for theta in np.linspace(tstart,tstart+twopi/2,angtot,endpoint=False):
-    #             newpt=parametrizedpt.subs({u:radius*np.cos(theta),v:radius*np.sin(theta)}).evalf()
-    #             newpt.translate(0,offset,0)
-    #             pts.append([newpt,theta,radius])
-    #         tstart+=tstep
-
-
-
-    # tot=len(pts)
-    # xi, yi, zi = midpoint[0], midpoint[1], midpoint[2]
-    # L.commands_string(f'''
-    #         set atom {atom} x {xi} y {yi} z {zi}
-    #         ''')
-    # s=0
-    # Ef=0
-    # Ei = L.extract_compute('thermo_pe',0,0)*conv
-    # minE=0
-    # minpt=[midpoint,0,0]
-    # for ptt in pts:
-    #     pt=ptt[0]
-    #     xf=pt[0]
-    #     yf=pt[1]
-    #     zf=pt[2]
-        
-    #     L.commands_string(f'''
-    #         set atom {atom} x {xf} y {yf} z {zf}
-    #         run 0
-    #         ''')
-        
-    #     s+=1
-    #     Ef = L.extract_compute('thermo_pe',0,0)*conv
-        
-    #     if me==0:
-    #         print(f"Step {s}/{tot}: {Ef - Ei} ang:{ptt[1]} r:{ptt[2]}")
-            
-    #     if Ef < minE:
-    #         minE=Ef
-    #         minpt=ptt
-
-    # L.commands_string(f'''
-    #         set atom {atom} x {minpt[0][0]} y {minpt[0][1]} z {minpt[0][2]}
-    #         run 0
-    #         ''')
-
-    # x = L.extract_variable(f'x{atom}')
-    # y = L.extract_variable(f'y{atom}')
-    # z = L.extract_variable(f'z{atom}')
-    # mpt=[x,y,z]
-    # initialpos=[xi,yi,zi]
-    # tf=time.time()
-    # if me==0:
-    #     print(f"Atom {atom} from {initialpos} to {mpt}, ang:{minpt[1]}, r:{minpt[2]}\n{Ei}  {minE} in {tf-ti}s")
-        
-    return mpt
-
-def angle_in_plane(box,plane_point,plane_vec,orig_point,plane_zero_vec,ax=None):
-    # from sympy.abc import g,f
-    # dplane=Plane(Point3D(plane_point),normal_vector=plane_vec)
-    plane_point=np.array(plane_point,dtype=float)
-    plane_vec=np.array(plane_vec,dtype=float)
-    orig_point=np.array(orig_point,dtype=float)
-    orig_to_plane=pbc_vec_subtract(box,plane_point,orig_point)
-    # parametrizedpt=dplane.arbitrary_point(g,f)
-    # zpoint_plane=np.array(parametrizedpt.subs({g:np.cos(0),f:np.sin(0)}).evalf(),dtype=float)
-    # plane_zero_vec=zpoint_plane
-
-
-
-    orig_plane_proj=vec_proj_to_plane(orig_to_plane,plane_vec)
-    if all(t==0 for t in orig_plane_proj):
-        print("projection is [0,0,0]")
-        return 0
-
-    opp_vec=orig_plane_proj/np.linalg.norm(orig_plane_proj)
-
-
-    #find the angle between the two vecotrs IN THE PLANE
-    # n=sepvec/np.linalg.norm(sepvec)
-    angdeg=angle_between_vec(box,opp_vec,plane_zero_vec)[0][0]
-    anginplane_orig=np.radians(angdeg)#-np.dot(n,np.cross(opp_vec,plane_zero_vec))
-    #print(f"rad: {anginplane_orig} deg:{angdeg}")
-    dmat=[plane_zero_vec,plane_point+opp_vec,plane_vec]
-    sign=np.linalg.det(dmat)
-    anginplane_orig=anginplane_orig if sign > 0 else -anginplane_orig
-    
-    if ax is not None:
-        opp_pt=plane_point+orig_plane_proj
-        plto=np.array([plane_point,opp_pt]).T
-        ax.plot(plto[0],plto[1],plto[2],color='r')
-        
-        plto=np.array([orig_point,opp_pt]).T
-        ax.plot(plto[0],plto[1],plto[2],color='r')
-
-        # zv=np.array([plane_point,plane_zero_vec]).T
-        # ax.plot(zv[0],zv[1],zv[2],color='blue')
-        
-    return anginplane_orig
-
-def find_local_minima_position(file,atom,initial_guess):
-    ti=time.time()
-    #Need two lammps instances so that when removing an atom and minimizing we don't increase time for final NEB image minimization
-    L = lammps('mpi',["-log",'none',"-screen",'none'])
-    init_dat(L,file)
-
-    len=1
-    perDim=10
-    step=len/perDim
-    elist=np.zeros([perDim,perDim,perDim])
-
-    dlist=np.arange(-len/2,len/2,step)
-    
-    tot = perDim**3
-    s=1
-    
-    
-    xi, yi, zi = initial_guess[0], initial_guess[1], initial_guess[2]
-    minx, miny, minz = xi, yi, zi
-    
-    L.commands_string(f'''
-                    set atom {atom} x {xi} y {yi} z {zi}
-                    run 0
-                    ''')
-
-    Ef=0
-    Ei = L.extract_compute('thermo_pe',0,0)*conv
-    minE=Ei
-    for i in range(perDim):
-        for j in range(perDim):
-            for k in range(perDim):
-            
-                x=dlist[i]
-                y=dlist[j]
-                z=dlist[k]
-
-                
-                xf = xi + x
-                yf = yi + y
-                zf = zi + z
-                
-                
-                
-                L.commands_string(f'''
-                    set atom {atom} x {xf} y {yf} z {zf}
-                    run 0
-                    ''')
-                s+=1
-                Ef = L.extract_compute('thermo_pe',0,0)*conv
-                # elist[i,j,k]=Ef
-                
-                if me==0:
-                    print(f"Step {s}/{tot}: {Ef - minE}")
-                    
-                if Ef < minE:
-                    minx=xf
-                    miny=yf
-                    minz=zf
-                    
-                    
-                    # if me==0:
-                    #     print(f"New minima; {minE} to {Ef}")
-                        
-                    minE=Ef
-                    
-                
-    
-    lowestpos=[minx,miny,minz]
-    initialpos=[xi,yi,zi]
-    tf=time.time()
-    if me==0:
-        print(f"Atom {atom} from {initialpos} to {lowestpos}: {Ei}  {minE} in {tf-ti}")
-        
-    return lowestpos
 
 def angle_between_df(df, col, refang=[0,0,1]):
+    """
+    Calculate the angle between vectors in a DataFrame based on the given columns and reference angle.
+    :param df - The DataFrame containing the vectors and box information.
+    :param col - The column in which to store the calculated angles.
+    :param refang - The reference angle to compare the vectors to. Default is [0,0,1].
+    :return None
+    """
     
     for index, row in df.iterrows():
         ipos = np.array(row["iPos"])
@@ -484,215 +106,13 @@ def angle_between_df(df, col, refang=[0,0,1]):
         df.at[index,col]=ang#angle_between(fpos-ipos,refang)
     return df
 
-def create_bond_file(datapath, file,bondfile):
-    L= lammps('mpi',["-log",f'{datapath}/scratchfolder/CreateBonds.log',"-screen",'none'])
-    L.commands_string(f'''
-        clear
-        units         real
-        dimension     3
-        boundary    p p p
-        atom_style  charge
-        atom_modify map yes
-
-
-        #atom_modify map array
-        variable seed equal 12345
-        variable NA equal 6.02e23
-
-        timestep 0.5
-
-        variable printevery equal 100
-        variable restartevery equal 0
-        variable datapath string "data/"
-
-
-        variable massSi equal 28.0855 #Si
-        variable massO equal 15.9991 #O
-        variable massH equal  1.00784 #H
-        
-
-        read_data {datapath+file}
-        
-        mass         3 $(v_massH)
-        mass         2 $(v_massO)
-        mass         1 $(v_massSi)
-
-
-        min_style quickmin
-        
-        pair_style	    reaxff /home/adam/code/topcon-md/potential/topcon.control
-        pair_coeff	    * * /home/adam/code/topcon-md/potential/ffield_Nayir_SiO_2019.reax Si O H
-
-        neighbor        2 bin
-        neigh_modify    every 10 delay 0 check no
-        
-        thermo $(v_printevery)
-        thermo_style custom step temp density press vol pe ke etotal #flush yes
-        thermo_modify lost ignore
-        
-        region sim block EDGE EDGE EDGE EDGE EDGE EDGE
-        
-        fix r1 all qeq/reax 1 0.0 10.0 1e-6 reaxff
-        compute c1 all property/atom x y z
-        fix f1 all reaxff/bonds 1 {datapath}/scratchfolder/{bondfile}
-        
-        run 0
-        ''')
-    
-def read_bonds(df,file):
-    # alist=[]
-    #create new columns in the datafram
-    with open(file,'r') as f:
-
-        for line in f:
-            #skip the first 7 lines for header
-            ainfo=[]
-            l=line.split()
-            if l[0] == '#':
-                continue
-            i=0#the current item in the line we're on
-
-            id=int(l[0])
-            typ=int(l[1])
-            nb=int(l[2])
-            if typ == 1:
-                typ='Si'
-            elif typ==2:
-                typ='O'
-            elif typ==3:
-                typ='H'
-            if df.at[id,'type']!=typ:
-                print(f'Big bombad making bonds - Atom{id} doesnt match types')
-                
-            df.at[id,'nb']=nb
-            i=3
-            blist=[]
-           
-           #run through each bond and grab the id and bond order(index offset by the number of bonds)
-            for j in range(nb):
-                blist.append([int(l[i+j]),float(l[i+j+nb+1])])
-            #print(blist)
-            df.at[id,"bonds"]=""
-            df.at[id,"bonds"]=blist
-
-    return df
-
-def read_data(file):
-    dlist=[]
-    skipindex=0
-    simbox=np.zeros((3,2))
-
-    with open(file,'r') as f:
-
-        
-        for line in f:
-            l=line.split()
-            
-            if "xlo" in line:
-                simbox[0,0]=l[0]
-                simbox[0,1]=l[1]
-            if "ylo" in line:
-                simbox[1,0]=l[0]
-                simbox[1,1]=l[1]
-            if "zlo" in line:
-                simbox[2,0]=l[0]
-                simbox[2,1]=l[1]
-            #skip the first 17 lines for header
-            if skipindex<17:
-                skipindex+=1
-                continue
-            
-            dinfo=[]
-            
-            if len(l)<6:
-                continue
-            #example line 
-            #1 1 0.03793783944547108 1.2804479390923988 1.2230759130866515 1.8085851741085164 0 0 0
-            id=int(l[0])
-            typ=int(l[1])
-            if typ == 1:
-                typ='Si'
-            elif typ==2:
-                typ='O'
-            elif typ==3:
-                typ='H'
-                
-            q=float(l[2])#charge
-            x=float(l[3])
-            y=float(l[4])
-            z=float(l[5])
-            pos=np.array([x,y,z])
-            dinfo=[id,typ,q,x,y,z,pos]
-            
-            #add this row to the dataframe
-            dlist.append(dinfo)
-
-    df = pd.DataFrame(dlist,columns=['id','type','q','x','y','z','pos'])
-    df.set_index('id',inplace=True,drop=True)
-
-    return (df,simbox)
-
-def get_lammps(log):
-    return lammps('mpi',["-log",log,'-screen','none'])
-
-def init_dat(L,file):
-
-    L.commands_string(f'''
-        clear
-        units         real
-        dimension     3
-        boundary    p p p
-        atom_style  charge
-        atom_modify map yes
-
-
-        #atom_modify map array
-        variable seed equal 12345
-        variable NA equal 6.02e23
-
-        timestep 0.5
-
-        variable printevery equal 100
-        variable restartevery equal 0
-        variable datapath string "data/"
-
-
-        variable massSi equal 28.0855 #Si
-        variable massO equal 15.9991 #O
-        variable massH equal  1.00784 #H
-        
-
-        read_data {file}
-        
-        mass         3 $(v_massH)
-        mass         2 $(v_massO)
-        mass         1 $(v_massSi)
-
-
-        min_style quickmin
-        
-        pair_style	    reaxff potential/topcon.control
-        pair_coeff	    * * potential/ffield_Nayir_SiO_2019.reax Si O H
-
-        neighbor        2 bin
-        neigh_modify    every 10 delay 0 check no
-        
-        thermo $(v_printevery)
-        thermo_style custom step temp density press vol pe ke etotal #flush yes
-        thermo_modify lost ignore
-        
-        region sim block EDGE EDGE EDGE EDGE EDGE EDGE
-        
-        fix r1 all qeq/reax 1 0.0 10.0 1e-6 reaxff
-        compute c1 all property/atom x y z
-        run 0
-        ''')
-
 
 def get_pinhole_pairs(basedf,pinhole_loc,pin_rad=12,inside_pinhole=True):
+    """
+    DEPRECATED NEEDS ARCHIVED
+    """
     df=basedf.copy()
     csvlist=df["csvname"].unique()
-    colranges=[0,1.8,2.8,3.8,10]
 
     for csvfile in csvlist:
         dfc=df[df["csvname"]==csvfile]
@@ -723,10 +143,11 @@ def get_pinhole_pairs(basedf,pinhole_loc,pin_rad=12,inside_pinhole=True):
         #     row['pin_dist']=dist
             
     return retdf
-                
-                
-            
+                            
 def get_out_pinhole_pairs(basedf,pinhole_loc,pin_rad=12,inside_pinhole=True):
+    """
+    DEPRECATED NEEDS ARCHIVED
+    """
     df=basedf.copy()
     csvlist=df["csvname"].unique()
     colranges=[0,1.8,2.8,3.8,10]
@@ -762,10 +183,15 @@ def get_out_pinhole_pairs(basedf,pinhole_loc,pin_rad=12,inside_pinhole=True):
     return retdf
             
             
-
-#@TODO rename plot bond investigation
-def temp(path,dfile):
-    (atoms,box) = read_file_data_bonds(path,dfile)
+def plot_bond_investigation(path,dfile):
+    """
+    Investigation of bonds in a given file. This is a custom investigation script where I am focused on the properties of atoms
+    near a pinhole.
+    :param path - the path to the file
+    :param dfile - the data file name
+    :return None
+    """
+    (atoms,box) = nts.read_file_data_bonds(path,dfile)
     
     pinholeCenter=[27,27,20]
     
@@ -781,7 +207,7 @@ def temp(path,dfile):
         pinholeCenterCurZ=pinholeCenter
         pinholeCenterCurZ[2]=curpos[2]
         
-        dist=pbc_dist(box,pinholeCenterCurZ,curpos)
+        dist=nts.pbc_dist(box,pinholeCenterCurZ,curpos)
         if dist > 13:
             continue
         
@@ -815,11 +241,11 @@ def temp(path,dfile):
         spos2=atoms.at[si2,'pos']   
         opos=atoms.at[oatom,'pos']
         
-        d1=abs(np.linalg.norm(pbc_vec_subtract(box,opos,spos1)))
-        d2=abs(np.linalg.norm(pbc_vec_subtract(box,opos,spos2)))
+        d1=abs(np.linalg.norm(nts.bc_vec_subtract(box,opos,spos1)))
+        d2=abs(np.linalg.norm(nts.pbc_vec_subtract(box,opos,spos2)))
         
-        dis= pbc_dist_point_to_vec(box,spos1,spos2,opos)
-        ang=angle_between_pts(box,spos1,spos2,opos)[0][0]
+        dis= nts.pbc_dist_point_to_vec(box,spos1,spos2,opos)
+        ang=nts.angle_between_pts(box,spos1,spos2,opos)[0][0]
         if dis is not None:
             distlist.append(dis)
             anglist.append(ang)
@@ -848,23 +274,10 @@ def temp(path,dfile):
         # avg=np.mean(difflist)
     # print(avg)
 
-def read_file_data_bonds(datapath,dfile):
-
-    (dfdata,simbox)=read_data(datapath+dfile)
-
-    filename=dfile.removesuffix('.dat').removesuffix('.data').removesuffix('.dump')
-    bondfile=filename+".bonds"
-
-    os.makedirs(datapath+'/scratchfolder/', exist_ok=True)
-
-    create_bond_file(datapath,dfile,bondfile)
-
-    df=read_bonds(dfdata,datapath+'/scratchfolder/'+bondfile)
-
-    return (df,simbox)
-
-
 def df_combine_H(df,spread=5):
+    """
+    Built to combine multiple different dataframes with similar hydrogen concentrations
+    """
     df=df.sort_values(["ratio","Hnum"])
 
     hlist=np.array(df['Hnum'].unique()).astype(int)
@@ -888,16 +301,26 @@ def df_combine_H(df,spread=5):
 
 
 def load_data_from_csv(csvname):
+    """
+    Take a post neb csv file from my pipeline and read the data file it corresponds to it into a datframe
+    """
     global datafolder
     datafile=csvname.removesuffix('.dat').removesuffix('.data').removesuffix('.dump').removesuffix('.csv')+'.dat'
-    return read_data(datafolder+datafile)
+    return nts.read_data(datafolder+datafile)
 
 def load_data_and_bonds_from_csv(csvname):
+    """
+    Take a post neb csv file that includes information about bonds and read it into a dataframe
+    """
     global datafolder
     datafile=csvname.removesuffix('.dat').removesuffix('.data').removesuffix('.dump').removesuffix('.csv')+'.dat'
-    return read_file_data_bonds(datafolder,datafile)
+    return nts.read_file_data_bonds(datafolder,datafile)
+
 
 def mean_str(col):
+    """
+    Kinda like mean girls but for strings
+    """
     global jp
     if is_numeric_dtype(col):
         return col.mean()
@@ -974,6 +397,9 @@ def mean_str(col):
         
         
 def csv_to_df(csvpath,includebad=False):
+    """
+    Take a csv and turn it into a dataframe, this is dealing with csv's directly from the NEB pipeline, not my post analysis csv
+    """
     csvname=csvpath.split('/')[-1]
     #print(csvname)
     (cratio,cHnum)=stats_from_csv_name(csvname)
@@ -1005,6 +431,9 @@ def csv_to_df(csvpath,includebad=False):
 
 
 def csvs_to_df(csvlist):
+    """
+    Take a list of csvs and turn them into a dataframe, this is dealing with csv's directly from the NEB pipeline, not my post analysis csv
+    """
     dflist=[]
     for csvpath in csvlist:
         df = csv_to_df(csvpath)
@@ -1016,6 +445,15 @@ def csvs_to_df(csvlist):
 
 
 def find_movers_neighbor(df,curatom,zappdatom,natom="Si",nnatom="O"):
+    """
+    Find the neighboring atom that is connected to a specific atom in a dataframe.
+    :param df - the dataframe containing atom information
+    :param curatom - the current atom index
+    :param zappdatom - the atom to which the current atom is connected
+    :param natom - the type of atom to search for (default is "Si")
+    :param nnatom - the type of neighboring atom to search for (default is "O")
+    :return The index of the neighboring atom or None if not found
+    """
     curbonds=df.at[curatom,'bonds']
 
     on=[]
@@ -1039,78 +477,19 @@ def find_movers_neighbor(df,curatom,zappdatom,natom="Si",nnatom="O"):
                     return ni
     return None
                 
-def find_suitable_neighbors(df,curatom,zappdatom,natom="Si",nnatom="O"):
-    
-    ni=find_movers_neighbor(df,curatom,zappdatom,natom,nnatom)
-    if ni is None:
-        return 0
-    
-    curbonds=df.at[curatom,'bonds']
-    neibonds = df.at[ni,'bonds']
-    for b in curbonds:
-        if b[0] == ni:
-            return b[1]
 
 
-def find_nnneighbor(df,curatom,zappdatom,natom="Si",nnatom="O"):
-    curbonds=df.at[curatom,'bonds']
-
-
-    for n in curbonds:
-        ni=n[0]
-        bo=n[1]
-
-        neitype=df.at[ni,'type']
-        if neitype ==natom:
-            neibonds = df.at[ni,'bonds']
-        
-            for nn in neibonds:
-                nni=nn[0]
-                nnbo=nn[1]
-
-                #found the interested atom
-                if nni == zappdatom:
-                    return ni
-    return None
-
-def find_neighboring_sibc(atoms,oi):
-    #start with an Oxygen and find all neighboring Si with BC vacancies
-    nindices=atoms.at[oi,'bonds']
-    #look to see if this atom has any neighboring SI with vacancies
-
-    si_bc_vac=[]
-    badsi=[]
-    for n in nindices:
-        
-        ni=n[0]
-        neitype=atoms.at[ni,'type']
-        if neitype=='Si':
-
-            sibonds=atoms.at[ni,'bonds']
-                    
-            badsi=[]  
-            for b in sibonds:
-                bi=b[0]
-                btype=atoms.at[bi,'type']
-                if btype=='H' or btype=='O':
-                    bb=atoms.at[bi,'bonds']
-                    for bn in bb:
-                        bni=bn[0]
-                        bntype=atoms.at[bni,'type']
-                        if bntype=='Si' and bni !=ni:
-                            badsi.append(bni)
-        
-            
-            for nnn in sibonds:
-                nnni=nnn[0]
-                nnntype=atoms.at[nnni,'type']
-                if nnntype=='Si'and nnni not in badsi:
-                    si_bc_vac.append([ni,nnni])
-    
-    return si_bc_vac
 
 def angle_between_pts_df(df,valcol,posdf=None,box=None):
-    #this function finds the angle between pts of NEB vacancy pairs
+    """
+    This function finds the angle between pts of NEB vacancy pairs
+    :param df - The DataFrame containing the points
+    :param valcol - The column in which to store the calculated angles
+    :param posdf - DataFrame containing position data
+    :param box - The box coordinates
+    :return the updated dataframe with a new column
+    """
+    #
     
     #df=basedf.copy()
     csvlist=df["csvname"].unique()
@@ -1140,7 +519,7 @@ def angle_between_pts_df(df,valcol,posdf=None,box=None):
             # if pair=="4704-5380":
             #     debug = True
                 
-            (ang, ret) = angle_between_pts(box,ipos,fpos,middle,debug)
+            (ang, ret) = nts.angle_between_pts(box,ipos,fpos,middle,debug)
             
             # if ang <20:
             #     print(f"fudge and crackers {pair}")
@@ -1148,11 +527,20 @@ def angle_between_pts_df(df,valcol,posdf=None,box=None):
 
             df.at[index,valcol]=ang[0]
         
-        print(f'angle_between_pts_df done with {csvfile}')
+        print(f'nts.angle_between_pts_df done with {csvfile}')
     return df
 
 
 def find_final_si_pair(bonddf,simbox,mover,f_loc=None):
+    """
+    Find the final pair of silicon atoms in a given NEB process. This function is meant for NEB runs that only 
+        gave a location but were ultimately BC processes.
+    :param bonddf - the bond dataframe
+    :param simbox - the sim box
+    :param mover - the mover atom
+    :param f_loc - the final location of the atoms 
+    :return The final pair of silicon atoms that the atom ended up inbetween
+    """
     si_atoms=[]
     
     # if zapped is not None: 
@@ -1170,7 +558,7 @@ def find_final_si_pair(bonddf,simbox,mover,f_loc=None):
     # elif f_loc is not None:
     radius=1.75#ang
     #this is a move to location style
-    distdf=apply_dist_from_pos(bonddf,simbox,f_loc,"Si")
+    distdf=nts.apply_dist_from_pos(bonddf,simbox,f_loc,"Si")
     distdf=distdf[distdf['dist']<radius]
 
     for i,r in distdf.iterrows():
@@ -1309,6 +697,13 @@ def drop_non_O_pairs(basedf):
             
         
 def create_initial_final_neb_files(basedf,neb_data_folder):
+    """
+    Create initial and final NEB (Nudged Elastic Band) files based on the provided dataframe and NEB data folder. This is for analyzing problem runs
+    post original NEB pipeline execution
+    :param basedf - The base dataframe containing information for NEB files creation.
+    :param neb_data_folder - The folder where NEB data is stored.
+    :return None
+    """
     import PrepNEB as pnb
     
     
@@ -1374,7 +769,7 @@ def create_initial_final_neb_files(basedf,neb_data_folder):
             
             pnb.NEB_min(L1f)
             
-            ri = find_atom_position(L1f,atomI)
+            ri = pnb.find_atom_position(L1f,atomI)
             L1f.commands_string(f'''
                 write_data {nebI}
                 ''')
@@ -1397,8 +792,15 @@ def create_initial_final_neb_files(basedf,neb_data_folder):
                 print("bad os fail")
                 return
             
-
+            
 def find_initial_final_si(posdf,mover,zapped):
+    """
+    Find the initial and final silicon atoms based on the oxygen atom that was moving during the NEB and the O atom that was zapped
+    :param posdf - the position dataframe
+    :param mover - the mover atom
+    :param zapped - the zapped atom
+    :return The initial and final silicon atoms surrounding the NEB run
+    """
     si_o_bondorder=0.9
     si_si_bondorder=3
     si_h_bondorder=1.7
@@ -1448,17 +850,21 @@ def find_initial_final_si(posdf,mover,zapped):
     return [initial_si,final_si]
 
 def helper_calc_avg_BLen_Si(neb_datfile,si_atom,blist,missing, box=None, posdf=None):
-    #neb_datfile - premade datafile which has either the initial or final si atom 
-    #si_atom - atom to get oxygen bond angles around
-    #bonds - the bonds around the Si
-    #missing - the missing atom
+    """
+    Calculate the average bond length between a silicon atom and its neighboring atoms.
+    :param neb_datfile - premade datafile which has either the initial or final si atom
+    :param si_atom - atom to get oxygen bond angles around
+    :param blist - the bonds around the Si
+    :param missing - the missing atom
+    :return The average bond angle
+    """
     
     #BUG if we try to do the reaxff fix bonds on a file with a deleted atom then it bitches so we have to get the bonds from other places and just find positions
     avg_angle=None
     
     if box is None and posdf is None:
         try:
-            (posdf,box)=read_data(neb_datfile)
+            (posdf,box)=nts.read_data(neb_datfile)
         except:
             return None 
     # blist=posdf.at[si_atom,'bonds']
@@ -1503,7 +909,7 @@ def helper_calc_avg_BLen_Si(neb_datfile,si_atom,blist,missing, box=None, posdf=N
         done_o.append(o)
         o_pos=posdf.at[o,'pos']
         
-        len=pbc_dist(box,o_pos,pos_si)
+        len=nts.pbc_dist(box,o_pos,pos_si)
         angle_sum+=float(len)
         angle_num+=1
             
@@ -1511,18 +917,22 @@ def helper_calc_avg_BLen_Si(neb_datfile,si_atom,blist,missing, box=None, posdf=N
         avg_angle=angle_sum/angle_num
     
     return [avg_angle,o_count]
-                    
+                   
 def helper_calc_avg_BAngle_Si(neb_datfile,si_atom,blist,missing):
-    #neb_datfile - premade datafile which has either the initial or final si atom 
-    #si_atom - atom to get oxygen bond angles around
-    #bonds - the bonds around the Si
-    #missing - the missing atom
-    
+    """
+    Calculate the average bond angle between a silicon atom and its neighboring atoms.
+    :param neb_datfile - premade datafile which has either the initial or final si atom
+    :param si_atom - atom to get oxygen bond angles around
+    :param blist - the bonds around the Si
+    :param missing - the missing atom
+    :return The average bond angle
+    """
+
     #BUG if we try to do the reaxff fix bonds on a file with a deleted atom then it bitches so we have to get the bonds from other places and just find positions
     avg_angle=None
     
     try:
-        (posdf,box)=read_data(neb_datfile)
+        (posdf,box)=nts.read_data(neb_datfile)
     except:
         return None 
     # blist=posdf.at[si_atom,'bonds']
@@ -1573,7 +983,7 @@ def helper_calc_avg_BAngle_Si(neb_datfile,si_atom,blist,missing):
                 continue
             so_pos=posdf.at[so,'pos']
             
-            ang_ret=angle_between_pts(box,o_pos,so_pos,pos_si)
+            ang_ret=nts.angle_between_pts(box,o_pos,so_pos,pos_si)
             angle_sum+=float(ang_ret[0][0])
             angle_num+=1
             
@@ -1581,10 +991,15 @@ def helper_calc_avg_BAngle_Si(neb_datfile,si_atom,blist,missing):
         avg_angle=angle_sum/angle_num
     
     return avg_angle
-    
-    
-
+       
 def calc_local_bond_angles(basedf,pair_path):
+    """
+    Calculate the local bond angles for a NEB run. This analysis was done to try and discover any relationships between
+    the local configuration around an atom and the diffusion barrier the atom faced for motion.
+    :param basedf - the dataframe containing the run data
+    :param pair_path - the path to the location where we should save the gif
+    :return - None but plots pretty pictures for analysis
+    """
     df=basedf.copy()    
     csvlist=df["csvname"].unique()
 
@@ -1704,9 +1119,15 @@ def calc_local_bond_angles(basedf,pair_path):
     print("Calculation done, now plotting")
     plot_any_split_hist(dfc,'FEB','avg_ang_i',colranges,numbins,vartitle,xlabel,units,subfolder,plotfilename)
             
-        
-
-def calc_local_structure(basedf,pair_path,gif=True):
+def calc_local_structure_zap(basedf,pair_path,gif=True):
+    """
+    Calculate the local structure of a NEB run that used the ZAP method. This analysis was done to try and discover any relationships between
+    the local configuration around an atom and the diffusion barrier the atom faced for motion.
+    :param basedf - the dataframe containing the run data
+    :param pair_path - the path to the location where we should save the gif
+    :param gif - a boolean indicating whether to output a gif (default is True)
+    :return - None but plots pretty pictures for analysis
+    """
     df=basedf.copy()    
     csvlist=df["csvname"].unique()
 
@@ -1730,6 +1151,7 @@ def calc_local_structure(basedf,pair_path,gif=True):
         final_configs=[]
         for index, row in dfc.iterrows():
             f_loc=row['fPos']
+            print(row['id'])
             mover=int(row['id'].split('-')[0])
             zapped=int(row['id'].split('-')[1])
             cell_origin=row['iPos']
@@ -1744,7 +1166,7 @@ def calc_local_structure(basedf,pair_path,gif=True):
             
             pos_initial_si=posdf.at[initial_si,'pos']
             pos_final_si=posdf.at[final_si,'pos']
-            si_i_f_dist=round(pbc_dist(box,pos_initial_si,pos_final_si),2)
+            si_i_f_dist=round(nts.pbc_dist(box,pos_initial_si,pos_final_si),2)
             
             
             #final_pair=find_final_si_pair(posdf,box,mover,f_loc=f_loc)
@@ -1848,8 +1270,6 @@ def calc_local_structure(basedf,pair_path,gif=True):
         plt.show()
 
 
-
-
 class TurntableAnimation(ModifierInterface):
     
     # Parameter controlling the animation length (value can be changed by the user):
@@ -1908,8 +1328,9 @@ class ShrinkWrap(ModifierInterface):
             data.create_cell(matrix, (False, False, False))
     
     
+# #Plotters below 
+# Numerous functions that are used to analyze the final NEB data are below
 
-# #Plotters
 def plot_SiI_SiF_dist(basedf,col="FEB"):
     df=basedf.copy()
     csvlist=df["csvname"].unique()
@@ -1935,8 +1356,7 @@ def plot_SiI_SiF_dist(basedf,col="FEB"):
         #     # print(fsn)
         #     middle=posdf.at[fsn,"pos"]
             
-            
-    
+              
 def plot_small_chunk(csv_file,imagename,all_atoms,select_atoms,cell_origin,text_overlay,pair_path):
     from ovito.io import import_file, export_file
     import ovito.data
@@ -1983,10 +1403,6 @@ def plot_small_chunk(csv_file,imagename,all_atoms,select_atoms,cell_origin,text_
     #                                                                                             [0, 0, 1, cell_origin[2]]]))
     pipeline.modifiers.append(ShrinkWrap())
     pipeline.modifiers.append(TurntableAnimation())
-    
-    
-
-    
     
 
     # Create the overlay:
@@ -2045,8 +1461,6 @@ def plot_small_chunk(csv_file,imagename,all_atoms,select_atoms,cell_origin,text_
         frames.append(frame)
     # Save the frames as a new image
     frames[0].save(imagename, save_all=True, append_images=frames[1:])
-
-    
 
 def plot_ratio_hist(basedf,col,var,colranges,numbins,vartitle,xlabel,units,subfolder,plotfilename):
     
@@ -2165,11 +1579,6 @@ def plot_ratio_hist(basedf,col,var,colranges,numbins,vartitle,xlabel,units,subfo
         
         # # figure.savefig(figname)
         # # print(f"Saved figure with path {figname}")
-
-
-
-    
-   
 
 def plot_any_split_hist(basedf,col,var,colranges,numbins,vartitle,xlabel,units,subfolder,plotfilename):
     df=basedf.copy()
@@ -2301,8 +1710,7 @@ def plot_any_split_hist(basedf,col,var,colranges,numbins,vartitle,xlabel,units,s
     plt.show()
     
     plt.close(fig)
-    
-    
+       
 def plot_pair_angle(basedf,col="FEB"):
     df=basedf.copy()
     csvlist=df["csvname"].unique()
@@ -2310,7 +1718,7 @@ def plot_pair_angle(basedf,col="FEB"):
     colranges=[0,1.8,2.8,3.8,10]
     valcol="Pair angle"
     print('here')
-    df=angle_between_pts_df(df,valcol)
+    df=nts.angle_between_pts_df(df,valcol)
     #print(df.to_string())
     
     units="°" 
@@ -2389,9 +1797,8 @@ def plot_pair_angle(basedf,col="FEB"):
           
     plt.show()
     return df
-
-    
-def plot_multi_distribution(setdf,cols=["FEB","REB"],units="eV",plot=False):
+  
+def plot_multi_distribution(setdf,cols=["FEB","REB"],units="eV",plot=False,areal_hydrogen=True):
     df=setdf.copy()
     colstxt=""
     
@@ -2452,9 +1859,11 @@ def plot_multi_distribution(setdf,cols=["FEB","REB"],units="eV",plot=False):
             
             xvals=dfr[f"{col}Hnum"].to_numpy(dtype=float)
             yvals=dfr[f"{col}mean"].to_numpy(dtype=float)
-            xvals=xvals*HNumToConcentration
-            ax1.set_xscale('log')
-            ax2.set_xscale('log')
+            yerr=dfr[f"{col}stddev"].to_numpy(dtype=float)
+            if areal_hydrogen:
+                xvals=xvals*HNumToConcentration
+                ax1.set_xscale('log')
+                ax2.set_xscale('log')
             
             #Setting tick and label text to smaller font
             axisfontsize=10
@@ -2524,7 +1933,6 @@ def plot_multi_distribution(setdf,cols=["FEB","REB"],units="eV",plot=False):
     plt.close(fig)
         #erb[-1][0].set_linestyle('--')
      
-
 def plot_rangehist(basedf,rlist,type=None,col='FEB',skip=False): 
     df=basedf.copy()    
     csvlist=df["csvname"].unique()
@@ -2583,7 +1991,7 @@ def plot_rangehist(basedf,rlist,type=None,col='FEB',skip=False):
 #                 continue
 # ##Testing
             #need to load in this csv's data file and look at that dataframe in conjunction with this one
-            distdf=apply_dist_from_pos(posdf,box,pos,type)
+            distdf=nts.apply_dist_from_pos(posdf,box,pos,type)
             
             for radius in rlist:
                 valcol=f'{typename}range{radius}' 
@@ -2697,7 +2105,6 @@ def plot_atominrange(basedf,radius,type=None,col='FEB'):
             print('-----------------------------------------------------')
     return dfc
 
-
 def plot_vang_multi(basedf,col='FEB',refvec=[0,0,1]):
     df=basedf.copy()
     #df=df.sort_values(by='csvname')
@@ -2749,7 +2156,7 @@ def plot_bondang_vdz(basedf):
         
         (posdf,box)=load_data_from_csv(csvfile)
         
-        dfc=angle_between_pts_df(dfc,valcol)
+        dfc=nts.angle_between_pts_df(dfc,valcol)
         dfc=dfc.apply(vz_idz,axis=1)
         #dfc=dfc[dfc[valcol]<maxang]
         
@@ -2757,6 +2164,76 @@ def plot_bondang_vdz(basedf):
             
     zpos=dfc['zpos'].tolist()
     anglis=dfc['Pair angle'].tolist()    
+    fig, ax = plt.subplots()
+    # pl=np.array([hnum,angnum]).T
+    ax.scatter(zpos,anglis,s=6,facecolors='none',edgecolors='b')
+    # ax.set_title(f"Number of H in range vs. Number of pairs with angle < {maxang}")
+    # ax.set_xlabel(f"Number of H within {dist}Å of pair.")
+    # ax.set_ylabel(f"Number of pair angles < 110° in range.")
+    # for hn in np.unique(pl[:,0]):
+    #     tl = pl[pl[:,0]==hn]
+    #     mtl=np.mean(tl[:,1])
+    #     ax.scatter(hn,mtl,s=20,marker='x',c='r')
+    
+def plot_feb_vdz(basedf):
+    df=basedf.copy()
+    csvlist=df["csvname"].unique()
+
+
+    
+    dfc=df.apply(vz_idz,axis=1)
+        
+            
+    zpos=dfc['zpos'].tolist()
+    anglis=dfc['FEB'].tolist()    
+    fig, ax = plt.subplots()
+    # pl=np.array([hnum,angnum]).T
+    ax.scatter(zpos,anglis,s=6,facecolors='none',edgecolors='b')
+    # ax.set_title(f"Number of H in range vs. Number of pairs with angle < {maxang}")
+    # ax.set_xlabel(f"Number of H within {dist}Å of pair.")
+    # ax.set_ylabel(f"Number of pair angles < 110° in range.")
+    # for hn in np.unique(pl[:,0]):
+    #     tl = pl[pl[:,0]==hn]
+    #     mtl=np.mean(tl[:,1])
+    #     ax.scatter(hn,mtl,s=20,marker='x',c='r')
+    
+def plot_feb_vreplica(basedf):
+    df=basedf.copy()
+    csvlist=df["csvname"].unique()
+
+
+    
+    dfc=df.apply(vz_idz,axis=1)
+        
+            
+    zpos=dfc['dist'].tolist()
+    anglis=dfc['FEB'].tolist()    
+    fig, ax = plt.subplots()
+    # pl=np.array([hnum,angnum]).T
+    ax.scatter(zpos,anglis,s=6,facecolors='none',edgecolors='b')
+    # ax.set_title(f"Number of H in range vs. Number of pairs with angle < {maxang}")
+    # ax.set_xlabel(f"Number of H within {dist}Å of pair.")
+    # ax.set_ylabel(f"Number of pair angles < 110° in range.")
+    # for hn in np.unique(pl[:,0]):
+    #     tl = pl[pl[:,0]==hn]
+    #     mtl=np.mean(tl[:,1])
+    #     ax.scatter(hn,mtl,s=20,marker='x',c='r')
+    
+def plot_feb_vreplica(basedf):
+    df=basedf.copy()
+    csvlist=df["csvname"].unique()
+
+
+    
+    dfc=df.apply(vz_idz,axis=1)
+        
+            
+    fPos=dfc['fPos'].tolist()
+    iPos=dfc['iPos'].tolist()
+    
+    # for i in range(len(fPos)):
+        
+    anglis=dfc['FEB'].tolist()    
     fig, ax = plt.subplots()
     # pl=np.array([hnum,angnum]).T
     ax.scatter(zpos,anglis,s=6,facecolors='none',edgecolors='b')
@@ -2835,12 +2312,11 @@ def create_bond_angles(atoms,box,type1='O',typeM='Si',type2='O'):
         pos1=atoms.at[i1,'pos']
         posm=atoms.at[im,'pos']
         pos2=atoms.at[i2,'pos']
-        (ang,[v1,v2]) = angle_between_pts(box,pos1,pos2,posm)
+        (ang,[v1,v2]) = nts.angle_between_pts(box,pos1,pos2,posm)
         retlist.append((posm,ang[0]))
 
     return retlist
         
-
 def plot_all_bondang_vs_atom(basedf,dist,atype="H",maxang=180,all=False,bulk=False):
     #not just doing bond angle on our pairs but every atom in a sim
     df=basedf.copy()
@@ -2872,7 +2348,7 @@ def plot_all_bondang_vs_atom(basedf,dist,atype="H",maxang=180,all=False,bulk=Fal
         bondAngleL=create_bond_angles(posdf,box)
         print(len(bondAngleL))
         
-        #dfc=angle_between_pts_df(dfc,valcol)
+        #dfc=nts.angle_between_pts_df(dfc,valcol)
         #dfc=dfc.apply(vz_idz,axis=1)
         #dfc=dfc[dfc[valcol]<maxang]
         
@@ -2884,8 +2360,8 @@ def plot_all_bondang_vs_atom(basedf,dist,atype="H",maxang=180,all=False,bulk=Fal
             #     continue
             #print("plot_bondang_vdz on "+ str(csvfile)
             
-            #fulldf=apply_dist_from_pos(dfc,box,pos,col='iPos')
-            hdist=apply_dist_from_pos(posdf,box,pos,atype)
+            #fulldf=nts.apply_dist_from_pos(dfc,box,pos,col='iPos')
+            hdist=nts.apply_dist_from_pos(posdf,box,pos,atype)
             
             numH=0
             for ind, row in hdist.iterrows():
@@ -2982,15 +2458,15 @@ def plot_bondang_vs_h(basedf,poslist,dist,maxang=180,bulk=False):
         
         (posdf,box)=load_data_from_csv(csvfile)
         
-        dfc=angle_between_pts_df(dfc,valcol)
+        dfc=nts.angle_between_pts_df(dfc,valcol)
         dfc=dfc.apply(vz_idz,axis=1)
         #dfc=dfc[dfc[valcol]<maxang]
         
         for pos in poslist:
             #print("plot_bondang_vdz on "+ str(csvfile)
             
-            fulldf=apply_dist_from_pos(dfc,box,pos,col='iPos')
-            hdist=apply_dist_from_pos(posdf,box,pos,"H")
+            fulldf=nts.apply_dist_from_pos(dfc,box,pos,col='iPos')
+            hdist=nts.apply_dist_from_pos(posdf,box,pos,"H")
             numH=0
             for ind, row in hdist.iterrows():
                 if row['dist']<dist:
@@ -3049,7 +2525,6 @@ def limit_zpos_iface(row,bulk,col='iPos'):
     return not bulk
 
 
- 
 def vz_idz(row,var='zpos'):
     #read the position of the pair and create a new column for the z coordinate
     zipos = np.array(row['iPos'])[2]
@@ -3073,9 +2548,6 @@ def vz_dz(row,var='zpos'):
         
     row[var]=(zfpos+zipos)/2
     return row
-
-
-
 
 def b_len_df(row,box=None,posdf=None,var='blength'):
     f_loc=row['fPos']
@@ -3127,7 +2599,6 @@ def plot_bond_length_df(basedf,col='FEB'):
     print("Calculation done, now plotting")
     plot_any_split_hist(dfz,col,var,colranges,numbins, vartitle,xlabel,units,subfolder,plotfilename)
     
-    
 def plot_vz_df(basedf,col='FEB',colranges=None):
     df=basedf.copy()  
     colranges=[0,1.8,2.8,3.8,10] if colranges is None else colranges
@@ -3143,8 +2614,9 @@ def plot_vz_df(basedf,col='FEB',colranges=None):
     vartitle=r"Z Depth($\AA$)"
     plotfilename="z-depth"
     print("Calculation done, now plotting")
-    plot_ratio_hist(dfz,col,var,colranges,numbins, vartitle,xlabel,units,subfolder,plotfilename)
-    # plot_any_split_hist(dfz,col,var,colranges,numbins, vartitle,xlabel,units,subfolder,plotfilename)
+    #below might be the actual call
+    #plot_ratio_hist(dfz,col,var,colranges,numbins, vartitle,xlabel,units,subfolder,plotfilename)
+    plot_any_split_hist(dfz,col,var,colranges,numbins, vartitle,xlabel,units,subfolder,plotfilename)
 
 
 def plot_vang_2dhist(basedf,col='FEB',refvec=[0,0,1]):
@@ -3201,7 +2673,7 @@ def dist_from_csv(csvfile, plot=False):
     data = csv_to_df(csvfile)
     dist_from_df(data,plot=plot)
     
-def dist_from_df(basedf,col="FEB",units="eV",plot=False):
+def dist_from_df(basedf,col="FEB",units="eV",plot=False,average=False):
     dist=[]
         
     done=[]
@@ -3217,7 +2689,10 @@ def dist_from_df(basedf,col="FEB",units="eV",plot=False):
     print(col)
 
     #average over repeated runs, so any repeated pairs in a specific csv
-    grpdf=df.groupby(["csvname","pair"], as_index=False,axis=0)[col].mean()
+    if average:
+        grpdf=df.groupby(["csvname","pair"], as_index=False,axis=0)[col].mean()
+    else:
+        grpdf=df
     #print(grpdf.duplicated(subset=["csvname","pair"]).any())
 
 
@@ -3259,7 +2734,7 @@ def dist_from_df(basedf,col="FEB",units="eV",plot=False):
         #plot a proper sized normal distribution over the histogram
         bin_width = (max(dist) - min(dist)) / num_bins
         x = np.linspace(mean - 3*stddev, mean + 3*stddev, 100)
-        ax.plot(x, stats.norm.pdf(x, mean, stddev)*N*bin_width)
+        # ax.plot(x, stats.norm.pdf(x, mean, stddev)*N*bin_width)
         
         
         ax.text(0.01,0.99,mstxt,ha='left',va='top', transform=ax.transAxes, fontsize = 10)
@@ -3336,156 +2811,152 @@ def check_convergenc():
         plt.xticks(np.arange(0.5,0.7,0.1))
         plt.title('Forward energy barrier for different energy tolerances and timesteps')
     
-
-def working_recursive_fun(df, og, path=[], debug=False):
-    max_depth=5
-    depth=len(path)
-    if depth > max_depth:
-        return [depth, path]
-    
-    curatom = og if depth == 0 else path[-1]
-    
-    curblist=df.at[curatom,'bonds']
-    bonds=[item[0] for item in curblist]
-    
-    if debug:
-        print(f'depth {depth} - Atom {curatom} has {bonds} bonded to it, path:{path}')
-    
-    if og in bonds and depth != 1:
-        return [depth, path]
-    
-    minpath=None
-    mindepth=max_depth
-    for b in curblist:
-        bi=b[0]
-        newpath=path+[bi]
+def recursive_functions_to_study_bond_cycles_in_sio2():
+    def working_recursive_fun(df, og, path=[], debug=False):
+        max_depth=5
+        depth=len(path)
+        if depth > max_depth:
+            return [depth, path]
         
-        ret=recursive_fun(df,og,newpath)
+        curatom = og if depth == 0 else path[-1]
         
-        if ret is not None and ret[0]< mindepth:
-            mindepth=ret[0]
-            minpath=ret[1]
-     
-    return [mindepth, minpath]
-
-
-def double_recursive_fun(df, og,debug=False):
-    
-    ret1=recursive_fun(df,og)
-
-    ret2=recursive_fun(df,og,[],ret1[1])
-
-    if ret1[0]!=ret2[0]:
-        print(f"{og} path1:{ret1} path2:{ret2}")
-    return (ret1[0]+ret2[0])/2
-    
+        curblist=df.at[curatom,'bonds']
+        bonds=[item[0] for item in curblist]
         
-def recursive_fun(df, og, path=[], badpaths=[],debug=False):
-    max_depth=100
-    depth=len(path)
-    if depth > max_depth:
-        return [depth, path]
-    
-    curatom = og if depth == 0 else path[-1]
-    
-    curblist=df.at[curatom,'bonds']
-    bonds=[item[0] for item in curblist]
-    
-    if debug:
-        print(f'depth {depth} - Atom {curatom} has {bonds} bonded to it, path:{path} badpath{badpaths}')
-    
-    if og in bonds and depth != 1:
-        return [depth, path]
-    
-    minpath=None
-    mindepth=max_depth
-    for b in curblist:
-        bi=b[0]
-        newpath=path+[bi]
+        if debug:
+            print(f'depth {depth} - Atom {curatom} has {bonds} bonded to it, path:{path}')
         
-        ret=recursive_fun(df,og,newpath)
+        if og in bonds and depth != 1:
+            return [depth, path]
         
-        if ret is not None and ret[0]< mindepth:
-            good=True
-            for b in badpaths:
-                if ret[1]==badpaths:
-                    good=False
-            if good:
+        minpath=None
+        mindepth=max_depth
+        for b in curblist:
+            bi=b[0]
+            newpath=path+[bi]
+            
+            ret=recursive_fun(df,og,newpath)
+            
+            if ret is not None and ret[0]< mindepth:
                 mindepth=ret[0]
                 minpath=ret[1]
-     
-    return [mindepth, minpath]
-
-# from scipy.sparse import csr_matrix
-# import networkx as nx
-
-# def sparse_graph(df):     
-#     csvlist=df["csvname"].unique()
-
-#     for csvfile in csvlist:
-
-#         print(csvfile)
-
-
-#         dfc=df[df["csvname"]==csvfile]
-
-#         (bonddf,box)=load_data_and_bonds_from_csv(csvfile)
         
-#         numatoms=len(bonddf)
-        
-#         sg=nx.Graph()
+        return [mindepth, minpath]
 
-#         for i in range(1,numatoms+1):
-#             bonds=bonddf.at[i,"bonds"]
-#             bl=[]
-#             sg.add_node(i)
-#             for b in bonds:
-#                 if b[0] != i:
-#                     sg.add_edge(i,b[0])
+    def double_recursive_fun(df, og,debug=False):
         
+        ret1=recursive_fun(df,og)
+
+        ret2=recursive_fun(df,og,[],ret1[1])
+
+        if ret1[0]!=ret2[0]:
+            print(f"{og} path1:{ret1} path2:{ret2}")
+        return (ret1[0]+ret2[0])/2
         
-#         sg.add_edge(1,2)
-#         sg.add_edge(2,3)
-#         sg.add_edge(1,3)
-#         # for s in sg.edges:
-#         #     print(s)
+    def recursive_fun(df, og, path=[], badpaths=[],debug=False):
+        max_depth=100
+        depth=len(path)
+        if depth > max_depth:
+            return [depth, path]
         
-#         #print(list(nx.edge_dfs(sg,5)))
+        curatom = og if depth == 0 else path[-1]
         
-#         tstart=time.time()
-#         # for s in sg.nodes:
-#         ti=time.time()
-#         cycle=nx.find_cycle(sg,10,orientation='reverse')
-#         # for start_node in sg.nbunch_iter(s):
-#         #     print(start_node)
-#         l=list(cycle)
-#         tf=time.time()
-#         print(f"){l} took {tf-ti}s")
+        curblist=df.at[curatom,'bonds']
+        bonds=[item[0] for item in curblist]
+        
+        if debug:
+            print(f'depth {depth} - Atom {curatom} has {bonds} bonded to it, path:{path} badpath{badpaths}')
+        
+        if og in bonds and depth != 1:
+            return [depth, path]
+        
+        minpath=None
+        mindepth=max_depth
+        for b in curblist:
+            bi=b[0]
+            newpath=path+[bi]
+            
+            ret=recursive_fun(df,og,newpath)
+            
+            if ret is not None and ret[0]< mindepth:
+                good=True
+                for b in badpaths:
+                    if ret[1]==badpaths:
+                        good=False
+                if good:
+                    mindepth=ret[0]
+                    minpath=ret[1]
+        
+        return [mindepth, minpath]
+
+    def sparse_graph(df):    
+        from scipy.sparse import csr_matrix
+        import networkx as nx 
+        csvlist=df["csvname"].unique()
+
+        for csvfile in csvlist:
+
+            print(csvfile)
+
+
+            dfc=df[df["csvname"]==csvfile]
+
+            (bonddf,box)=load_data_and_bonds_from_csv(csvfile)
+            
+            numatoms=len(bonddf)
+            
+            sg=nx.Graph()
+
+            for i in range(1,numatoms+1):
+                bonds=bonddf.at[i,"bonds"]
+                bl=[]
+                sg.add_node(i)
+                for b in bonds:
+                    if b[0] != i:
+                        sg.add_edge(i,b[0])
             
             
-
-
-#         return
+            sg.add_edge(1,2)
+            sg.add_edge(2,3)
+            sg.add_edge(1,3)
+            # for s in sg.edges:
+            #     print(s)
             
-# def get_path(Pr, i, j):
-#     path = [j]
-#     k = j
-#     while Pr[i, k] != -9999:
-#         path.append(Pr[i, k])
-#         k = Pr[i, k]
-#     return path[::-1]
+            #print(list(nx.edge_dfs(sg,5)))
+            
+            tstart=time.time()
+            # for s in sg.nodes:
+            ti=time.time()
+            cycle=nx.find_cycle(sg,10,orientation='reverse')
+            # for start_node in sg.nbunch_iter(s):
+            #     print(start_node)
+            l=list(cycle)
+            tf=time.time()
+            print(f"){l} took {tf-ti}s")
+                
+                
 
 
-# def find_rings(g,ring_size):
+            return
+                
+    def get_path(Pr, i, j):
+        path = [j]
+        k = j
+        while Pr[i, k] != -9999:
+            path.append(Pr[i, k])
+            k = Pr[i, k]
+        return path[::-1]
 
-#     D,Pr =csg.shortest_path(g,directed=False, return_predecessors=True)
-    
-    
-#     for r in range(1,4):
-#         inds=list(zip(*np.where(D==r)))
+    def find_rings(g,ring_size):
 
-#         for i in inds:
-#             print(get_path(Pr,i[0],i[1]))
+        D,Pr =csg.shortest_path(g,directed=False, return_predecessors=True)
+        
+        
+        for r in range(1,4):
+            inds=list(zip(*np.where(D==r)))
+
+            for i in inds:
+                print(get_path(Pr,i[0],i[1]))
         
         
 
@@ -3587,14 +3058,8 @@ if __name__ == "__main__":
     # pair_path="/home/agoga/documents/code/topcon-md/data/neb/PinholeCenterZap/"
 
     # t=calc_local_structure(setdf,pair_path) #,["REB"])
-    from mpl_toolkits.mplot3d import Axes3D
-    import matplotlib.pyplot as plt
-    import pandas as pd
-    import numpy as np
-
-    import statistics
     from pathlib import Path
-    from operator import itemgetter
+
 
 
     pairspath="/home/adam/code/topcon-md/data/neb/PinholeFileAll/"

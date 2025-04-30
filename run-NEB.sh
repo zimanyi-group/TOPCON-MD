@@ -31,7 +31,7 @@ data_folder=/home/adam/code/topcon-md/data/neb #/pinhole-dump-files/"
 
 setName=/InsidePinhole/
 setName=/PinholeFileAll/
-setName=/pair_lists/wtmd/
+setName=/pair_lists/bc_to_empty/
 distFolder=$data_folder$setName"/"
 
 nebfolder="/home/adam/code/topcon-md/neb-out/hydrogen_project/"

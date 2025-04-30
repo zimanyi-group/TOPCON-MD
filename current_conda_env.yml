@@ -229,7 +229,7 @@ dependencies:
   - ovito=3.12.2=py311h8595387_2
   - p11-kit=0.24.1=hc5aa10d_0
   - packaging=25.0=pyh29332c3_1
-  - pandas=2.2.3=py311h7db5c69_3
+  - pandas=2.1.4=py311h320fe9a_0
   - pango=1.56.3=h9ac818e_1
   - parso=0.8.4=pyhd8ed1ab_1
   - patsy=1.0.1=pyhd8ed1ab_1

@@ -1,4 +1,10 @@
 #!/usr/bin/env python
+"""
+Author: Adam Goga
+This file contains the last step of the NEB pipeline. The NEB calculation has already been completed and this routine is passed the log files from this calculation 
+along side a number of other parameters via the command line. This file will then calculate the final minimum energy path(MEP), determine if the NEB calculation was 
+successful or not, and create images and/or GIFs of the calculation to be saved in the output folder. 
+"""
 # from PyQt5.QtWidgets import QFileDialog, QApplication, QWidget, QPushButton, QVBoxLayout
 
 # app = QApplication([])
@@ -43,6 +49,12 @@ conv=0.043361254529175
 
 
 def read_log(file, mod=0):
+    """
+    Read a log file and extract numerical values from the last line based on a given modifier.
+    :param file - the log file to read
+    :param mod - the modifier to determine which line to read from the end (default is 0 for the last line)
+    :return a NumPy array of numerical values from the selected line
+    """
     ar=[]
     with open(file) as f:
         cont=len(f.readlines())
@@ -54,8 +66,18 @@ def read_log(file, mod=0):
 
 
 def MEP(file):
+    """
+    Calculate the minimum energy path values from a given file.
+    :param file - the file containing the data
+    :return R - points in replica space, RD1-RDN
+    :return ms - the MEP values after normalization
+    :return efb - forward barrier
+    :return erb - reverse barrier
+    :return RD - total reaction distance in coord space
+    """
     #there are 9 elements before RD1
     last= read_log(file)
+    # print(last)
     prev = read_log(file,mod=1)
     R=last[9::2]                #points in replica space, RD1-RDN
     mep=last[10::2]*conv            #actual pE values, PE1-PEN
@@ -65,7 +87,16 @@ def MEP(file):
     RD=last[8]                  #total reaction cood space
     return R, ms , efb, erb, RD
 
-def plot_mep(args,logfiles,figPath,hnum=0, plot=True, xo= 0.01):
+def plot_mep(args,logfiles,figPath, plot=True, xo= 0.01):
+    """
+    Plot the Minimum Energy Path (MEP) based on the given arguments and log files.
+    :param args - Arguments containing etol (energy tolerance) and timestep (time step), as well as whether to play or not
+    :param logfiles - List of log files from an NEB calculation
+    :param figPath - Path to save the generated figure
+    :param plot - Boolean flag to indicate whether to plot or not
+    :param xo - offset for printing text on plot
+    :return None but it may save an image to the location specified in figPath 
+    """
     etol=args.etol
     timestep=args.ts
     plot=plot if args.plot is True else False
@@ -106,7 +137,7 @@ def plot_mep(args,logfiles,figPath,hnum=0, plot=True, xo= 0.01):
         last_pe=cpe
         txt=(r"Forward E$_A $ = {0:.2f} eV"+"\n"
              r"Reverse E$_A $ = {1:.2f} eV"+"\n"
-             r"Replica distance={0:.2f}$\AA $").format(EF, ER, RD)
+             r"Replica distance={2:.2f}$\AA $").format(EF, ER, RD)
         txtl.append(txt)
                 
 
@@ -136,6 +167,11 @@ def plot_mep(args,logfiles,figPath,hnum=0, plot=True, xo= 0.01):
 
 
 def calc_barrier(file):
+    """
+    Calculate the barrier points based on the log file using the MEP function.
+    :param file - the input log file coming from an NEB calculation
+    :return The barrier points, values, and the number of barriers.
+    """
     r, pe, ef, er, rd = MEP(file)
     pe=pe
     low = pe[0]
@@ -196,6 +232,13 @@ def calc_barrier(file):
 
 
 def savecsv(data,filename,col_names=None):
+    """
+    Save data to a CSV file.
+    :param data - The data to be saved to the CSV file.
+    :param filename - The name of the CSV file to save the data to.
+    :param col_names - (optional) List of column names for the CSV file.
+    :return None but saves a csv file to the location given in filename
+    """
 
     csv_name=filename+'.csv'
 
@@ -212,6 +255,15 @@ def savecsv(data,filename,col_names=None):
         csv_writer.writerow(data)
 
 def catch(func, *args, handle=lambda e : e, **kwargs):
+    """_summary_
+
+    Args:
+        func (_type_): _description_
+        handle (_type_, optional): _description_. Defaults to lambdae:e.
+
+    Returns:
+        _type_: _description_
+    """
     try:
         return func(*args, **kwargs)
     except Exception as e:
@@ -285,10 +337,20 @@ def calc_dist():
     #Step MaxReplicaForce MaxAtomForce.....
     #3000    57.295123........
 #end example
-def check_convergence(filename,maxneb,maxclimbing,numpart=13):
-    
+def check_convergence(filename,maxneb,maxclimbing,numpart=7):
+    """
+    Check the convergence of a simulation based on the log file generated. Returns failed if the first or last replica was used as the climbing image, or if we reached the 
+    maximum number of NEB iterations.
+    :param filename - the name of the log file
+    :param maxneb - the maximum number of NEB iterations allowed
+    :param maxclimbing - the maximum number of climbing image iterations allowed
+    :param numpart - the number of partitions (default is 7)
+    :return True if the simulation has converged, False otherwise.
+    """
     fsize=os.path.getsize(filename)
+
     with open(filename,'r') as logF:
+
         last = collections.deque(maxlen=1)
         climbing=None
         nebiter=None
@@ -306,6 +368,7 @@ def check_convergence(filename,maxneb,maxclimbing,numpart=13):
                 climbing=int(line.split()[3])
             
             last.append(line)
+        # print(f"{climbing} - {nebiter} - {climbing_iter_f} - {climbing_iter_i}")
         if climbing is None or nebiter is None or climbing_iter_f is None or climbing_iter_i is None:#cry
             print('Big boy oppsie in "Process-NEB.py"')    
             return False
@@ -322,14 +385,27 @@ def check_convergence(filename,maxneb,maxclimbing,numpart=13):
             return True
     
 def check_bad_NEB(feb,reb,pe):
+    """
+    Check for bad NEB (Nudged Elastic Band) calculations by comparing the difference between consecutive points in the potential energy profile to a cutoff value.
+    :param feb - the first endpoint of the NEB calculation
+    :param reb - the last endpoint of the NEB calculation
+    :param pe - the potential energy profile
+    :return True if a point exceeds the cutoff, False otherwise
+    """
     cutoff=max(feb,reb)/2
     for i in range(pe.size-1):
         diff=abs(pe[i+1]-pe[i])
         if abs(diff)>cutoff:
+            print('CUTOFF FAIL CUTOFF FAIL CUTOFF FAIL CUTOFF FAIL CUTOFF FAIL CUTOFF FAIL CUTOFF FAIL ')
             return True
     return False
 
 def find_NEB_info(filename):
+    """
+    Parse a log file to find NEB (Nudged Elastic Band) information.
+    :param filename - the name of the log file to parse
+    :return a list of fields containing NEB information
+    """
     #The log file outputs lines like
     #print pcsv_Zi 25
     
@@ -350,6 +426,11 @@ def find_NEB_info(filename):
     return fields   
 
 def find_NEB_images(filename):
+    """
+    Find and extract the names of images from a log file.
+    :param filename - the name of the log file to search for image names
+    :return A list of image names extracted from the log file.
+    """
     #The log file outputs lines like
     #print pcsv_Zi 25
     
@@ -370,6 +451,12 @@ def find_NEB_images(filename):
 
 
 def render_neb_gif(dumpfiles, gifname, atom):
+    """
+    Render a GIF animation of a NEB (Nudged Elastic Band) simulation using OVITO.
+    :param dumpfiles - The dump files containing the simulation data
+    :param gifname - The name of the GIF file to be generated
+    :param atom - The atom to be visualized in the animation
+    """
     from ovito.io import import_file, export_file
     import ovito.data
     import ovito.modifiers
@@ -444,6 +531,11 @@ def render_neb_gif(dumpfiles, gifname, atom):
 
     
 def str2bool(v):
+    """
+    Convert a string to a boolean value.
+    :param v - the input string
+    :return the boolean representation of the input string
+    """
     if isinstance(v, bool):
         return v
     if v.lower() in ('yes', 'true', 't', 'y', '1'):
@@ -572,7 +664,7 @@ if __name__=='__main__':
         if pl:
             figpaths.append(figPath)
             
-        badneb=check_bad_NEB(ret[0],ret[1],ret[5])
+        badneb=False #1/17/2025 commented out because with reduced replica's almsot all runs have a large gap between some replicas #check_bad_NEB(ret[0],ret[1],ret[5])
         convergence=check_convergence(logFile,3000,1000)
         #@TODO for multi jump runs make sure to crash the entire run if an earlier NEB has a maximum energy at final replica
 

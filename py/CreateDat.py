@@ -1,4 +1,10 @@
 #!/usr/bin/env python
+"""
+Author: Adam Goga
+This script contains functions for setting up and running LAMMPS simulations that create minimized data files from already create samples.
+This is needed to speed up NEB calculations later on in the pipeline. 
+"""
+
 from lammps import lammps
 import sys
 import os
@@ -34,6 +40,12 @@ buff=1
 
 
 def NEB_min(L=None):
+    """
+    Add a minimization to current lammps run
+    :param L - The lammps object
+    :return The minimization command string
+    """
+    
     lstr=f'''minimize {etol} {etol} 100000 100000'''
     if L is not None:
         L.commands_string(lstr)
@@ -42,6 +54,13 @@ def NEB_min(L=None):
     
 
 def create_lmp_file(file,out,dumpstep=0):
+    """
+    Create a LAMMPS input script file with specified parameters and write it to a specified output file.
+    :param file - The input file
+    :param out - The output file
+    :param dumpstep - The dump step value (default is 0)
+    :return LAMMPS input script string
+    """
     lammps_str=f'''
         clear
         units         real
@@ -136,12 +155,17 @@ def create_lmp_file(file,out,dumpstep=0):
         group mobile subtract all cSi
         
         fix h1 mobile nvt temp 300 300 $(100.0 * dt)
-        run  1000000
+        run  500000
+        
+        fix h1 mobile nvt temp 300 10 $(100.0 * dt)
+        run  10000000
         
         '''
     lammps_str += NEB_min()
         
     lammps_str+=f'''
+        
+        
         
         variable tot equal $(count(gSi)+count(gO)+count(gH))
         variable Htot equal count(gH)
@@ -150,15 +174,30 @@ def create_lmp_file(file,out,dumpstep=0):
         print '~$(v_perctH)% Hydrogen'
         
         write_data {out} '''
-        
+    
+    write_file='/home/adam/code/topcon-md/lmp/CreateDat_current.lmp'
+    with open(write_file,'a') as f:
+        f.write(lammps_str)
+    
     print(f"Saving file with path: {out}")
     return lammps_str
 
 def extract_box(L):
+    """
+    Extract the bounding box coordinates from a running lammps script.
+    :param L - The object from which the bounding box needs to be extracted.
+    :return A numpy array containing the bounding box coordinates.
+    """
     bbox=L.extract_box()
     return np.array([[bbox[0][0],bbox[1][0]],[bbox[0][1],bbox[1][1]],[bbox[0][2],bbox[1][2]]])
 
 def find_atom_position(L,atomI):
+    """
+    Find the position of a specific atom in a LAMMPS simulation.
+    :param L - The simulation box
+    :param atomI - The index of the atom
+    :return A tuple containing the x, y, and z coordinates of the atom
+    """
     L.commands_string(f'''
         variable x{atomI} equal x[{atomI}]
         variable y{atomI} equal y[{atomI}]
@@ -172,6 +211,12 @@ def find_atom_position(L,atomI):
     return (x,y,z)
 
 def recenter_sim(L,atom_id=2370):
+    """
+    Recenter the simulation by moving the specified atom to the center of the box.
+    :param L - The simulation box
+    :param atom_id - The ID of the atom to recenter (default is 2370)
+    :return The bounding box of the simulation.
+    """
     
     r=find_atom_position(L,atom_id)
     bbox= extract_box(L)
@@ -191,6 +236,12 @@ def recenter_sim(L,atom_id=2370):
     return bbox
 
 def create_dat(file,out,dumpstep=0):
+    """
+    Create a LAMMPS instance using the provided input file and output file paths.
+    :param file - The input file path.
+    :param out - The output file path.
+    :param dumpstep - The step at which to dump the data. Default is 0.
+    """
     #Initialize and load the dump file
     
     lstr=create_lmp_file(file,out,dumpstep)
@@ -206,6 +257,12 @@ def create_dat(file,out,dumpstep=0):
     
 
 def prep_data(file,dumpstep,outfolder):
+    """
+    Prepare data for processing by removing unnecessary suffixes from the file name, creating a new output file, and calling a function to process the data.
+    :param file - the input file to be processed
+    :param dumpstep - the step for dumping data
+    :param outfolder - the folder where the output file will be saved
+    """
     me = MPI.COMM_WORLD.Get_rank()
     nprocs = MPI.COMM_WORLD.Get_size()
     
