@@ -3,7 +3,7 @@ This is a large project that creates and analyzes Molecular Dynamics(MD) simulat
 # NEB Pipeline
 <img src="https://github.com/user-attachments/assets/b19c814b-41b7-4d7a-ba66-2313e4d91797" align="right" width="30%" alt="Example diffusion process whose energy barrier has been calculated using this NEB pipeline">
 
-The NEB method requires the initial and final states of the reaction, so this pipeline speeds up the procedure of creating these two data files so that more NEB calculations can be done. An example diffusion process whose energy barrier has been calculated using this NEB pipeline is shown on the right. Significant understanding of the initial and final states is needed to be able to develop the code that creates the correct data files.
+The NEB method requires the initial and final states of the reaction, so this pipeline speeds up the procedure of creating these two data files so that more NEB calculations can be done. An example diffusion process whose energy barrier has been calculated using this NEB pipeline is shown on the right. Significant understanding of the initial and final states is needed to be able to develop the code that creates the correct data files but common diffusion processes in solids are already implemented in this codebase.
 
 The important steps and files in the NEB pipeline;
 
