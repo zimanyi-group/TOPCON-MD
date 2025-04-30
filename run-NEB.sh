@@ -3,8 +3,19 @@
 #! -j y
 #! -S /bin/bash
 
-
-
+# Author Adam Goga
+################################################################################################################################################
+# This is the main pipeline script which has a lot of different settings, most of which are straight forward. It is critical to have the right
+# folder structure and output files in each segment of the pipeline. Loops through all the data file/pairlist pairs in the
+# '$data_folder/$setName' folder and runs the pipeline on each.
+# 
+# PrepNEB.py creates a info file placed in the output folder which informs the rest of the pipeline about what NEB calculation to actually runs.
+#
+#
+# The call to LAMMPS which actually runs the NEB calculation using lmp/NEB.lmp must have its log files output to the temporary output folder
+# which will the be read in by the final python script which creates the datafile/gif after verification that the NEB calculation was successful
+#
+################################################################################################################################################
 neb_file=/home/adam/code/topcon-md/lmp/NEB.lmp
 
 
@@ -20,18 +31,20 @@ num_replica=7
 skippes=1
 numruns=0 #couning the number of runs
 start=`date +%s`
+
 maxneb=3000
 maxclimb=1000
-springconst=452
+springconst=452 #roughly 20eV/ang^2
+
+#final plot/gif
 plot=true
 create_gif=true
 
 data_folder=/home/adam/code/topcon-md/data/neb #/pinhole-dump-files/"
 # data_folder=/home/adam/code/topcon-md/data/create_dat #/pinhole-dump-files/"
 
-setName=/InsidePinhole/
-setName=/PinholeFileAll/
-setName=/pair_lists/bc_to_empty/
+
+setName=/pair_lists/bc_to_bc/
 distFolder=$data_folder$setName"/"
 
 nebfolder="/home/adam/code/topcon-md/neb-out/hydrogen_project/"
@@ -39,24 +52,38 @@ nebfolder="/home/adam/code/topcon-md/neb-out/hydrogen_project/"
 mkdir -p $nebfolder$setName
 
 
+#loop through all the datafile/pairlist sets
 for data_file in "$distFolder"/*.dat
 do
-    
-
     #data_file="${data_folder}${setName}/1.6-143.dat"
-    # data_file="${data_folder}${setName}/Hcon-1500-695.dat"
-    #data_file="${data_folder}${setName}/boom_1.6-551.dat"
+
     pairsfile=${data_file%.*}"-pairlist.txt"
     
-    #styles of NEB avail
+################################
+    # Styles of NEB avail
+    # zap takes two atoms a mover and a zapped atom, the zapped atom is deleted and it's location is used as the mover atom's final location.
+    # This can be done with multiple atoms, for example moving a OH complex to a nearby O vacancy
     single_zap="single_zap"
     multi_zap="multi_zap"
+
+    # This is a test NEB process, it takes a H atom and a final location. PrepNEB will then create another H atom in the region near that final
+    # location. The final NEB image is the initial H atom and this new atom in a formed H2 bond.
+    h_to_h2="h_to_h2"
+
+    # Multi/single jump take a atom and a location and moves the atom to the location or multiple locations. Multi-jump will perform a number 
+    # of NEB calculations equal to the number of final locations given, and each final location will be the initial location for the next jump.
     multi_jump="multi_jump"
     single_jump="single_jump"
-    h_to_h2="h_to_h2"
+
+    # Interstitial was a test function which searched an area nearby a given atom for a viable interstitial location to move to. This is better
+    # done in the CreatePairList.py step of the pipeline but it is left for posterity.
+    interstitial="interstitial"
+
+    # Boomerang is a style of the pipeline which moves the atom from initial to final location multiple times over and over again. This produces 
+    # interesting results and required some testing to determine if it was more realistic than the normal NEB, but was ultimately not used.
     boomerang="boomerang"
     boomerang_zap="boomerang_zap"
-    interstitial="interstitial"
+################################
 
     ########################################################
     ########################################################
@@ -66,6 +93,7 @@ do
 
     cyclelen=1
     num_boomerang=1
+
     #lastdone="385 1189"
     #alreadydone=1 #set to 1 to run everything
 
@@ -186,7 +214,7 @@ do
         fi
 
         
-        for etol in 7e-6 #7e-6  #3e-7 1e-7 # 1e-5 #3e-6 1e-6 7e-7 5e-7 3e-7 1e-7  #7e-5 5e-5 3e-5 1e-5 
+        for etol in 7e-6 #7e-6  #3e-7 1e-7 # 1e-5 #3e-6 1e-6 7e-7 5e-7 3e-7 1e-7 
         do 
             for timestep in 0.5 #$(seq 1.6 0.1 1.8) 
             do
@@ -205,19 +233,17 @@ do
                 mkdir $out_folder #Now make folder where all the output will go
                 mkdir $data_folder
 
-
-                
-                
             
-                # for((iboom=0;iboom<$num_repeat;++iboom))
-                # do
-                neb_info_file=$out_folder"nebinfo_"$iboom".txt"
+
+                neb_info_file=$out_folder"nebinfo_"$run_id".txt"
+
                 echo "----------------Prepping NEB "$echo_string" ----------------"
                 mpiexec -np 1 python3 /home/adam/code/topcon-md/py/PrepNEB.py \
                 --out=$out_folder --etol=$etol --ts=$timestep --dfile=$data_file --plot=$plot --atomid=$atom_id --info=$neb_info_file \
                 --style=$style --fposx=$fPosx --fposy=$fPosy --fposz=$fPosz --h2x=$h2x --h2y=$h2y --h2z=$h2z --bc1=$atomF1 --bc2=$atomF2 --bclist="$jumpPairs" --repeat=$num_repeat --zapid=$zap_id #  
                 
-                
+
+                #now ready the info file that was just created by PrepNEB.py and for every line that starts with neb, run a neb calculation with the input parameters
                 while read -u3 line
                 do
                     #echo $line
